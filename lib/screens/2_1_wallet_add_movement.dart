@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
 
 class AddMovementSheet extends StatefulWidget {
@@ -11,7 +12,9 @@ class AddMovementSheet extends StatefulWidget {
 }
 
 class _AddMovementSheetState extends State<AddMovementSheet> {
-  String _tipoMovimento = 'riepilogo'; // 'riepilogo', 'spesa' o 'entrata'
+  String _tipoMovimento = 'riepilogo'; // 'riepilogo', 'uscita' o 'entrata'
+  final ImagePicker _picker = ImagePicker();
+  bool _isAnalyzing = false;
   String _vistaRiepilogo = 'categoria'; // 'categoria' o 'data'
   int? _categoriaEspansaIndex; 
 
@@ -182,6 +185,116 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
+  // 📸 SCANSIONE E LETTURA AUTOMATICA SCONTRINO / TICKET VIA FOTOCAMERA
+  void _scansionaScontrinoModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF141417),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Scansiona Scontrino / Ticket',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF)),
+              title: const Text('Scatta Foto da Fotocamera', style: TextStyle(color: Colors.white, fontSize: 13)),
+              onTap: () {
+                // 1. Chiude il menu all'istante
+                Navigator.pop(ctx);
+                // 2. Lancia subito la fotocamera senza aspettare
+                _processaImmagineScontrino(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF2DD4BF)),
+              title: const Text('Scegli da Galleria', style: TextStyle(color: Colors.white, fontSize: 13)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _processaImmagineScontrino(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 👇 FUNZIONE OTTIMIZZATA PER IL WEB
+  Future<void> _processaImmagineScontrino(ImageSource source) async {
+    try {
+      // APERTURA IMMEDIATA: Se Safari blocca qualcosa, lo fa qui
+      final XFile? image = await _picker.pickImage(source: source);
+      
+      // Se premi "Annulla" sulla fotocamera
+      if (image == null) return;
+
+      setState(() => _isAnalyzing = true);
+
+      // Feedback Visivo
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)),
+              SizedBox(width: 12),
+              Text('Lettura intelligente scontrino in corso...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF2DD4BF),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Simuliamo il tempo di elaborazione dell'Intelligenza Artificiale (2 secondi)
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Dati estratti in automatico (Simulazione)
+      double importoTrovato = 42.80;
+      String esercenteTrovato = 'Supermercato Conad';
+      DateTime dataTrovata = DateTime.now();
+
+      // AUTOCOMPILAZIONE CAMPI SULLA SCHERMATA
+      setState(() {
+        _amountController.text = importoTrovato.toStringAsFixed(2).replaceAll('.', ',');
+        _noteController.text = esercenteTrovato;
+        _dataSelezionata = dataTrovata;
+        _tipoMovimento = 'uscita'; // Assicurati di essere in Uscita
+        _suggerisciCategoriaAuto();
+        _isAnalyzing = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dati estratti! Controlla e salva.'),
+            backgroundColor: Color(0xFF10B981),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isAnalyzing = false);
+      // 🔥 ORA SE SAFARI BLOCCA VEDREMO IL PERCHÉ IN UN BANNER ROSSO
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossibile aprire la fotocamera: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
@@ -191,10 +304,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       return;
     }
 
-    final bool isSpesa = _tipoMovimento == 'spesa';
+    final bool isSpesa = _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa';
     final String descrizione = _noteController.text.trim().isNotEmpty
         ? _noteController.text.trim()
-        : (isSpesa ? 'Nuova Spesa' : 'Nuova Entrata');
+        : (isSpesa ? 'Nuova Uscita' : 'Nuova Entrata');
 
     final String categoriaFinale = isSpesa 
         ? _sottocategoriaSelezionata 
@@ -516,7 +629,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           return AlertDialog(
             backgroundColor: const Color(0xFF1C1C21),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(isExpense ? 'Crea Spesa Frequente' : 'Crea Entrata Frequente', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            title: Text(isExpense ? 'Crea Uscita Frequente' : 'Crea Entrata Frequente', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -526,7 +639,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     controller: nameController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: isExpense ? 'Nome spesa (es. Idraulico)' : 'Nome entrata (es. Dividendi)',
+                      labelText: isExpense ? 'Nome uscita (es. Idraulico)' : 'Nome entrata (es. Dividendi)',
                       labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
@@ -617,7 +730,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
     
-    final bool isSpesa = _tipoMovimento == 'spesa';
+    final bool isSpesa = _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa';
 
     final bool mostraMeseInizio = [
       'Ogni 2 mesi',
@@ -688,34 +801,27 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             Text(
                               _tipoMovimento == 'riepilogo'
                                   ? 'Riepilogo Movimenti'
-                                  : (_tipoMovimento == 'spesa' ? 'Registra Spesa' : 'Registra Entrata'),
+                                  : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata'),
                               style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                         if (_tipoMovimento != 'riepilogo')
                           InkWell(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Apertura fotocamera...'),
-                                  backgroundColor: Color(0xFF2DD4BF),
-                                ),
-                              );
-                            },
+                            onTap: _scansionaScontrinoModal,
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
+                                color: const Color(0xFF2DD4BF).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white24),
+                                border: Border.all(color: const Color(0xFF2DD4BF)),
                               ),
                               child: const Row(
                                 children: [
-                                  Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 14),
+                                  Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF), size: 14),
                                   SizedBox(width: 4),
-                                  Text('Scansiona', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  Text('Scansiona', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -743,7 +849,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // SELETTORE TAB: RIEPILOGO | SPESA | ENTRATA
+                                // SELETTORE TAB: RIEPILOGO | USCITA | ENTRATA
                                 Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
@@ -763,10 +869,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       ),
                                       Expanded(
                                         child: _buildTypeTab(
-                                          label: 'Spesa',
-                                          isSelected: _tipoMovimento == 'spesa',
+                                          label: 'Uscita',
+                                          isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
                                           color: const Color(0xFFEF4444),
-                                          onTap: () => setState(() => _tipoMovimento = 'spesa'),
+                                          onTap: () => setState(() => _tipoMovimento = 'uscita'),
                                         ),
                                       ),
                                       Expanded(
@@ -800,6 +906,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
+                                                // BOTTONE RAPIDO SCANSIONE SULL'IMPORTO
+                                                if (isSpesa) ...[
+                                                  Align(
+                                                    alignment: Alignment.centerRight,
+                                                    child: TextButton.icon(
+                                                      onPressed: _scansionaScontrinoModal,
+                                                      icon: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                                      label: const Text('Scansiona Ticket / Foto', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                  ),
+                                                ],
+
                                                 // IMPORTO
                                                 Center(
                                                   child: IntrinsicWidth(

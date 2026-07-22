@@ -16,6 +16,7 @@ dependencies:
     sdk: flutter
   intl: any # 👈 Usare 'any' risolve qualsiasi problema di versione in Codespaces
   shared_preferences: ^2.5.5
+  image_picker: ^1.1.2
 cupertino_icons: ^1.0.8
 
 dev_dependencies:
