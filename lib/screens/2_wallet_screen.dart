@@ -38,7 +38,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 decoration: const BoxDecoration(
                   image: DecorationImage(
                     image: NetworkImage(
-                      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop',
+                      'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop](https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop',
                     ),
                     fit: BoxFit.cover,
                   ),

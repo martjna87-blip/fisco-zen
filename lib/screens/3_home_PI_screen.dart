@@ -478,54 +478,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 12),
-
-                  // PORTAFOGLIO EQUILIBRIO
-                  GestureDetector(
-                    onTap: () {
-                      if (widget.onSwipeToWallet != null) {
-                        widget.onSwipeToWallet!(); 
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF18181B),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF27272A)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Equilibrio Portafoglio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                              Text('Fatturato: ${fatturato.toStringAsFixed(0)} €', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: SizedBox(
-                              height: 8,
-                              child: LinearProgressIndicator(
-                                value: (patrimonioNetto / (fatturato > 0 ? fatturato : 1)).clamp(0.0, 1.0),
-                                backgroundColor: const Color(0xFF27272A),
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
                   const SizedBox(height: 24),
                 ],
               ),
