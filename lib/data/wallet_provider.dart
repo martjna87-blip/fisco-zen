@@ -173,15 +173,17 @@ class WalletProvider extends ChangeNotifier {
     required bool isIncome,
     required String category,
     String? accountId,
+    DateTime? date, // 👈 AGGIUNTA PARAMETRO DATA
   }) {
+    final DateTime dataUso = date ?? DateTime.now();
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
-      subtitle: 'Oggi • $category',
+      subtitle: '${dataUso.day}/${dataUso.month} • $category',
       amount: amount,
       isIncome: isIncome,
       category: category,
-      date: DateTime.now(),
+      date: dataUso, // 👈 USA LA DATA PASSATA
     );
 
     _transactions.insert(0, newTx);
@@ -227,18 +229,39 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🚀 INCASSA FATTURA
+  // 🚀 INCASSA FATTURA (CON GESTIONE DATA CUSTOM)
   void incassaFatturaPiva({
     String? idFattura,
     required String cliente,
     required double importoLordo,
     required double importoTasse,
     required String contoDestinazione,
+    String? dataIncasso, // 👈 PARAMETRO RICEVUTO DALLA SCHERMATA
   }) {
     final targetAccount = _accounts.firstWhere(
       (acc) => acc.title.contains(contoDestinazione) || contoDestinazione.contains(acc.title),
       orElse: () => _accounts.first,
     );
+
+    final String dataFinale = dataIncasso ?? 'Oggi';
+
+    // Conversione della stringa data in oggetto DateTime per la transazione
+    DateTime dataObj = DateTime.now();
+    if (dataIncasso != null) {
+      try {
+        final parti = dataIncasso.split(' ');
+        if (parti.length >= 3) {
+          final g = int.parse(parti[0]);
+          final a = int.parse(parti[2]);
+          final mesi = [
+            'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+            'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+          ];
+          final m = mesi.indexOf(parti[1]) + 1;
+          if (m > 0) dataObj = DateTime(a, m, g);
+        }
+      } catch (_) {}
+    }
 
     if (idFattura != null) {
       final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
@@ -246,7 +269,8 @@ class WalletProvider extends ChangeNotifier {
         final f = _fattureDaIncassare.removeAt(idx);
         _fattureIncassate.add({
           ...f,
-          'dataIncasso': 'Oggi',
+          'dataIncasso': dataFinale, // 👈 SALVA LA DATA SCELTA (ES. GIUGNO)
+          'importoTasse': importoTasse,
           'contoAccredito': contoDestinazione,
         });
       }
@@ -260,6 +284,7 @@ class WalletProvider extends ChangeNotifier {
       isIncome: true,
       category: 'P.IVA',
       accountId: targetAccount.id,
+      date: dataObj, // 👈 ASSEGNA LA DATA CORRETTA ALLA TRANSAZIONE
     );
 
     if (importoTasse > 0) {
@@ -269,6 +294,7 @@ class WalletProvider extends ChangeNotifier {
         isIncome: false,
         category: 'Risparmi',
         accountId: targetAccount.id,
+        date: dataObj, // 👈 ASSEGNA LA DATA CORRETTA ALLA TRANSAZIONE
       );
     }
 

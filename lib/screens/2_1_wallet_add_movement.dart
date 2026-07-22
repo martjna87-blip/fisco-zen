@@ -39,8 +39,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
   String _sottocategoriaSelezionata = 'Alimentari';
 
-  final List<Map<String, dynamic>> _movimentiReali = [];
-
   bool _isCategoriaEspansa = false;
   bool _isSottocategoriaEspansa = false;
   bool _isContoEspanso = false;
@@ -173,6 +171,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
+  // 💾 SALVATAGGIO MOVIMENTO (Senza chiudere il modale -> Ritorna a 'riepilogo')
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
@@ -209,38 +208,31 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       accountId = '1';
     }
 
+    // Passiamo la data selezionata (con mese e anno scelti) al Provider
     context.read<WalletProvider>().addTransaction(
       title: descrizione,
       amount: importo,
       isIncome: !isSpesa,
-      category: categoriaProvider,
+      category: isSpesa ? _sottocategoriaSelezionata : categoriaProvider,
       accountId: accountId,
+      date: _dataSelezionata,
     );
 
+    // Reset Form e passa alla scheda RIEPILOGO impostando il mese corrente uguale a quello registrato
     setState(() {
-      _movimentiReali.add({
-        'desc': descrizione,
-        'imp': importo,
-        'cat': isSpesa ? _sottocategoriaSelezionata : 'Entrate',
-        'macroCat': isSpesa ? _categoriaSelezionata : 'Entrate',
-        'conto': _contoSelezionato,
-        'data': _dataSelezionata,
-        'isSpesa': isSpesa,
-      });
-
       _amountController.clear();
       _noteController.clear();
       _meseSelezionatoRiepilogo = DateTime(_dataSelezionata.year, _dataSelezionata.month);
+      _tipoMovimento = 'riepilogo'; // 👈 Ritorna alla tab Riepilogo invece di chiudere
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Movimento "$descrizione" registrato con successo!'),
         backgroundColor: const Color(0xFF2DD4BF),
+        duration: const Duration(seconds: 2),
       ),
     );
-
-    Navigator.pop(context);
   }
 
   Future<void> _selezionaData(BuildContext context) async {
@@ -623,7 +615,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER CON BOTTONE (X) CIRCOLARE IDENTICO A REGISTRA FATTURA ---
+                    // --- HEADER CON BOTTONE (X) CIRCOLARE ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1126,7 +1118,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                                                 const SizedBox(height: 14),
 
-                                                // PULSANTE SALVA VERDE ACQUA IDENTICO A "REGISTRA E SALVA FATTURA"
+                                                // PULSANTE SALVA VERDE ACQUA
                                                 SizedBox(
                                                   width: double.infinity,
                                                   height: 44,
@@ -1204,13 +1196,30 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // SCHERMATA RIEPILOGO DINAMICA
+  // 🧮 SCHERMATA RIEPILOGO UNIFICATA (TUTTO PROVIENE DAL WALLET PROVIDER REALE)
   Widget _buildSchermataRiepilogo() {
-    final movimentiMeseSelezionato = _movimentiReali.where((m) {
+    final walletProvider = Provider.of<WalletProvider>(context);
+
+    // Legge le transazioni ignorando gli accantonamenti tasse (operazione contabile interna)
+    final List<Map<String, dynamic>> tuttiMovimenti = walletProvider.transactions
+        .where((tx) => !tx.title.startsWith('Accantonamento Tasse'))
+        .map((tx) {
+      return {
+        'desc': tx.title,
+        'imp': tx.amount,
+        'cat': tx.category,
+        'data': tx.date,
+        'isSpesa': !tx.isIncome,
+      };
+    }).toList();
+
+    // Filtra per il mese ed anno attualmente selezionati nella schermata
+    final movimentiMeseSelezionato = tuttiMovimenti.where((m) {
       final dt = m['data'] as DateTime;
       return dt.year == _meseSelezionatoRiepilogo.year && dt.month == _meseSelezionatoRiepilogo.month;
     }).toList();
 
+    // Calcolo Totali Mese
     final double totaleSpese = movimentiMeseSelezionato
         .where((m) => m['isSpesa'] == true)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
@@ -1219,12 +1228,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         .where((m) => m['isSpesa'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
+    // Raggruppamento Per Categoria
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
     for (var m in movimentiMeseSelezionato) {
       final cat = m['cat'] as String;
       perCategoria.putIfAbsent(cat, () => []).add(m);
     }
 
+    // Raggruppamento Per Data (Ordinato Decrescente)
     final List<Map<String, dynamic>> movimentiOrdinatiData = List.from(movimentiMeseSelezionato);
     movimentiOrdinatiData.sort((a, b) => (b['data'] as DateTime).compareTo(a['data'] as DateTime));
 
@@ -1237,6 +1248,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     return Column(
       children: [
+        // TESTATA MESI CON FRECCE
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
@@ -1307,6 +1319,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ),
         const Divider(color: Colors.white12, height: 1),
 
+        // LISTA MOVIMENTI
         Expanded(
           child: movimentiMeseSelezionato.isEmpty
               ? const Center(
@@ -1319,7 +1332,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       itemBuilder: (context, index) {
                         final catName = perCategoria.keys.elementAt(index);
                         final listaMovs = perCategoria[catName]!;
-                        final double totCat = listaMovs.fold(0.0, (sum, m) => sum + (m['imp'] as double));
+                        final double totCat = listaMovs.fold(0.0, (sum, m) {
+                          final imp = m['imp'] as double;
+                          final isSpesa = m['isSpesa'] as bool;
+                          return sum + (isSpesa ? -imp : imp);
+                        });
                         final bool isEspansa = _categoriaEspansaIndex == index;
 
                         return Container(
@@ -1351,8 +1368,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         ),
                                       ),
                                       Text(
-                                        _formatValuta(totCat),
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                        '${totCat >= 0 ? '+' : '-'}${_formatValuta(totCat)}',
+                                        style: TextStyle(
+                                          color: totCat >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1372,7 +1393,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('${m['desc']} (${dt.day}/${dt.month})', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                                            Expanded(
+                                              child: Text(
+                                                '${m['desc']} (${dt.day}/${dt.month})',
+                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
                                             Text(
                                               '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
                                               style: TextStyle(
@@ -1460,7 +1488,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('${m['desc']} (${m['cat']})', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                                            Expanded(
+                                              child: Text(
+                                                '${m['desc']} (${m['cat']})',
+                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
                                             Text(
                                               '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
                                               style: TextStyle(

@@ -528,13 +528,14 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                     if (_contoSelezionato != null) {
                                                       final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
 
-                                                      // 1. INCASSO REALE CON TOTALE COMPLETO DI ACCONTI
+                                                     // 1. INCASSO REALE CON TOTALE COMPLETO DI ACCONTI E DATA SCELTA
                                                       context.read<WalletProvider>().incassaFatturaPiva(
                                                         idFattura: id,
                                                         cliente: nomeCliente,
                                                         importoLordo: lordo,
                                                         importoTasse: tasseTotaliAccantonare,
                                                         contoDestinazione: _contoSelezionato!,
+                                                        dataIncasso: dataFormatted,
                                                       );
 
                                                       // 2. CALLBACK LOCALE SE PRESENTE
