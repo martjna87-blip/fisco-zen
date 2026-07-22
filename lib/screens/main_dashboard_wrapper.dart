@@ -80,7 +80,7 @@ class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
 
           // 📍 INDICATORE DI PAGINA
           Positioned(
-            bottom: 770, // Distanza dal fondo dello schermo
+            bottom: 10, // Distanza dal fondo dello schermo
             left: 0,
             right: 0,
             child: SafeArea(

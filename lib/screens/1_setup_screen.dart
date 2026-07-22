@@ -3,6 +3,7 @@ import '../widgets_shared/fluid_wave_painter.dart';
 import '2_wallet_screen.dart';
 import '3_home_PI_screen.dart';
 import 'main_dashboard_wrapper.dart';
+import '1_main_menu.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -342,11 +343,12 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                                 : '56.10.11 - Artigiani & Ristorazione');
 
                                     // NUOVO NAVIGATOR PER PARTITA IVA
+                                    // INVIA I DATI AL MAIN MENU
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => MainDashboardWrapper(
-                                          hasPartitaIva: true, // Attiva il carosello!
+                                        builder: (context) => MainMenu(
+                                          hasPartitaIva: true, 
                                           codiceAtecoIniziale: atecoStr,
                                           coefficienteIniziale: coefficienteRedditivita,
                                           aliquotaImpostaIniziale: imposta,
@@ -382,11 +384,12 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                         child: ElevatedButton(
                           onPressed: () {
                             // NUOVO NAVIGATOR PER DIPENDENTE
+                            // INVIA I DATI AL MAIN MENU
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MainDashboardWrapper(
-                                  hasPartitaIva: false, // Disattiva il carosello, mostra solo il Wallet!
+                                builder: (context) => const MainMenu(
+                                  hasPartitaIva: false, 
                                 ),
                               ),
                             );
