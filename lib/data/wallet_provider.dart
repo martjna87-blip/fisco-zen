@@ -336,6 +336,30 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🗑️ ELIMINA TRANSAZIONE MANUALE (Storna il saldo del conto)
+  void deleteTransaction(String id) {
+    final idx = _transactions.indexWhere((t) => t.id == id);
+    if (idx != -1) {
+      final tx = _transactions.removeAt(idx);
+
+      // Trova il conto principale
+      final targetAccount = _accounts.first;
+
+      // Storna il saldo
+      if (tx.isIncome) {
+        targetAccount.amount -= tx.amount;
+      } else {
+        targetAccount.amount += tx.amount;
+        if (tx.category == 'Bisogni') _spesoBisogni = (_spesoBisogni - tx.amount).clamp(0.0, double.infinity);
+        if (tx.category == 'Svago') _spesoSvago = (_spesoSvago - tx.amount).clamp(0.0, double.infinity);
+        if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
+      }
+
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+
   // 🔄 RESET GLOBALE
   void resetTuttiIDati() {
     html.window.localStorage.clear();

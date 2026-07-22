@@ -39,7 +39,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
   String _sottocategoriaSelezionata = 'Alimentari';
 
-  // ➕ Categorie specifiche per le entrate
   final List<String> _sottocategorieEntrata = [
     'Stipendio',
     'Entrate Extra / Freelance',
@@ -183,7 +182,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
-  // 💾 SALVATAGGIO MOVIMENTO (Mostra il riepilogo senza chiudere il modale)
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
@@ -211,7 +209,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       accountId = '1';
     }
 
-    // Salva nel WalletProvider globale mantenendo la data selezionata
     context.read<WalletProvider>().addTransaction(
       title: descrizione,
       amount: importo,
@@ -221,7 +218,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       date: _dataSelezionata,
     );
 
-    // Ripristina i campi e passa al riepilogo nel mese della data selezionata
     setState(() {
       _amountController.clear();
       _noteController.clear();
@@ -234,6 +230,51 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         content: Text('Movimento "$descrizione" registrato con successo!'),
         backgroundColor: const Color(0xFF2DD4BF),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // 🗑️ DIALOG CONFERMA ELIMINAZIONE
+  void _confermaEliminazioneMovimento(BuildContext context, String id, String desc) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141417),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 8),
+            Text('Elimina Movimento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              context.read<WalletProvider>().deleteTransaction(id);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Movimento "$desc" eliminato.'),
+                  backgroundColor: const Color(0xFFEF4444),
+                ),
+              );
+            },
+            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -936,7 +977,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   const SizedBox(height: 12),
                                                 ],
 
-                                                // ➕ SOTTOCATEGORIA SPECIFICA ENTRATA
+                                                // SOTTOCATEGORIA SPECIFICA ENTRATA
                                                 if (!isSpesa) ...[
                                                   const Text('CATEGORIA ENTRATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                                                   const SizedBox(height: 4),
@@ -962,7 +1003,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   const SizedBox(height: 12),
                                                 ],
 
-                                                // CATEGORIA BUDGET (SOLO PER SPESA)
+                                                // CATEGORIA BUDGET (SOLO SPESA)
                                                 if (isSpesa) ...[
                                                   const Text('REGOLE BUDGET', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                                                   const SizedBox(height: 4),
@@ -1228,30 +1269,30 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🧮 SCHERMATA RIEPILOGO UNIFICATA
+  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CESTINO DI ELIMINAZIONE
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    // Legge le transazioni ignorando gli accantonamenti tasse (operazione contabile interna)
     final List<Map<String, dynamic>> tuttiMovimenti = walletProvider.transactions
         .where((tx) => !tx.title.startsWith('Accantonamento Tasse'))
         .map((tx) {
+      final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
       return {
+        'id': tx.id,
         'desc': tx.title,
         'imp': tx.amount,
         'cat': tx.category,
         'data': tx.date,
         'isSpesa': !tx.isIncome,
+        'isFattura': isFatturaPiva, // Identifica se è una fattura
       };
     }).toList();
 
-    // Filtra per il mese ed anno attualmente selezionati nella schermata
     final movimentiMeseSelezionato = tuttiMovimenti.where((m) {
       final dt = m['data'] as DateTime;
       return dt.year == _meseSelezionatoRiepilogo.year && dt.month == _meseSelezionatoRiepilogo.month;
     }).toList();
 
-    // Calcolo Totali Mese
     final double totaleSpese = movimentiMeseSelezionato
         .where((m) => m['isSpesa'] == true)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
@@ -1260,14 +1301,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         .where((m) => m['isSpesa'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
-    // Raggruppamento Per Categoria
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
     for (var m in movimentiMeseSelezionato) {
       final cat = m['cat'] as String;
       perCategoria.putIfAbsent(cat, () => []).add(m);
     }
 
-    // Raggruppamento Per Data (Ordinato Decrescente)
     final List<Map<String, dynamic>> movimentiOrdinatiData = List.from(movimentiMeseSelezionato);
     movimentiOrdinatiData.sort((a, b) => (b['data'] as DateTime).compareTo(a['data'] as DateTime));
 
@@ -1280,7 +1319,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     return Column(
       children: [
-        // TESTATA MESI CON FRECCE
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
@@ -1351,7 +1389,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ),
         const Divider(color: Colors.white12, height: 1),
 
-        // LISTA MOVIMENTI
         Expanded(
           child: movimentiMeseSelezionato.isEmpty
               ? const Center(
@@ -1420,6 +1457,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       final dt = m['data'] as DateTime;
                                       final isSpesa = m['isSpesa'] as bool;
                                       final imp = m['imp'] as double;
+                                      final bool isFattura = m['isFattura'] as bool;
+                                      final String id = m['id'] as String;
+                                      final String desc = m['desc'] as String;
+
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4),
                                         child: Row(
@@ -1427,7 +1468,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                '${m['desc']} (${dt.day}/${dt.month})',
+                                                '$desc (${dt.day}/${dt.month})',
                                                 style: const TextStyle(color: Colors.white60, fontSize: 11),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -1441,6 +1482,21 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
+                                            // 🗑️ CESTINO PER I MOVIMENTI MANUALI
+                                            if (!isFattura) ...[
+                                              const SizedBox(width: 6),
+                                              InkWell(
+                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       );
@@ -1515,6 +1571,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     children: listaMovs.map((m) {
                                       final isSpesa = m['isSpesa'] as bool;
                                       final imp = m['imp'] as double;
+                                      final bool isFattura = m['isFattura'] as bool;
+                                      final String id = m['id'] as String;
+                                      final String desc = m['desc'] as String;
+
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4),
                                         child: Row(
@@ -1522,7 +1582,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                '${m['desc']} (${m['cat']})',
+                                                '$desc (${m['cat']})',
                                                 style: const TextStyle(color: Colors.white60, fontSize: 11),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -1536,6 +1596,21 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
+                                            // 🗑️ CESTINO PER I MOVIMENTI MANUALI
+                                            if (!isFattura) ...[
+                                              const SizedBox(width: 6),
+                                              InkWell(
+                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       );
@@ -1551,7 +1626,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
         const SizedBox(height: 8),
 
-        // SWITCH IN BASSO [ Per Categoria ] | [ Per Data ]
         Container(
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
