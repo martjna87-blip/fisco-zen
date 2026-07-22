@@ -11,12 +11,14 @@ class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
   final double? coefficienteIniziale;
   final double? aliquotaImpostaIniziale;
+  final VoidCallback? onSwipeToWallet;
 
   const HomeScreen({
     super.key,
     this.codiceAtecoIniziale,
     this.coefficienteIniziale,
     this.aliquotaImpostaIniziale,
+    this.onSwipeToWallet,
   });
 
   @override
@@ -43,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _aliquotaImposta = widget.aliquotaImpostaIniziale ?? 0.05;
   }
 
-  // 🧮 HELPER UNIFICATO CALCOLI FISCALI (Identico alla Modale Tasse)
+  // 🧮 HELPER UNIFICATO CALCOLI FISCALI
   double _calcolaTasseComplete(double lordo) {
     if (lordo <= 0) return 0.0;
     
@@ -182,17 +184,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final fattureDaIncassare = walletProvider.fattureDaIncassare;
     final fattureIncassate = walletProvider.fattureIncassate;
 
-    // 🧮 CALCOLI SICURI: Legge il provider e applica la formula Helper
+    // 🧮 CALCOLI SICURI
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
     
-    // Tasse relative SOLO alle fatture in sospeso (usato nella card arancione in Home)
     final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
     final double nettoStimatoInSospeso = totaleInSospeso - tasseStimateInSospeso;
 
-    // Tasse relative SOLO alle fatture incassate
     final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
 
-    // SOMMA GLOBALE per la card piccolina "Stima Tasse P.IVA"
     final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
 
     return Scaffold(
@@ -273,10 +272,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         // BOTTONE WALLET
                         GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
-                            );
+                            if (widget.onSwipeToWallet != null) {
+                              widget.onSwipeToWallet!(); 
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
+                              );
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -345,10 +348,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
-                                children: const [
-                                  Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
+                                children: [
+                                  const Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 18),
+                                  const SizedBox(width: 8),
+                                  const Text(
                                     'Fatture da Incassare',
                                     style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                                   ),
@@ -448,7 +451,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: _buildMiniCard(
                           icon: Icons.shield_outlined,
                           title: 'Stima Tasse\nP.IVA',
-                          // 📍 ORA MOSTRA LA SOMMA COMPLETA (SALDO + ACCONTI) PER FATTURE INCASSATE E IN SOSPESO
                           value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
                           onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                         ),
@@ -481,10 +483,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   // PORTAFOGLIO EQUILIBRIO
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
-                      );
+                      if (widget.onSwipeToWallet != null) {
+                        widget.onSwipeToWallet!(); 
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
+                        );
+                      }
                     },
                     child: Container(
                       width: double.infinity,

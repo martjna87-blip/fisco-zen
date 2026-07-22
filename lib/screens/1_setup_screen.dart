@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '2_wallet_screen.dart';
 import '3_home_PI_screen.dart';
+import 'main_dashboard_wrapper.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -340,10 +341,12 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                                 ? '47.91.10 - Commercio & Agenti'
                                                 : '56.10.11 - Artigiani & Ristorazione');
 
-                                    Navigator.push(
+                                    // NUOVO NAVIGATOR PER PARTITA IVA
+                                    Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => HomeScreen(
+                                        builder: (context) => MainDashboardWrapper(
+                                          hasPartitaIva: true, // Attiva il carosello!
                                           codiceAtecoIniziale: atecoStr,
                                           coefficienteIniziale: coefficienteRedditivita,
                                           aliquotaImpostaIniziale: imposta,
@@ -378,10 +381,13 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                         height: 54,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
+                            // NUOVO NAVIGATOR PER DIPENDENTE
+                            Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const WalletScreen(isPiva: false),
+                                builder: (context) => const MainDashboardWrapper(
+                                  hasPartitaIva: false, // Disattiva il carosello, mostra solo il Wallet!
+                                ),
                               ),
                             );
                           },
