@@ -114,7 +114,7 @@ class WalletProvider extends ChangeNotifier {
     _caricaDatiDaLocalStorage();
   }
 
-  // 📥 LETTURA ISTANTANEA E SICURA DA LOCALSTORAGE
+  // 📥 LETTURA ISTANTANEA DA LOCALSTORAGE
   void _caricaDatiDaLocalStorage() {
     try {
       final storage = html.window.localStorage;
@@ -148,7 +148,7 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 💾 SALVATAGGIO REALE ED ISTANTANEO
+  // 💾 SALVATAGGIO IN LOCALSTORAGE
   void _salvaDatiInLocalStorage() {
     try {
       final storage = html.window.localStorage;
@@ -205,14 +205,24 @@ class WalletProvider extends ChangeNotifier {
   }
 
   // 🚀 REGISTRA FATTURA DA INCASSARE
-  void addFatturaPiva({required String cliente, required double importo, String? data}) {
+  void addFatturaPiva({
+    required String cliente,
+    required double importo,
+    String? data,
+    String? numero,
+  }) {
+    final String numCalcolato = (numero != null && numero.trim().isNotEmpty)
+        ? numero.trim()
+        : '${_fattureDaIncassare.length + 1}';
+
     _fattureDaIncassare.add({
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'cliente': cliente,
-      'numero': 'Fattura #${_fattureDaIncassare.length + 101}',
-      'data': data ?? 'Oggi',
       'importo': importo,
+      'data': data ?? DateTime.now().toString(),
+      'numero': numCalcolato,
     });
+
     _salvaDatiInLocalStorage();
     notifyListeners();
   }

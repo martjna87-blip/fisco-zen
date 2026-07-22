@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 
 class RegistraFatturaSheet extends StatefulWidget {
-  final Function(String cliente, double importo, String data)? onFatturaSalvata;
+  final Function? onFatturaSalvata;
 
   const RegistraFatturaSheet({
     super.key,
@@ -16,18 +16,57 @@ class RegistraFatturaSheet extends StatefulWidget {
 }
 
 class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
+  final _numeroController = TextEditingController();
   final _clienteController = TextEditingController();
   final _importoController = TextEditingController();
+  DateTime _dataSelezionata = DateTime.now();
   bool _isManualOpen = true;
 
   @override
   void dispose() {
+    _numeroController.dispose();
     _clienteController.dispose();
     _importoController.dispose();
     super.dispose();
   }
 
+  // APERTURA CALENDARIO
+  Future<void> _selezionaData(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _dataSelezionata,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF2DD4BF),
+              onPrimary: Colors.black,
+              surface: Color(0xFF18181B),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF18181B),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _dataSelezionata) {
+      setState(() {
+        _dataSelezionata = picked;
+      });
+    }
+  }
+
+  String _formattaData(DateTime dt) {
+    final giorno = dt.day.toString().padLeft(2, '0');
+    final mese = dt.month.toString().padLeft(2, '0');
+    return '$giorno/$mese/${dt.year}';
+  }
+
   void _salvaFattura() {
+    final numero = _numeroController.text.trim();
     final cliente = _clienteController.text.trim();
     final importoText = _importoController.text.trim();
 
@@ -52,20 +91,28 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       return;
     }
 
+    final dataFormattata = _formattaData(_dataSelezionata);
+
     Provider.of<WalletProvider>(context, listen: false).addFatturaPiva(
       cliente: cliente,
       importo: importo,
+      data: dataFormattata,
+      numero: numero.isNotEmpty ? numero : null,
     );
 
     if (widget.onFatturaSalvata != null) {
-      widget.onFatturaSalvata!(cliente, importo, 'Oggi');
+      try {
+        widget.onFatturaSalvata!(cliente, importo, dataFormattata, numero);
+      } catch (_) {
+        widget.onFatturaSalvata!(cliente, importo, dataFormattata);
+      }
     }
 
     Navigator.pop(context);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Fattura di $cliente (€$importoText) registrata!'),
+        content: Text('Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata!'),
         backgroundColor: const Color(0xFF10B981),
       ),
     );
@@ -76,9 +123,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     
-    // Se la tastiera è aperta, occupiamo più altezza e attacchiamo il box in alto
     final isKeyboardOpen = bottomInset > 0;
-    final dialogHeight = isKeyboardOpen ? screenSize.height * 0.72 : screenSize.height * 0.84;
+    final dialogHeight = isKeyboardOpen ? screenSize.height * 0.78 : screenSize.height * 0.88;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -239,12 +285,36 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                             style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                           ),
                                           subtitle: const Text(
-                                            'Compila dati cliente e importo a mano',
+                                            'Compila numero, cliente, importo e data',
                                             style: TextStyle(color: Colors.white54, fontSize: 10),
                                           ),
                                           childrenPadding: const EdgeInsets.all(12),
                                           children: [
-                                            // CAMPO CLIENTE
+                                            // 1. CAMPO NUMERO FATTURA (SOPRA AL CLIENTE)
+                                            TextField(
+                                              controller: _numeroController,
+                                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                                              scrollPadding: const EdgeInsets.only(bottom: 80),
+                                              decoration: InputDecoration(
+                                                labelText: 'Numero Fattura (es. 45/2026)',
+                                                labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                                                prefixIcon: const Icon(Icons.tag_rounded, color: Color(0xFF2DD4BF), size: 18),
+                                                filled: true,
+                                                fillColor: Colors.black.withOpacity(0.4),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                                ),
+                                                focusedBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
+                                                ),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+
+                                            // 2. CAMPO CLIENTE
                                             TextField(
                                               controller: _clienteController,
                                               style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -268,7 +338,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                             ),
                                             const SizedBox(height: 10),
 
-                                            // CAMPO IMPORTO
+                                            // 3. CAMPO IMPORTO
                                             TextField(
                                               controller: _importoController,
                                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -289,6 +359,47 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                                   borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
                                                 ),
                                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+
+                                            // 4. CAMPO SELEZIONE DATA CON CALENDARIO (SOTTO ALL'IMPORTO)
+                                            InkWell(
+                                              onTap: () => _selezionaData(context),
+                                              borderRadius: BorderRadius.circular(12),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black.withOpacity(0.4),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 18),
+                                                        const SizedBox(width: 12),
+                                                        Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            const Text(
+                                                              'Data Fattura',
+                                                              style: TextStyle(color: Colors.white54, fontSize: 10),
+                                                            ),
+                                                            const SizedBox(height: 2),
+                                                            Text(
+                                                              _formattaData(_dataSelezionata),
+                                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const Icon(Icons.arrow_drop_down_rounded, color: Colors.white54, size: 22),
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(height: 14),
@@ -326,7 +437,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                         ),
                       ),
 
-                      // Mostra il tasto chiudi inferiore solo se la tastiera NON è aperta
                       if (!isKeyboardOpen) ...[
                         const SizedBox(height: 12),
 
