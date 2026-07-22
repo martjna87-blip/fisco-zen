@@ -39,6 +39,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
   String _sottocategoriaSelezionata = 'Alimentari';
 
+  // ➕ Categorie specifiche per le entrate
+  final List<String> _sottocategorieEntrata = [
+    'Stipendio',
+    'Entrate Extra / Freelance',
+    'Regalo',
+    'Rimborso',
+    'Investimenti / Dividendi',
+    'Altro',
+  ];
+  String _sottocategoriaEntrataSelezionata = 'Stipendio';
+  bool _isSottocategoriaEntrataEspansa = false;
+
   bool _isCategoriaEspansa = false;
   bool _isSottocategoriaEspansa = false;
   bool _isContoEspanso = false;
@@ -171,7 +183,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
-  // 💾 SALVATAGGIO MOVIMENTO (Senza chiudere il modale -> Ritorna a 'riepilogo')
+  // 💾 SALVATAGGIO MOVIMENTO (Mostra il riepilogo senza chiudere il modale)
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
@@ -186,18 +198,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ? _noteController.text.trim()
         : (isSpesa ? 'Nuova Spesa' : 'Nuova Entrata');
 
-    String categoriaProvider = 'Bisogni';
-    if (isSpesa) {
-      if (_categoriaSelezionata.contains('30%')) {
-        categoriaProvider = 'Svago';
-      } else if (_categoriaSelezionata.contains('20%')) {
-        categoriaProvider = 'Risparmi';
-      } else {
-        categoriaProvider = 'Bisogni';
-      }
-    } else {
-      categoriaProvider = 'P.IVA';
-    }
+    final String categoriaFinale = isSpesa 
+        ? _sottocategoriaSelezionata 
+        : _sottocategoriaEntrataSelezionata;
 
     String? accountId;
     if (_contoSelezionato.contains('Carta Spese')) {
@@ -208,22 +211,22 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       accountId = '1';
     }
 
-    // Passiamo la data selezionata (con mese e anno scelti) al Provider
+    // Salva nel WalletProvider globale mantenendo la data selezionata
     context.read<WalletProvider>().addTransaction(
       title: descrizione,
       amount: importo,
       isIncome: !isSpesa,
-      category: isSpesa ? _sottocategoriaSelezionata : categoriaProvider,
+      category: categoriaFinale,
       accountId: accountId,
       date: _dataSelezionata,
     );
 
-    // Reset Form e passa alla scheda RIEPILOGO impostando il mese corrente uguale a quello registrato
+    // Ripristina i campi e passa al riepilogo nel mese della data selezionata
     setState(() {
       _amountController.clear();
       _noteController.clear();
       _meseSelezionatoRiepilogo = DateTime(_dataSelezionata.year, _dataSelezionata.month);
-      _tipoMovimento = 'riepilogo'; // 👈 Ritorna alla tab Riepilogo invece di chiudere
+      _tipoMovimento = 'riepilogo'; 
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -300,6 +303,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     setState(() {
       _noteController.text = label;
       _iconaCorrente = icon;
+      if (_sottocategorieEntrata.contains(label)) {
+        _sottocategoriaEntrataSelezionata = label;
+      }
     });
   }
 
@@ -904,7 +910,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                                                 const SizedBox(height: 12),
 
-                                                // SOTTOCATEGORIA SPECIFICA
+                                                // SOTTOCATEGORIA SPECIFICA SPESA
                                                 if (isSpesa) ...[
                                                   const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                                                   const SizedBox(height: 4),
@@ -930,7 +936,33 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   const SizedBox(height: 12),
                                                 ],
 
-                                                // CATEGORIA BUDGET
+                                                // ➕ SOTTOCATEGORIA SPECIFICA ENTRATA
+                                                if (!isSpesa) ...[
+                                                  const Text('CATEGORIA ENTRATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(height: 4),
+                                                  _buildInlineSelector(
+                                                    icon: Icons.account_balance_wallet_outlined,
+                                                    iconColor: const Color(0xFF10B981),
+                                                    selectedValue: _sottocategoriaEntrataSelezionata,
+                                                    isExpanded: _isSottocategoriaEntrataEspansa,
+                                                    onToggle: () {
+                                                      setState(() {
+                                                        _isSottocategoriaEntrataEspansa = !_isSottocategoriaEntrataEspansa;
+                                                      });
+                                                      if (_isSottocategoriaEntrataEspansa) _scrollToOffset(120);
+                                                    },
+                                                    items: _sottocategorieEntrata,
+                                                    onSelect: (val) {
+                                                      setState(() {
+                                                        _sottocategoriaEntrataSelezionata = val;
+                                                        _isSottocategoriaEntrataEspansa = false;
+                                                      });
+                                                    },
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                ],
+
+                                                // CATEGORIA BUDGET (SOLO PER SPESA)
                                                 if (isSpesa) ...[
                                                   const Text('REGOLE BUDGET', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                                                   const SizedBox(height: 4),
@@ -1196,7 +1228,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🧮 SCHERMATA RIEPILOGO UNIFICATA (TUTTO PROVIENE DAL WALLET PROVIDER REALE)
+  // 🧮 SCHERMATA RIEPILOGO UNIFICATA
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
