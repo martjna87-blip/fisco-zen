@@ -122,8 +122,8 @@ class _WalletScreenState extends State<WalletScreen> {
                       Expanded(
                         child: _buildActionSquareCard(
                           icon: Icons.add_circle_outline_rounded,
-                          title: 'Aggiungi\nmovimento',
-                          value: 'Entrata / Spesa',
+                          title: 'Movimenti',
+                          value: 'Entrata / Uscita',
                           onTap: () {
                             showModalBottomSheet(
                               context: context,
