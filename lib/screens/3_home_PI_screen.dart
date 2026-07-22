@@ -108,6 +108,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 🔄 DIALOGO DI CONFERMA PER RESET GLOBALE
+  void _mostraConfermaResetGlobale(BuildContext context, WalletProvider walletProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 8),
+            Text('Reset Completo', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Vuoi davvero azzerare tutti i dati?\n\nVerranno cancellati il fatturato, le stime tasse, i conti e lo storico di tutte le fatture.',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              walletProvider.resetTuttiIDati();
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tutti i dati sono stati azzerati con successo!'),
+                  backgroundColor: Color(0xFFEF4444),
+                ),
+              );
+            },
+            child: const Text('Azzera Tutto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
@@ -174,10 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // BOTTONE ATECO
                         GestureDetector(
                           onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: const Color(0xFF27272A).withOpacity(0.8),
                               borderRadius: BorderRadius.circular(16),
@@ -186,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Row(
                               children: [
                                 const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 13),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Text(
                                   'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
                                   style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
@@ -195,8 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
 
+                        // BOTTONE WALLET
                         GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -205,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(16),
@@ -214,8 +261,29 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: const Row(
                               children: [
                                 Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 13),
-                                SizedBox(width: 6),
-                                Text('Vai al Wallet', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                SizedBox(width: 4),
+                                Text('Wallet', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // 🔄 BOTTONE RESET DATI
+                        GestureDetector(
+                          onTap: () => _mostraConfermaResetGlobale(context, walletProvider),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 13),
+                                SizedBox(width: 4),
+                                Text('Reset', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold)),
                               ],
                             ),
                           ),

@@ -276,14 +276,40 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🗑️ ELIMINA FATTURA
+  // 🗑️ ELIMINA FATTURA E STORNA IL FATTURATO / WALLET
   void eliminaFatturaPiva(String idFattura) {
-    _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
-    _fattureIncassate.removeWhere((f) => f['id'] == idFattura);
+    // 1. Controlla se la fattura era tra quelle già incassate
+    final int idxIncassata = _fattureIncassate.indexWhere((f) => f['id'] == idFattura);
+
+    if (idxIncassata != -1) {
+      final fattura = _fattureIncassate.removeAt(idxIncassata);
+      final double importoLordo = (fattura['importo'] as num).toDouble();
+      final String cliente = fattura['cliente'] as String? ?? '';
+      final String? contoAccredito = fattura['contoAccredito'] as String?;
+
+      // Storna il fatturato totale (aggiorna la Stima Tasse)
+      _fatturatoTotale = (_fatturatoTotale - importoLordo).clamp(0.0, double.infinity);
+
+      // Storna il saldo dal conto del Wallet se presente
+      if (contoAccredito != null) {
+        final targetAccount = _accounts.firstWhere(
+          (acc) => acc.title.contains(contoAccredito) || contoAccredito.contains(acc.title),
+          orElse: () => _accounts.first,
+        );
+        targetAccount.amount = (targetAccount.amount - importoLordo).clamp(0.0, double.infinity);
+      }
+
+      // Rimuovi le transazioni associate dall'elenco del wallet
+      _transactions.removeWhere((t) => t.title.contains(cliente));
+    } else {
+      // Se era ancora da incassare, la rimuove solo dalle sospese
+      _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
+    }
+
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
-  
+
   // 🔄 RESET GLOBALE
   void resetTuttiIDati() {
     html.window.localStorage.clear();
