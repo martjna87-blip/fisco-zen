@@ -36,7 +36,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   // FUNZIONE PER APRIRE IL DETTAGLIO MOVIMENTI DEL CONTO REALI
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
-    // Filtra transazioni relative al conto specifico se disponibili
     final movimentiConto = transactions.where((t) => t.title.contains(account.title) || account.title.contains(t.title)).toList();
 
     showDialog(
@@ -202,7 +201,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
 
                 if (nome.isNotEmpty) {
-                  // Aggiunge la transazione iniziale se > 0
                   if (saldo > 0) {
                     context.read<WalletProvider>().addTransaction(
                           title: 'Saldo Iniziale: $nome',
@@ -318,7 +316,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 if (daConto != aConto && importo > 0) {
                   final provider = context.read<WalletProvider>();
                   
-                  // Detrae dal conto di partenza e accredita su quello di arrivo
                   final accDa = accounts.firstWhere((a) => a.title == daConto);
                   final accA = accounts.firstWhere((a) => a.title == aConto);
 
@@ -437,82 +434,74 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
 
-    // 🟢 LETTURA REATTIVA REALE DAL WALLET PROVIDER GLOBALE
     final walletProvider = context.watch<WalletProvider>();
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
 
+    // 📍 STRUTTURA DIALOG A DOPPIO RIQUADRO IDENTICA A REGISTRA FATTURA
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 1. SFONDO FOTOGRAFICO CLICCABILE PER CHIUDERE
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              height: screenHeight * 0.76,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
-                  ),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: 10, 
+        vertical: isKeyboardOpen ? 10 : 14,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: SizedBox(
+          width: double.infinity,
+          height: screenSize.height * 0.88,
+          child: Stack(
+            children: [
+              // 1. IMMAGINE SFONDO ATMOSFERICA
+              Positioned.fill(
+                child: Image.network(
+                  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
                   fit: BoxFit.cover,
-                  alignment: Alignment(0.0, 3),
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.35),
-                      Colors.black.withOpacity(0.80),
-                    ],
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFF0F172A),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // 2. CARD SCURA IN VETRO TRASPARENTE (FROSTED GLASS)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 18),
-              child: Container(
-                height: screenHeight * 0.72,
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141417).withOpacity(0.68),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+              // 2. OVERLAY SCURO SFUMATO
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.75),
                 ),
+              ),
+
+              // 3. CONTENUTO CON HEADER CIRCOLARE E SCHEDE GLASS
+              Padding(
+                padding: const EdgeInsets.all(12.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // INTESTAZIONE CON CHIUSURA (X) E "+ NUOVO CONTO"
+                    // --- HEADER CON BOTTONE (X) CIRCOLARE IDENTICO A REGISTRA FATTURA ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
-                              onPressed: () => Navigator.pop(context),
-                              tooltip: 'Chiudi',
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => Navigator.pop(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.12),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                  ),
+                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             const Text(
                               'Gestione Conti',
                               style: TextStyle(
@@ -533,8 +522,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.white24),
                             ),
-                            child: Row(
-                              children: const [
+                            child: const Row(
+                              children: [
                                 Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 16),
                                 SizedBox(width: 4),
                                 Text(
@@ -548,240 +537,301 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       ],
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    // CARD SALDO COMPLESSIVO
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('PATRIMONIO LIQUIDO TOTALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                            onPressed: () => _mostraDialogGiroconto(accounts),
-                            tooltip: 'Esegui Giroconto',
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // CONTENUTO SCROLLABILE LISTA CONTI
+                    // ==========================================
+                    // 🔲 RIQUADRO 1: CORPO PRINCIPALE GLASSMORPHIC
+                    // ==========================================
                     Expanded(
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('I TUOI CONTI & CARTE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
-                              ],
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF18181B).withOpacity(0.60),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: Colors.white.withOpacity(0.15)),
                             ),
-                            const SizedBox(height: 8),
-
-                            // LISTA CONTI DINAMICA DAL PROVIDER
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: accounts.length,
-                              itemBuilder: (context, index) {
-                                final account = accounts[index];
-                                final bool isEspanso = _contoEspansoIndex == index;
-
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin: const EdgeInsets.only(bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // INNER CARD SALDO COMPLESSIVO
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.35),
+                                    color: Colors.black.withOpacity(0.4),
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isEspanso ? account.color.withOpacity(0.5) : Colors.white.withOpacity(0.08),
-                                    ),
+                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
                                   ),
-                                  child: Column(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      // RIGA TESTATA CLICCABILE
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            if (_contoEspansoIndex == index) {
-                                              _contoEspansoIndex = null;
-                                            } else {
-                                              _contoEspansoIndex = index;
-                                              _scrollToOffset(120);
-                                            }
-                                          });
-                                        },
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: account.color.withOpacity(0.15),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  account.id == '1'
-                                                      ? Icons.account_balance_outlined
-                                                      : (account.id == '2' ? Icons.credit_card_rounded : Icons.savings_outlined),
-                                                  color: account.color,
-                                                  size: 18,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(account.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                                    const SizedBox(height: 2),
-                                                    Text(account.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                                                  ],
-                                                ),
-                                              ),
-                                              Column(
-                                                crossAxisAlignment: CrossAxisAlignment.end,
-                                                children: [
-                                                  Text(
-                                                    '${account.amount.toStringAsFixed(2)} €',
-                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                  ),
-                                                  Icon(
-                                                    isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                    color: Colors.white38,
-                                                    size: 16,
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('PATRIMONIO LIQUIDO TOTALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                                           ),
-                                        ),
+                                        ],
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
+                                        onPressed: () => _mostraDialogGiroconto(accounts),
+                                        tooltip: 'Esegui Giroconto',
+                                      ),
+                                    ],
+                                  ),
+                                ),
 
-                                      // CONTENUTO IN-LINE INTEGRATO APPARTENENTE ALLA CELLA
-                                      if (isEspanso) ...[
-                                        const Divider(color: Colors.white12, height: 1),
-                                        Container(
-                                          padding: const EdgeInsets.all(12),
-                                          color: Colors.black.withOpacity(0.15),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              // PULSANTE VEDI DETTAGLIO MOVIMENTI
-                                              InkWell(
-                                                onTap: () {
-                                                  _mostraDettaglioMovimentiConto(context, account);
-                                                },
-                                                borderRadius: BorderRadius.circular(10),
-                                                child: Container(
-                                                  width: double.infinity,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: const [
-                                                      Icon(Icons.list_alt_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                                      SizedBox(width: 6),
-                                                      Text(
-                                                        'Vedi Dettaglio Movimenti',
-                                                        style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ],
-                                                  ),
+                                const SizedBox(height: 14),
+
+                                // CONTENUTO SCROLLABILE LISTA CONTI
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    controller: _scrollController,
+                                    physics: const BouncingScrollPhysics(),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('I TUOI CONTI & CARTE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                            Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+
+                                        // LISTA CONTI DINAMICA DAL PROVIDER
+                                        ListView.builder(
+                                          shrinkWrap: true,
+                                          physics: const NeverScrollableScrollPhysics(),
+                                          itemCount: accounts.length,
+                                          itemBuilder: (context, index) {
+                                            final account = accounts[index];
+                                            final bool isEspanso = _contoEspansoIndex == index;
+
+                                            return AnimatedContainer(
+                                              duration: const Duration(milliseconds: 200),
+                                              margin: const EdgeInsets.only(bottom: 10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.35),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: isEspanso ? account.color.withOpacity(0.5) : Colors.white.withOpacity(0.08),
                                                 ),
                                               ),
-                                              const SizedBox(height: 12),
-                                              const Text('MODIFICA RAPIDA SALDO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                              const SizedBox(height: 6),
-                                              Row(
+                                              child: Column(
                                                 children: [
-                                                  Expanded(
-                                                    child: Container(
-                                                      height: 38,
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.black.withOpacity(0.3),
-                                                        borderRadius: BorderRadius.circular(10),
-                                                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                                      ),
-                                                      child: TextField(
-                                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                                        decoration: InputDecoration(
-                                                          hintText: '${account.amount.toStringAsFixed(2)} €',
-                                                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 11),
-                                                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                          border: InputBorder.none,
-                                                        ),
-                                                        onSubmitted: (val) {
-                                                          final nuovoSaldo = double.tryParse(val.replaceAll(',', '.')) ?? account.amount;
-                                                          final differenza = nuovoSaldo - account.amount;
-                                                          if (differenza != 0) {
-                                                            context.read<WalletProvider>().addTransaction(
-                                                                  title: 'Rettifica Saldo (${account.title})',
-                                                                  amount: differenza.abs(),
-                                                                  isIncome: differenza > 0,
-                                                                  category: 'Risparmi',
-                                                                  accountId: account.id,
-                                                                );
-                                                          }
-                                                          setState(() {
-                                                            _contoEspansoIndex = null;
-                                                          });
-                                                        },
+                                                  // RIGA TESTATA CLICCABILE
+                                                  InkWell(
+                                                    onTap: () {
+                                                      setState(() {
+                                                        if (_contoEspansoIndex == index) {
+                                                          _contoEspansoIndex = null;
+                                                        } else {
+                                                          _contoEspansoIndex = index;
+                                                          _scrollToOffset(120);
+                                                        }
+                                                      });
+                                                    },
+                                                    borderRadius: BorderRadius.circular(16),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(12),
+                                                      child: Row(
+                                                        children: [
+                                                          Container(
+                                                            padding: const EdgeInsets.all(8),
+                                                            decoration: BoxDecoration(
+                                                              color: account.color.withOpacity(0.15),
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: Icon(
+                                                              account.id == '1'
+                                                                  ? Icons.account_balance_outlined
+                                                                  : (account.id == '2' ? Icons.credit_card_rounded : Icons.savings_outlined),
+                                                              color: account.color,
+                                                              size: 18,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 12),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(account.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                                const SizedBox(height: 2),
+                                                                Text(account.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                                            children: [
+                                                              Text(
+                                                                '${account.amount.toStringAsFixed(2)} €',
+                                                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                              ),
+                                                              Icon(
+                                                                isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                                color: Colors.white38,
+                                                                size: 16,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
                                                       ),
                                                     ),
                                                   ),
+
+                                                  // CONTENUTO IN-LINE INTEGRATO APPARTENENTE ALLA CELLA
+                                                  if (isEspanso) ...[
+                                                    const Divider(color: Colors.white12, height: 1),
+                                                    Container(
+                                                      padding: const EdgeInsets.all(12),
+                                                      color: Colors.black.withOpacity(0.15),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          // PULSANTE VEDI DETTAGLIO MOVIMENTI
+                                                          InkWell(
+                                                            onTap: () {
+                                                              _mostraDettaglioMovimentiConto(context, account);
+                                                            },
+                                                            borderRadius: BorderRadius.circular(10),
+                                                            child: Container(
+                                                              width: double.infinity,
+                                                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                                                                borderRadius: BorderRadius.circular(10),
+                                                                border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+                                                              ),
+                                                              child: const Row(
+                                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                                children: [
+                                                                  Icon(Icons.list_alt_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                                                  SizedBox(width: 6),
+                                                                  Text(
+                                                                    'Vedi Dettaglio Movimenti',
+                                                                    style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(height: 12),
+                                                          const Text('MODIFICA RAPIDA SALDO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                                                          const SizedBox(height: 6),
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Container(
+                                                                  height: 38,
+                                                                  decoration: BoxDecoration(
+                                                                    color: Colors.black.withOpacity(0.3),
+                                                                    borderRadius: BorderRadius.circular(10),
+                                                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                                                  ),
+                                                                  child: TextField(
+                                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                                                    decoration: InputDecoration(
+                                                                      hintText: '${account.amount.toStringAsFixed(2)} €',
+                                                                      hintStyle: const TextStyle(color: Colors.white24, fontSize: 11),
+                                                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                                      border: InputBorder.none,
+                                                                    ),
+                                                                    onSubmitted: (val) {
+                                                                      final nuovoSaldo = double.tryParse(val.replaceAll(',', '.')) ?? account.amount;
+                                                                      final differenza = nuovoSaldo - account.amount;
+                                                                      if (differenza != 0) {
+                                                                        context.read<WalletProvider>().addTransaction(
+                                                                              title: 'Rettifica Saldo (${account.title})',
+                                                                              amount: differenza.abs(),
+                                                                              isIncome: differenza > 0,
+                                                                              category: 'Risparmi',
+                                                                              accountId: account.id,
+                                                                            );
+                                                                      }
+                                                                      setState(() {
+                                                                        _contoEspansoIndex = null;
+                                                                      });
+                                                                    },
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
-                                            ],
-                                          ),
+                                            );
+                                          },
                                         ),
-                                      ],
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
 
-                            const SizedBox(height: 12),
-                          ],
+                                        const SizedBox(height: 12),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
+
+                    if (!isKeyboardOpen) ...[
+                      const SizedBox(height: 12),
+
+                      // ==========================================
+                      // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
+                      // ==========================================
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF18181B).withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.white.withOpacity(0.15)),
+                            ),
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: const Text(
+                                'Annulla e Chiudi',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
