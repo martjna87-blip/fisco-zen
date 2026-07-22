@@ -28,95 +28,102 @@ class _WalletScreenState extends State<WalletScreen> {
     
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0C),
-      body: Stack(
-        children: [
-          // 1. SFONDO IMMERSIVO
-          Positioned.fill(
-            child: Transform.translate(
-              offset: const Offset(0, -150),
-              child: Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(
-                      'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop](https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop',
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            // 🎯 HEADER PORTAFOGLIO (STESSA STRUTTURA & ALTEZZA 280PX)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. SFONDO IMMERSIVO
+                Container(
+                  height: 280,
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(
+                        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop',
+                      ),
+                      fit: BoxFit.cover,
+                      opacity: 0.45,
                     ),
-                    fit: BoxFit.cover,
                   ),
                 ),
-                child: Container(
+                // 2. GRADIENTE SCURO
+                Container(
+                  height: 280,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.65),
-                        const Color(0xFF0A0A0C).withOpacity(0.85),
+                        Colors.transparent,
+                        const Color(0xFF0A0A0C).withOpacity(0.5),
                         const Color(0xFF0A0A0C),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
 
-          // 2. CONTENUTO SCROLLABILE
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                // 🎯 3. CONTENUTO CENTRATO IDENTICO
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Portafoglio netto',
+                      style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 42,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // BOTTONE RIEPILOGO ANNUALE
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AnnualSummarySheet(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.show_chart_rounded, size: 18, color: Color(0xFF2DD4BF)),
+                      label: const Text(
+                        'Riepilogo Annuale',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.08),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(color: Colors.white.withOpacity(0.18)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // CONTENUTO SCROLLABILE
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // HEADER SALDO NETTO
-                  Center(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 70),
-                        const Text(
-                          'Portafoglio netto',
-                          style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // PULSANTE RIEPILOGO ANNUALE
-                        FilledButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AnnualSummarySheet(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.show_chart_rounded, size: 18, color: Color(0xFF2DD4BF)),
-                          label: const Text(
-                            'Riepilogo Annuale',
-                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.08),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(color: Colors.white.withOpacity(0.18)),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 12),
                   
-                  // 3 QUADRANTI AZIONE (MOVIMENTO, CONTI, BUDGET)
+                  // 3 QUADRANTI AZIONE
                   Row(
                     children: [
                       Expanded(
@@ -171,7 +178,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 16),
 
-                  // BARRA EQUILIBRIO PORTAFOGLIO
+                  // BARRA EQUILIBRIO
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -210,7 +217,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 20),
 
-                  // GRAFICO A TORTA (REGOLA 50 / 30 / 20)
+                  // GRAFICO A TORTA
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -228,7 +235,6 @@ class _WalletScreenState extends State<WalletScreen> {
                         const SizedBox(height: 20),
                         Row(
                           children: [
-                            // Donut Chart Custom
                             SizedBox(
                               width: 110,
                               height: 110,
@@ -240,7 +246,6 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                             ),
                             const SizedBox(width: 24),
-                            // Legenda
                             Expanded(
                               child: Column(
                                 children: [
@@ -260,14 +265,12 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 24),
 
-                  // CONTI E CARTE
                   const Text(
                     'CONTI & CARTE',
                     style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
                   ),
                   const SizedBox(height: 12),
 
-                  // 🟢 MAPPA DINAMICA DAL PROVIDER
                   ...walletProvider.accounts.map((acc) => Padding(
                         padding: const EdgeInsets.only(bottom: 10.0),
                         child: _buildAccountCard(
@@ -281,14 +284,12 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                       )),
 
-                  // ULTIMI MOVIMENTI
                   const Text(
                     'ULTIMI MOVIMENTI',
                     style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
                   ),
                   const SizedBox(height: 12),
 
-                  // 🟢 CODICE DINAMICO:
                   if (movimenti.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12.0),
@@ -307,8 +308,8 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -458,7 +459,6 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
-// PAINTER PER IL GRAFICO A TORTA (DONUT CHART)
 class DonutChartPainter extends CustomPainter {
   final List<double> values;
   final List<Color> colors;
@@ -469,7 +469,6 @@ class DonutChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double total = values.reduce((a, b) => a + b);
    
-    // 🛡️ SICUREZZA AGGIUNTA: Blocca il disegno se il totale è zero per evitare errori matematici
     if (total == 0) return;
 
     double startAngle = -pi / 2;

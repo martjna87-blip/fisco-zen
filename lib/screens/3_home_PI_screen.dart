@@ -46,23 +46,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _aliquotaImposta = widget.aliquotaImpostaIniziale ?? 0.05;
   }
 
-  // 🧮 HELPER UNIFICATO CALCOLI FISCALI
   double _calcolaTasseComplete(double lordo) {
     if (lordo <= 0) return 0.0;
     
     final double imponibile = lordo * _coefficienteRedditivita;
 
-    // 1. Saldi Y
     final double inpsY = imponibile * _aliquotaInps;
     final double impostaY = imponibile * _aliquotaImposta;
     final double saldoY = inpsY + impostaY;
 
-    // 2. Acconti Y+1
     final double accontoInpsY1 = inpsY * 0.80;
     final double accontoImpostaY1 = impostaY * 1.00;
     final double accontiY1 = accontoInpsY1 + accontoImpostaY1;
 
-    // Totale complessivo
     return saldoY + accontiY1;
   }
 
@@ -185,7 +181,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final fattureDaIncassare = walletProvider.fattureDaIncassare;
     final fattureIncassate = walletProvider.fattureIncassate;
 
-    // 🧮 CALCOLI SICURI
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
     
     final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
@@ -201,11 +196,11 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // HEADER PORTAFOGLIO
+            // 🎯 HEADER PORTAFOGLIO (STESSA ALTEZZA 280PX)
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. IMMAGINE DI SFONDO
+                // 1. IMMAGINE
                 Container(
                   height: 280,
                   decoration: const BoxDecoration(
@@ -214,11 +209,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop',
                       ),
                       fit: BoxFit.cover,
-                      opacity: 0.25,
+                      opacity: 0.45,
                     ),
                   ),
                 ),
-                // 2. GRADIENTE SCURO
+                // 2. SFUMATURA
                 Container(
                   height: 280,
                   decoration: BoxDecoration(
@@ -227,14 +222,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        const Color(0xFF0F0F12).withOpacity(0.8),
+                        const Color(0xFF0F0F12).withOpacity(0.5),
                         const Color(0xFF0F0F12),
                       ],
                     ),
                   ),
                 ),
 
-                // 🔄 3. BOTTONE RESET SPOSTATO IN ALTO A DESTRA (SOLO PER DEV)
+                // 🔄 3. RESET SPOSTATO IN ALTO A DESTRA
                 Positioned(
                   top: 10,
                   right: 16,
@@ -250,12 +245,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 4. TESTO E BOTTONI CENTRALI (IDENTICI AL WALLET!)
+                // 🎯 4. CONTENUTO CENTRATO
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 10),
-                    const Text('Portafoglio netto', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.w500)),
+                    const Text(
+                      'Portafoglio netto', 
+                      style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
@@ -263,11 +261,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // RIGA BOTTONI ATECO & WALLET (STESSO STILE DEL RIEPILOGO ANNUALE)
+                    // BOTTONI VETRO UNIFICATI
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // BOTTONE ATECO
                         FilledButton.icon(
                           onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                           icon: const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2DD4BF)),
@@ -287,7 +284,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         const SizedBox(width: 8),
 
-                        // BOTTONE WALLET
                         FilledButton.icon(
                           onPressed: () {
                             if (widget.onSwipeToWallet != null) {
@@ -319,12 +315,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+
             // CONTENUTO
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  // CARD FATTURE DA INCASSARE
                   GestureDetector(
                     onTap: () => _mostraDialogIncassoFatture(walletProvider),
                     child: Container(
@@ -427,7 +423,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // TRIPTICO CARDS
                   Row(
                     children: [
                       Expanded(
@@ -440,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 8),
 
-                      // 🛡️ STIMA TASSE P.IVA
                       Expanded(
                         child: _buildMiniCard(
                           icon: Icons.shield_outlined,
@@ -482,7 +476,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🛠️ MINI CARD IDENTICA A QUELLA DEL WALLET (Prima immagine)
   Widget _buildMiniCard({
     required IconData icon,
     required String title,
@@ -492,10 +485,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110, // 👈 Stessa altezza del Wallet
+        height: 110,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF141417).withOpacity(0.92), // 👈 Stesso colore/opacità
+          color: const Color(0xFF141417).withOpacity(0.92),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
@@ -503,7 +496,6 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Icona senza il cerchietto scuro attorno, dimensione 22px
             Icon(icon, color: Colors.white70, size: 22),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white70, // 👈 Colore e leggibilità identici
+                    color: Colors.white70,
                     fontSize: 11,
                     height: 1.2,
                   ),
@@ -521,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   value,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12, // 👈 Stesso font del Wallet
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
