@@ -488,28 +488,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMiniCard({required IconData icon, required String title, required String value, required VoidCallback onTap}) {
+  // 🛠️ MINI CARD IDENTICA A QUELLA DEL WALLET (Prima immagine)
+  Widget _buildMiniCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 130,
-        padding: const EdgeInsets.all(14),
+        height: 110, // 👈 Stessa altezza del Wallet
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF18181B),
+          color: const Color(0xFF141417).withOpacity(0.92), // 👈 Stesso colore/opacità
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF27272A)),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(color: Color(0xFF27272A), shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white70, size: 16),
+            // Icona senza il cerchietto scuro attorno, dimensione 22px
+            Icon(icon, color: Colors.white70, size: 22),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white70, // 👈 Colore e leggibilità identici
+                    fontSize: 11,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12, // 👈 Stesso font del Wallet
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            Text(title, style: const TextStyle(color: Color(0xFF71717A), fontSize: 11, height: 1.2)),
-            Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
       ),
