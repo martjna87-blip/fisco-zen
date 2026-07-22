@@ -27,18 +27,62 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
   ];
 
+  // METODO FILTRO INTELLIGENTE E TOLLERANTE PER I MESI
+  List<Map<String, dynamic>> _getFattureFiltrate() {
+    if (_meseSelezionato == 0) {
+      return widget.fattureIncassate;
+    }
+
+    return widget.fattureIncassate.where((f) {
+      // 1. Controlla se esiste un valore numerico 'mese'
+      if (f['mese'] != null && f['mese'] is int) {
+        return f['mese'] == _meseSelezionato;
+      }
+
+      // 2. Controlla il campo 'data'
+      final rawData = f['data'];
+      if (rawData != null) {
+        if (rawData is DateTime) {
+          return rawData.month == _meseSelezionato;
+        }
+
+        if (rawData is String) {
+          // Prova ISO (es. "2026-05-18")
+          final parsedIso = DateTime.tryParse(rawData);
+          if (parsedIso != null) {
+            return parsedIso.month == _meseSelezionato;
+          }
+
+          // Prova formato IT (es. "18/05/2026")
+          final parti = rawData.split(RegExp(r'[/.-]'));
+          if (parti.length >= 2) {
+            final meseParsed = int.tryParse(parti[1]);
+            if (meseParsed != null) {
+              return meseParsed == _meseSelezionato;
+            }
+          }
+        }
+      }
+
+      return false;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
-    // Calcolo Totali Fiscai
+    // Otteniamo la lista filtrata
+    final fattureFiltrate = _getFattureFiltrate();
+
+    // Calcolo Totali Fiscai sulla LISTA FILTRATA
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
     double accontoInpsY1Totale = 0.0;
     double accontoImpostaY1Totale = 0.0;
 
-    for (var f in widget.fattureIncassate) {
+    for (var f in fattureFiltrate) {
       final double lordo = (f['importo'] as num).toDouble();
       final double imponibile = lordo * widget.coefficienteRedditivita;
       
@@ -201,20 +245,22 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                                 const SizedBox(height: 10),
 
-                                // LISTA FATTURE
+                                // LISTA FATTURE (USA LA LISTA FILTRATA)
                                 Expanded(
-                                  child: widget.fattureIncassate.isEmpty
+                                  child: fattureFiltrate.isEmpty
                                       ? Center(
                                           child: Text(
-                                            'Nessuna fattura incassata salvata.',
+                                            _meseSelezionato == 0
+                                                ? 'Nessuna fattura incassata salvata.'
+                                                : 'Nessuna fattura presente per ${_mesiStr[_meseSelezionato]}.',
                                             style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
                                           ),
                                         )
                                       : ListView.builder(
                                           physics: const BouncingScrollPhysics(),
-                                          itemCount: widget.fattureIncassate.length,
+                                          itemCount: fattureFiltrate.length,
                                           itemBuilder: (context, index) {
-                                            final f = widget.fattureIncassate[index];
+                                            final f = fattureFiltrate[index];
                                             final double lordo = (f['importo'] as num).toDouble();
                                             final double imponibile = lordo * widget.coefficienteRedditivita;
 
@@ -288,7 +334,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                     const SizedBox(height: 12),
 
                     // ==========================================
-                    // 🔲 RIQUADRO 2: RIEPILOGO FISCALE ANNUO
+                    // 🔲 RIQUADRO 2: RIEPILOGO FISCALE (FILTRATO)
                     // ==========================================
                     ClipRRect(
                       borderRadius: BorderRadius.circular(22),
@@ -305,17 +351,19 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                             children: [
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: const [
+                                children: [
                                   Text(
-                                    'RIEPILOGO FISCALE COMPLETO',
-                                    style: TextStyle(
+                                    _meseSelezionato == 0
+                                        ? 'RIEPILOGO FISCALE COMPLETO'
+                                        : 'RIEPILOGO FISCALE (${_mesiStr[_meseSelezionato].toUpperCase()})',
+                                    style: const TextStyle(
                                       color: Colors.white54,
                                       fontSize: 9,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.8,
                                     ),
                                   ),
-                                  Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 15),
+                                  const Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 15),
                                 ],
                               ),
                               const SizedBox(height: 6),
