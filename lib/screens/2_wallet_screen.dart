@@ -71,7 +71,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   Center(
                     child: Column(
                       children: [
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 70),
                         const Text(
                           'Portafoglio netto',
                           style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),

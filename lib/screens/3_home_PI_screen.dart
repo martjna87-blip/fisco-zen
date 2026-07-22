@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -204,8 +205,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Stack(
               alignment: Alignment.center,
               children: [
+                // 1. IMMAGINE DI SFONDO
                 Container(
-                  height: 380,
+                  height: 280,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
@@ -216,8 +218,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+                // 2. GRADIENTE SCURO
                 Container(
-                  height: 380,
+                  height: 280,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -230,10 +233,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+
+                // 🔄 3. BOTTONE RESET SPOSTATO IN ALTO A DESTRA (SOLO PER DEV)
+                Positioned(
+                  top: 10,
+                  right: 16,
+                  child: SafeArea(
+                    child: IconButton(
+                      onPressed: () => _mostraConfermaResetGlobale(context, walletProvider),
+                      icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 22),
+                      tooltip: 'Reset Dati',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444).withOpacity(0.15),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 4. TESTO E BOTTONI CENTRALI (IDENTICI AL WALLET!)
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 10),
                     const Text('Portafoglio netto', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 6),
                     Text(
@@ -242,36 +263,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    // RIGA BOTTONI ATECO & WALLET (STESSO STILE DEL RIEPILOGO ANNUALE)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // BOTTONE ATECO
-                        GestureDetector(
-                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF27272A).withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                        FilledButton.icon(
+                          onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                          icon: const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2DD4BF)),
+                          label: Text(
+                            'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.08),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(color: Colors.white.withOpacity(0.18)),
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 13),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           ),
                         ),
-                        const SizedBox(width: 6),
+
+                        const SizedBox(width: 8),
 
                         // BOTTONE WALLET
-                        GestureDetector(
-                          onTap: () {
+                        FilledButton.icon(
+                          onPressed: () {
                             if (widget.onSwipeToWallet != null) {
                               widget.onSwipeToWallet!(); 
                             } else {
@@ -281,41 +299,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
                             }
                           },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 13),
-                                SizedBox(width: 4),
-                                Text('Wallet', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                          icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+                          label: const Text(
+                            'Wallet',
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // 🔄 BOTTONE RESET DATI
-                        GestureDetector(
-                          onTap: () => _mostraConfermaResetGlobale(context, walletProvider),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.08),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(color: Colors.white.withOpacity(0.18)),
                             ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 13),
-                                SizedBox(width: 4),
-                                Text('Reset', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           ),
                         ),
                       ],
@@ -324,7 +319,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-
             // CONTENUTO
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
