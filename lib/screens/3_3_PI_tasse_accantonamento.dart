@@ -55,21 +55,42 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
     super.dispose();
   }
 
-  // CALCOLI FISCALI PRINCIPALI
-  double get _imponibileIncassato => widget.totaleFatturatoIncassato * _coeffSelezionato;
-  double get _impostaReale => _imponibileIncassato * widget.aliquotaImposta;
-  double get _inpsReale => _imponibileIncassato * widget.aliquotaInps;
-  double get _tasseRealiIncassate => _impostaReale + _inpsReale;
+  // 🧮 HELPER UNIFICATO CALCOLI FISCALI (SALDO Y + ACCONTI Y+1)
+  Map<String, double> _calcolaFiscalita(double lordo) {
+    final double imponibile = lordo * _coeffSelezionato;
 
-  double get _imponibileSospeso => widget.totaleFatturatoInSospeso * _coeffSelezionato;
-  double get _tasseFutureInSospeso => _imponibileSospeso * (widget.aliquotaImposta + widget.aliquotaInps);
+    // 1. Saldi Anno Corrente (Y)
+    final double inpsY = imponibile * widget.aliquotaInps;
+    final double impostaY = imponibile * widget.aliquotaImposta;
+    final double saldoY = inpsY + impostaY;
+
+    // 2. Acconti Anno Successivo (Y+1) -> 80% INPS + 100% Imposta
+    final double accontoInpsY1 = inpsY * 0.80;
+    final double accontoImpostaY1 = impostaY * 1.00;
+    final double accontiY1 = accontoInpsY1 + accontoImpostaY1;
+
+    // 3. Totale complessivo da accantonare e Netto Spendibile
+    final double totaleTasse = saldoY + accontiY1;
+    final double nettoSpendibile = lordo - totaleTasse;
+
+    return {
+      'imponibile': imponibile,
+      'inpsY': inpsY,
+      'impostaY': impostaY,
+      'saldoY': saldoY,
+      'accontoInpsY1': accontoInpsY1,
+      'accontoImpostaY1': accontoImpostaY1,
+      'accontiY1': accontiY1,
+      'totaleTasse': totaleTasse,
+      'nettoSpendibile': nettoSpendibile,
+    };
+  }
 
   void _toggleAtecoAccordion() {
     setState(() {
       _isModificaEspansa = !_isModificaEspansa;
     });
 
-    // Se stiamo aprendo l'accordion, facciamo uno scroll fluido verso il fondo
     if (_isModificaEspansa) {
       Future.delayed(const Duration(milliseconds: 150), () {
         if (_scrollController.hasClients) {
@@ -86,6 +107,10 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
+
+    // CALCOLI DETTAGLIATI
+    final fiscaliIncassato = _calcolaFiscalita(widget.totaleFatturatoIncassato);
+    final fiscaliSospeso = _calcolaFiscalita(widget.totaleFatturatoInSospeso);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -115,7 +140,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                 ),
               ),
 
-              // 3. CONTENUTO ARTICOLATO IN 2 RIQUADRI GLASS CON HEADER FLUTTUANTE
+              // 3. CONTENUTO ARTICOLATO
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
@@ -227,7 +252,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
 
                                   const SizedBox(height: 10),
 
-                                  // HERO CARD TASSE REALI SU INCASSATO CON SCUDO
+                                  // HERO CARD TASSE REALI SU INCASSATO CON SCUDO (SALDO + ACCONTI)
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(14),
@@ -239,28 +264,35 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'STIMA ACCANTONAMENTO TASSE (CASSA)',
-                                              style: TextStyle(
-                                                color: Colors.white54,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0.8,
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'ACCANTONAMENTO REALE (SALDO + ACCONTI)',
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.8,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${_tasseRealiIncassate.toStringAsFixed(2)} €',
-                                              style: const TextStyle(
-                                                color: Color(0xFF3B82F6),
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF3B82F6),
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Netto spendibile rimanente: ${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €',
+                                                style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                         const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 28),
                                       ],
@@ -269,7 +301,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
 
                                   const SizedBox(height: 10),
 
-                                  // DETTAGLIO CALCOLO FISCALE CASSA
+                                  // DETTAGLIO CALCOLO FISCALE CASSA (INCASSATO)
                                   Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
@@ -281,7 +313,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const Text(
-                                          'DETTAGLIO CALCOLO FISCALE (INCASSATO)',
+                                          'DETTAGLIO FISCALE (FATTURATO INCASSATO)',
                                           style: TextStyle(
                                             color: Colors.white54,
                                             fontSize: 9,
@@ -291,15 +323,18 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                         ),
                                         const SizedBox(height: 8),
                                         _buildRow(
-                                          'Fatturato Incassato 2026:',
+                                          'Fatturato Incassato:',
                                           '${widget.totaleFatturatoIncassato.toStringAsFixed(2)} €',
                                           color: const Color(0xFF10B981),
                                           isBold: true,
                                         ),
-                                        _buildRow('Imponibile Fiscale Reale:', '${_imponibileIncassato.toStringAsFixed(2)} €'),
+                                        _buildRow('Imponibile Fiscale:', '${fiscaliIncassato['imponibile']!.toStringAsFixed(2)} €'),
                                         Divider(color: Colors.white.withOpacity(0.12), height: 12),
-                                        _buildRow('Imposta Sostitutiva (5%):', '${_impostaReale.toStringAsFixed(2)} €'),
-                                        _buildRow('Contributi INPS (26.07%):', '${_inpsReale.toStringAsFixed(2)} €'),
+                                        _buildRow('Saldo Tasse (Anno Y):', '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
+                                        _buildRow('Acconti (Anno Y+1) [80% INPS + 100% Imp]:', '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €', color: const Color(0xFFF97316)),
+                                        Divider(color: Colors.white.withOpacity(0.12), height: 12),
+                                        _buildRow('Totale da Accantonare:', '-${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
+                                        _buildRow('Netto Spendibile Reale:', '${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €', color: const Color(0xFF2DD4BF), isBold: true),
                                       ],
                                     ),
                                   ),
@@ -307,7 +342,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                   if (widget.totaleFatturatoInSospeso > 0) ...[
                                     const SizedBox(height: 10),
 
-                                    // BOX EVIDENZIATO SOSPESI
+                                    // BOX EVIDENZIATO SOSPESI CON ACCONTI
                                     Container(
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(12),
@@ -336,12 +371,10 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                           ),
                                           const SizedBox(height: 8),
                                           _buildRow('Non ancora incassate:', '${widget.totaleFatturatoInSospeso.toStringAsFixed(2)} €', color: Colors.white),
-                                          _buildRow('Tasse stimate alla cassa:', '~${_tasseFutureInSospeso.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
-                                          const SizedBox(height: 4),
-                                          const Text(
-                                            'Nota: Se incassate dopo il 31/12 slitteranno all\'anno fiscale successivo.',
-                                            style: TextStyle(color: Colors.white38, fontSize: 9, fontStyle: FontStyle.italic),
-                                          ),
+                                          _buildRow('Saldo Tasse Stimato (Y):', '-${fiscaliSospeso['saldoY']!.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
+                                          _buildRow('Acconti Stimati (Y+1):', '-${fiscaliSospeso['accontiY1']!.toStringAsFixed(2)} €', color: const Color(0xFFF97316)),
+                                          Divider(color: Colors.white.withOpacity(0.12), height: 10),
+                                          _buildRow('Totale Tasse in Sospeso:', '-${fiscaliSospeso['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
                                         ],
                                       ),
                                     ),
@@ -534,24 +567,25 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isBold ? Colors.white70 : Colors.white54,
-              fontSize: 10,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
           Expanded(
             child: Text(
-              value,
-              textAlign: TextAlign.right,
+              label,
               style: TextStyle(
-                color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.85)),
+                color: isBold ? Colors.white70 : Colors.white54,
                 fontSize: 10,
                 fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
               ),
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.85)),
+              fontSize: 10,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ],

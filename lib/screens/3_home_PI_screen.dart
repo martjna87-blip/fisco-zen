@@ -43,6 +43,26 @@ class _HomeScreenState extends State<HomeScreen> {
     _aliquotaImposta = widget.aliquotaImpostaIniziale ?? 0.05;
   }
 
+  // 🧮 HELPER UNIFICATO CALCOLI FISCALI (Identico alla Modale Tasse)
+  double _calcolaTasseComplete(double lordo) {
+    if (lordo <= 0) return 0.0;
+    
+    final double imponibile = lordo * _coefficienteRedditivita;
+
+    // 1. Saldi Y
+    final double inpsY = imponibile * _aliquotaInps;
+    final double impostaY = imponibile * _aliquotaImposta;
+    final double saldoY = inpsY + impostaY;
+
+    // 2. Acconti Y+1
+    final double accontoInpsY1 = inpsY * 0.80;
+    final double accontoImpostaY1 = impostaY * 1.00;
+    final double accontiY1 = accontoInpsY1 + accontoImpostaY1;
+
+    // Totale complessivo
+    return saldoY + accontiY1;
+  }
+
   String _formattaValuta(double importo) {
     final parti = importo.toStringAsFixed(2).split('.');
     final intero = parti[0].replaceAllMapped(
@@ -108,7 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🔄 DIALOGO DI CONFERMA PER RESET GLOBALE
   void _mostraConfermaResetGlobale(BuildContext context, WalletProvider walletProvider) {
     showDialog(
       context: context,
@@ -159,14 +178,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final double patrimonioNetto = walletProvider.patrimonioNetto;
     final double fatturato = walletProvider.fatturatoTotale;
-    final double tasseAccantonate = walletProvider.stimaTasseAccantonate;
 
     final fattureDaIncassare = walletProvider.fattureDaIncassare;
     final fattureIncassate = walletProvider.fattureIncassate;
 
+    // 🧮 CALCOLI SICURI: Legge il provider e applica la formula Helper
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
-    final double tasseStimateInSospeso = (totaleInSospeso * _coefficienteRedditivita) * (_aliquotaImposta + _aliquotaInps);
+    
+    // Tasse relative SOLO alle fatture in sospeso (usato nella card arancione in Home)
+    final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
     final double nettoStimatoInSospeso = totaleInSospeso - tasseStimateInSospeso;
+
+    // Tasse relative SOLO alle fatture incassate
+    final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
+
+    // SOMMA GLOBALE per la card piccolina "Stima Tasse P.IVA"
+    final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -403,51 +430,52 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 📍 NELLA SEZIONE TRIPTICO CARDS IN HomeScreen:
-Row(
-  children: [
-    Expanded(
-      child: _buildMiniCard(
-        icon: Icons.add_circle_outline_rounded,
-        title: 'Nuova\nfattura',
-        value: '+ Registra',
-        onTap: _mostraDialogRegistraFattura,
-      ),
-    ),
-    const SizedBox(width: 8),
+                  // TRIPTICO CARDS
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.add_circle_outline_rounded,
+                          title: 'Nuova\nfattura',
+                          value: '+ Registra',
+                          onTap: _mostraDialogRegistraFattura,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
 
-    // 🛡️ STIMA TASSE TOTALE (Incassate + In Sospeso)
-    Expanded(
-      child: _buildMiniCard(
-        icon: Icons.shield_outlined,
-        title: 'Stima Tasse\nP.IVA',
-        // Somma le tasse già accantonate con le tasse stimate sulle fatture in sospeso
-        value: '${(tasseAccantonate + tasseStimateInSospeso).toStringAsFixed(2)} €',
-        onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-      ),
-    ),
-    const SizedBox(width: 8),
+                      // 🛡️ STIMA TASSE P.IVA
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.shield_outlined,
+                          title: 'Stima Tasse\nP.IVA',
+                          // 📍 ORA MOSTRA LA SOMMA COMPLETA (SALDO + ACCONTI) PER FATTURE INCASSATE E IN SOSPESO
+                          value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
+                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
 
-    Expanded(
-      child: _buildMiniCard(
-        icon: Icons.analytics_outlined,
-        title: 'Dettaglio\nfatture',
-        value: '${fattureIncassate.length} incassate',
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (context) => DettaglioFattureSheet(
-              fattureIncassate: fattureIncassate,
-              coefficienteRedditivita: _coefficienteRedditivita,
-              aliquotaImposta: _aliquotaImposta,
-              aliquotaInps: _aliquotaInps,
-            ),
-          );
-        },
-      ),
-    ),
-  ],
-),
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.analytics_outlined,
+                          title: 'Dettaglio\nfatture',
+                          value: '${fattureIncassate.length} incassate',
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => DettaglioFattureSheet(
+                                fattureIncassate: fattureIncassate,
+                                coefficienteRedditivita: _coefficienteRedditivita,
+                                aliquotaImposta: _aliquotaImposta,
+                                aliquotaInps: _aliquotaInps,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 12),
 
                   // PORTAFOGLIO EQUILIBRIO
