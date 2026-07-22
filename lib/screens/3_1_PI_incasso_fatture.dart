@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 
 class IncassoFattureSheet extends StatefulWidget {
-  final List<Map<String, dynamic>> fattureDaIncassare;
-  final List<String> contiWallet;
+  final List<Map<String, dynamic>>? fattureDaIncassare;
+  final List<String>? contiWallet;
   final double coefficienteRedditivita;
   final double aliquotaImposta;
   final double aliquotaInps;
@@ -15,16 +15,16 @@ class IncassoFattureSheet extends StatefulWidget {
     double importoLordo,
     double importoTasse,
     String dataFormattata,
-  ) onIncasse;
+  )? onIncasse;
 
   const IncassoFattureSheet({
     super.key,
-    required this.fattureDaIncassare,
-    required this.contiWallet,
+    this.fattureDaIncassare,
+    this.contiWallet,
     required this.coefficienteRedditivita,
     required this.aliquotaImposta,
     required this.aliquotaInps,
-    required this.onIncasse,
+    this.onIncasse,
   });
 
   @override
@@ -40,9 +40,67 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.contiWallet.isNotEmpty) {
-      _contoSelezionato = widget.contiWallet.first;
+    if (widget.contiWallet != null && widget.contiWallet!.isNotEmpty) {
+      _contoSelezionato = widget.contiWallet!.first;
     }
+  }
+
+  // DIALOGO DI CONFERMA ED ELIMINAZIONE ISTANTANEA
+  void _confermaEliminazione(BuildContext context, Map<String, dynamic> fattura) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141417),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 8),
+            Text('Elimina Fattura', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Sei sicuro di voler eliminare la fattura #${fattura['numero'] ?? ''} di "${fattura['cliente']}"?\nL\'azione non potrà essere annullata.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              final String id = fattura['id'] as String;
+
+              // 1. ELIMINA NEL PROVIDER
+              Provider.of<WalletProvider>(context, listen: false).eliminaFatturaPiva(id);
+
+              // 2. CHIUDI IL DIALOGO
+              Navigator.pop(ctx);
+
+              // 3. RINFRESCA IMMEDIATAMENTE LA SCHERMATA CORRENTE
+              setState(() {
+                if (_fatturaEspansaId == id) {
+                  _fatturaEspansaId = null;
+                }
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Fattura di "${fattura['cliente']}" eliminata.'),
+                  backgroundColor: const Color(0xFFEF4444),
+                ),
+              );
+            },
+            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _selezionaData(BuildContext context) async {
@@ -51,7 +109,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
       initialDate: _dataSelezionata,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      locale: const Locale('it', 'IT'),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -97,6 +154,15 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final walletProvider = Provider.of<WalletProvider>(context);
+
+    // LEGGI SEMPRE LA LISTA AGGIORNATA DAL PROVIDER
+    final fattureAttuali = walletProvider.fattureDaIncassare;
+    final contiDisponibili = widget.contiWallet ?? walletProvider.accounts.map((a) => a.title).toList();
+
+    if (_contoSelezionato == null && contiDisponibili.isNotEmpty) {
+      _contoSelezionato = contiDisponibili.first;
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -173,7 +239,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
                     // LISTA FATTURE DA INCASSARE
                     Expanded(
-                      child: widget.fattureDaIncassare.isEmpty
+                      child: fattureAttuali.isEmpty
                           ? const Center(
                               child: Text(
                                 'Nessuna fattura da incassare!',
@@ -182,12 +248,12 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                             )
                           : ListView.builder(
                               physics: const BouncingScrollPhysics(),
-                              itemCount: widget.fattureDaIncassare.length,
+                              itemCount: fattureAttuali.length,
                               itemBuilder: (context, index) {
-                                final f = widget.fattureDaIncassare[index];
+                                final f = fattureAttuali[index];
                                 final String id = f['id'] as String;
                                 final bool isEspansa = _fatturaEspansaId == id;
-                                final double lordo = f['importo'] as double;
+                                final double lordo = (f['importo'] as num).toDouble();
                                 final String nomeCliente = f['cliente'] as String;
 
                                 final double imponibile = lordo * widget.coefficienteRedditivita;
@@ -207,7 +273,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // INTESTAZIONE FATTURA
+                                      // INTESTAZIONE FATTURA CON CESTINO
                                       InkWell(
                                         onTap: () {
                                           setState(() {
@@ -221,19 +287,22 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           child: Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    nomeCliente,
-                                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    '${f['numero']} • ${f['data']}',
-                                                    style: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                  ),
-                                                ],
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      nomeCliente,
+                                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      '${f['numero'] ?? ''} • ${f['data'] ?? ''}',
+                                                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                               Row(
                                                 children: [
@@ -241,7 +310,23 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                     '+${lordo.toStringAsFixed(2)} €',
                                                     style: const TextStyle(color: Color(0xFF10B981), fontSize: 15, fontWeight: FontWeight.bold),
                                                   ),
-                                                  const SizedBox(width: 6),
+                                                  const SizedBox(width: 8),
+
+                                                  // 🗑️ CESTINO INTESTAZIONE (CANCELLAZIONE ISTANTANEA)
+                                                  InkWell(
+                                                    onTap: () => _confermaEliminazione(context, f),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(6),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+
                                                   Icon(
                                                     isEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                                                     color: Colors.white54,
@@ -335,7 +420,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                     if (_isTendinaContiAperta) ...[
                                                       const Divider(color: Colors.white12, height: 1),
                                                       Column(
-                                                        children: widget.contiWallet.map((conto) {
+                                                        children: contiDisponibili.map((conto) {
                                                           final bool isSelected = conto == _contoSelezionato;
                                                           return InkWell(
                                                             onTap: () {
@@ -411,48 +496,70 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
                                               const SizedBox(height: 14),
 
-                                              // PULSANTE CONFERMA INCASSO
-                                              SizedBox(
-                                                width: double.infinity,
-                                                child: ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: const Color(0xFF2DD4BF),
-                                                    foregroundColor: Colors.black,
-                                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                    elevation: 0,
+                                              // AZIONI: CESTINO + CONFERMA INCASSO
+                                              Row(
+                                                children: [
+                                                  // 🗑️ CESTINO DENTRO VISTA ESPANSA
+                                                  InkWell(
+                                                    onTap: () => _confermaEliminazione(context, f),
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(12),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                                                      ),
+                                                      child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                                    ),
                                                   ),
-                                                  onPressed: () {
-  if (_contoSelezionato != null) {
-    final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
+                                                  const SizedBox(width: 10),
 
-    // 1. INCASSO REALE NEL WALLET PROVIDER PASSANDO L'ID FATTURA
-    context.read<WalletProvider>().incassaFatturaPiva(
-      idFattura: id,
-      cliente: nomeCliente,
-      importoLordo: lordo,
-      importoTasse: tasseTotali,
-      contoDestinazione: _contoSelezionato!,
-    );
+                                                  // PULSANTE CONFERMA INCASSO
+                                                  Expanded(
+                                                    child: ElevatedButton(
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: const Color(0xFF2DD4BF),
+                                                        foregroundColor: Colors.black,
+                                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                        elevation: 0,
+                                                      ),
+                                                      onPressed: () {
+                                                        if (_contoSelezionato != null) {
+                                                          final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
 
-    // 2. CALLBACK LOCALE
-    widget.onIncasse(
-      id,
-      _contoSelezionato!,
-      lordo,
-      tasseTotali,
-      dataFormatted,
-    );
+                                                          // 1. INCASSO REALE NEL WALLET PROVIDER PASSANDO L'ID FATTURA
+                                                          context.read<WalletProvider>().incassaFatturaPiva(
+                                                            idFattura: id,
+                                                            cliente: nomeCliente,
+                                                            importoLordo: lordo,
+                                                            importoTasse: tasseTotali,
+                                                            contoDestinazione: _contoSelezionato!,
+                                                          );
 
-    // 3. CHIUDI MODALE
-    Navigator.pop(context);
-  }
-},
-                                                  child: const Text(
-                                                    'Conferma Incasso e Accantona Tasse',
-                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                          // 2. CALLBACK LOCALE SE PRESENTE
+                                                          if (widget.onIncasse != null) {
+                                                            widget.onIncasse!(
+                                                              id,
+                                                              _contoSelezionato!,
+                                                              lordo,
+                                                              tasseTotali,
+                                                              dataFormatted,
+                                                            );
+                                                          }
+
+                                                          // 3. CHIUDI MODALE
+                                                          Navigator.pop(context);
+                                                        }
+                                                      },
+                                                      child: const Text(
+                                                        'Conferma Incasso e Accantona',
+                                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
                                               ),
                                             ],
                                           ),

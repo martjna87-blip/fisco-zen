@@ -1,15 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../data/wallet_provider.dart';
 
 class DettaglioFattureSheet extends StatefulWidget {
-  final List<Map<String, dynamic>> fattureIncassate;
+  final List<Map<String, dynamic>>? fattureIncassate;
   final double coefficienteRedditivita;
   final double aliquotaImposta;
   final double aliquotaInps;
 
   const DettaglioFattureSheet({
     super.key,
-    required this.fattureIncassate,
+    this.fattureIncassate,
     required this.coefficienteRedditivita,
     required this.aliquotaImposta,
     required this.aliquotaInps,
@@ -27,13 +29,68 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
   ];
 
-  // METODO FILTRO INTELLIGENTE E TOLLERANTE PER I MESI
-  List<Map<String, dynamic>> _getFattureFiltrate() {
+  // METODO PER MOSTRARE IL DIALOGO DI CONFERMA ED ELIMINARE ISTANTANEAMENTE
+  void _confermaEliminazione(BuildContext context, Map<String, dynamic> fattura) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 8),
+            Text('Elimina Fattura', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Sei sicuro di voler eliminare la fattura "${fattura['cliente']}" (${fattura['numero'] ?? 'Fattura'})?\nQuesta azione la rimuoverà dal registro, dal bilancio e dai calcoli fiscali.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              final String? id = fattura['id'] as String?;
+              if (id != null) {
+                // 1. Rimuovi dal Provider globale
+                Provider.of<WalletProvider>(context, listen: false).eliminaFatturaPiva(id);
+              }
+
+              // 2. Chiudi modale di conferma
+              Navigator.pop(ctx);
+
+              // 3. Forza il refresh immediato del widget
+              setState(() {});
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Fattura di "${fattura['cliente']}" eliminata.'),
+                  backgroundColor: const Color(0xFFEF4444),
+                ),
+              );
+            },
+            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // METODO FILTRO INTELLIGENTE PER I MESI
+  List<Map<String, dynamic>> _getFattureFiltrate(List<Map<String, dynamic>> sorgenteFatture) {
     if (_meseSelezionato == 0) {
-      return widget.fattureIncassate;
+      return sorgenteFatture;
     }
 
-    return widget.fattureIncassate.where((f) {
+    return sorgenteFatture.where((f) {
       // 1. Controlla se esiste un valore numerico 'mese'
       if (f['mese'] != null && f['mese'] is int) {
         return f['mese'] == _meseSelezionato;
@@ -71,11 +128,13 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
+    final walletProvider = Provider.of<WalletProvider>(context);
 
-    // Otteniamo la lista filtrata
-    final fattureFiltrate = _getFattureFiltrate();
+    // LEGGI DIRETTAMENTE DAL PROVIDER PER AVERE AGGIORNAMENTI REALI IN TEMPO REALE
+    final listaTutteIncassate = walletProvider.fattureIncassate;
+    final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
 
-    // Calcolo Totali Fiscai sulla LISTA FILTRATA
+    // Calcolo Totali Fiscale sulla LISTA FILTRATA
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
@@ -132,7 +191,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                 ),
               ),
 
-              // 3. CONTENUTO ARTICOLATO IN 2 RIQUADRI GLASS
+              // 3. CONTENUTO GLASS
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
@@ -245,7 +304,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                                 const SizedBox(height: 10),
 
-                                // LISTA FATTURE (USA LA LISTA FILTRATA)
+                                // LISTA FATTURE
                                 Expanded(
                                   child: fattureFiltrate.isEmpty
                                       ? Center(
@@ -296,9 +355,28 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                           overflow: TextOverflow.ellipsis,
                                                         ),
                                                       ),
-                                                      Text(
-                                                        '+${lordo.toStringAsFixed(2)} €',
-                                                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.bold),
+                                                      Row(
+                                                        children: [
+                                                          Text(
+                                                            '+${lordo.toStringAsFixed(2)} €',
+                                                            style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.bold),
+                                                          ),
+                                                          const SizedBox(width: 8),
+
+                                                          // 🗑️ CESTINO CANCELLAZIONE ISTANTANEA
+                                                          InkWell(
+                                                            onTap: () => _confermaEliminazione(context, f),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                            child: Container(
+                                                              padding: const EdgeInsets.all(5),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                                borderRadius: BorderRadius.circular(8),
+                                                              ),
+                                                              child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
                                                     ],
                                                   ),

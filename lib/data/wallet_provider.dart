@@ -276,6 +276,14 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🗑️ ELIMINA FATTURA
+  void eliminaFatturaPiva(String idFattura) {
+    _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
+    _fattureIncassate.removeWhere((f) => f['id'] == idFattura);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+  
   // 🔄 RESET GLOBALE
   void resetTuttiIDati() {
     html.window.localStorage.clear();
