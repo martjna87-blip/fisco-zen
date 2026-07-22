@@ -103,6 +103,41 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
       });
     }
   }
+// ℹ️ DIALOGO DI SPIEGAZIONE DELLE PERCENTUALI
+  void _mostraInfoTasse(BuildContext context, String titolo, String spiegazione) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141417),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                titolo,
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          spiegazione,
+          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Ho capito', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -330,8 +365,32 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                         ),
                                         _buildRow('Imponibile Fiscale:', '${fiscaliIncassato['imponibile']!.toStringAsFixed(2)} €'),
                                         Divider(color: Colors.white.withOpacity(0.12), height: 12),
-                                        _buildRow('Saldo Tasse (Anno Y):', '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
-                                        _buildRow('Acconti (Anno Y+1) [80% INPS + 100% Imp]:', '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €', color: const Color(0xFFF97316)),
+                                       _buildRow(
+  'Saldo Tasse:',
+  '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €',
+  color: const Color(0xFFF59E0B),
+  onInfoTap: () => _mostraInfoTasse(
+    context,
+    'Saldo Tasse Anno Corrente',
+    'Rappresenta le tasse reali sul fatturato incassato sull\'Imponibile Fiscale (${(_coeffSelezionato * 100).toInt()}%):\n\n'
+    '• INPS: ${(widget.aliquotaInps * 100).toStringAsFixed(2)}%\n'
+    '• Imposta Sostitutiva: ${(widget.aliquotaImposta * 100).toInt()}%\n\n'
+    'Totale Saldo = ${((widget.aliquotaInps + widget.aliquotaImposta) * 100).toStringAsFixed(2)}% sull\'Imponibile.',
+  ),
+),
+_buildRow(
+  'Accont Tasse',
+  '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €',
+  color: const Color(0xFFF97316),
+  onInfoTap: () => _mostraInfoTasse(
+    context,
+    'Acconti Anno Successivo',
+    'Sono i contributi e le tasse che lo Stato chiede di anticipare per l\'anno a venire:\n\n'
+    '• Acconto INPS: 80% dell\'INPS calcolato quest\'anno\n'
+    '• Acconto Imposta: 100% dell\'Imposta calcolata quest\'anno\n\n'
+    'Accantonarli ora ti evita brutte sorprese alla prossima dichiarazione dei redditi!',
+  ),
+),
                                         Divider(color: Colors.white.withOpacity(0.12), height: 12),
                                         _buildRow('Totale da Accantonare:', '-${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
                                         _buildRow('Netto Spendibile Reale:', '${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €', color: const Color(0xFF2DD4BF), isBold: true),
@@ -561,21 +620,35 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isBold = false, Color? color}) {
+  Widget _buildRow(String label, String value, {bool isBold = false, Color? color, VoidCallback? onInfoTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isBold ? Colors.white70 : Colors.white54,
-                fontSize: 10,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isBold ? Colors.white70 : Colors.white54,
+                      fontSize: 10,
+                      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (onInfoTap != null) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: onInfoTap,
+                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 13),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: 8),
