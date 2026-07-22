@@ -379,7 +379,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
   ),
 ),
 _buildRow(
-  'Accont Tasse',
+  'Acconto Tasse',
   '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €',
   color: const Color(0xFFF97316),
   onInfoTap: () => _mostraInfoTasse(
