@@ -403,50 +403,51 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // TRIPTICO CARDS
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.add_circle_outline_rounded,
-                          title: 'Nuova\nfattura',
-                          value: '+ Registra',
-                          onTap: _mostraDialogRegistraFattura,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                  // 📍 NELLA SEZIONE TRIPTICO CARDS IN HomeScreen:
+Row(
+  children: [
+    Expanded(
+      child: _buildMiniCard(
+        icon: Icons.add_circle_outline_rounded,
+        title: 'Nuova\nfattura',
+        value: '+ Registra',
+        onTap: _mostraDialogRegistraFattura,
+      ),
+    ),
+    const SizedBox(width: 8),
 
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.shield_outlined,
-                          title: 'Stima Tasse\nP.IVA',
-                          value: '${tasseAccantonate.toStringAsFixed(2)} €',
-                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+    // 🛡️ STIMA TASSE TOTALE (Incassate + In Sospeso)
+    Expanded(
+      child: _buildMiniCard(
+        icon: Icons.shield_outlined,
+        title: 'Stima Tasse\nP.IVA',
+        // Somma le tasse già accantonate con le tasse stimate sulle fatture in sospeso
+        value: '${(tasseAccantonate + tasseStimateInSospeso).toStringAsFixed(2)} €',
+        onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+      ),
+    ),
+    const SizedBox(width: 8),
 
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.analytics_outlined,
-                          title: 'Dettaglio\nfatture',
-                          value: '${fattureIncassate.length} incassate',
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => DettaglioFattureSheet(
-                                fattureIncassate: fattureIncassate,
-                                coefficienteRedditivita: _coefficienteRedditivita,
-                                aliquotaImposta: _aliquotaImposta,
-                                aliquotaInps: _aliquotaInps,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
+    Expanded(
+      child: _buildMiniCard(
+        icon: Icons.analytics_outlined,
+        title: 'Dettaglio\nfatture',
+        value: '${fattureIncassate.length} incassate',
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => DettaglioFattureSheet(
+              fattureIncassate: fattureIncassate,
+              coefficienteRedditivita: _coefficienteRedditivita,
+              aliquotaImposta: _aliquotaImposta,
+              aliquotaInps: _aliquotaInps,
+            ),
+          );
+        },
+      ),
+    ),
+  ],
+),
                   const SizedBox(height: 12),
 
                   // PORTAFOGLIO EQUILIBRIO

@@ -206,7 +206,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                 margin: const EdgeInsets.all(12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF141417).withOpacity(0.75),
+                  color: const Color(0xFF141417).withOpacity(0.80),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: Colors.white.withOpacity(0.18)),
                 ),
@@ -256,15 +256,28 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                 final double lordo = (f['importo'] as num).toDouble();
                                 final String nomeCliente = f['cliente'] as String;
 
+                                // 🧮 CALCOLO FISCALE COMPLETO (SALDO Y + ACCONTI Y+1)
                                 final double imponibile = lordo * widget.coefficienteRedditivita;
-                                final double tasseTotali = imponibile * (widget.aliquotaImposta + widget.aliquotaInps);
-                                final double disponibileNetto = lordo - tasseTotali;
+
+                                // 1. Tasse Saldo Anno Corrente (Y)
+                                final double inpsY = imponibile * widget.aliquotaInps;
+                                final double impostaY = imponibile * widget.aliquotaImposta;
+                                final double totaleSaldoY = inpsY + impostaY;
+
+                                // 2. Acconti Anno Successivo (Y+1)
+                                final double accontoInpsY1 = inpsY * 0.80;       // 80% INPS
+                                final double accontoImpostaY1 = impostaY * 1.00;  // 100% Imposta Sostitutiva
+                                final double totaleAccontiY1 = accontoInpsY1 + accontoImpostaY1;
+
+                                // 3. Totale da accantonare & Netto Spendibile Reale
+                                final double tasseTotaliAccantonare = totaleSaldoY + totaleAccontiY1;
+                                final double disponibileNetto = lordo - tasseTotaliAccantonare;
 
                                 return AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
-                                    color: isEspansa ? Colors.black.withOpacity(0.5) : Colors.black.withOpacity(0.3),
+                                    color: isEspansa ? Colors.black.withOpacity(0.55) : Colors.black.withOpacity(0.30),
                                     borderRadius: BorderRadius.circular(18),
                                     border: Border.all(
                                       color: isEspansa ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
@@ -273,7 +286,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // INTESTAZIONE FATTURA CON CESTINO
+                                      // INTESTAZIONE FATTURA
                                       InkWell(
                                         onTap: () {
                                           setState(() {
@@ -347,26 +360,30 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              // DETTAGLI INCASSO
+                                              // DETTAGLI INCASSO (LAYOUT CORRETTO SENZA OVERFLOW)
                                               Container(
-                                                padding: const EdgeInsets.all(10),
+                                                padding: const EdgeInsets.all(12),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.3),
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  color: Colors.black.withOpacity(0.35),
+                                                  borderRadius: BorderRadius.circular(14),
                                                   border: Border.all(color: Colors.white12),
                                                 ),
                                                 child: Column(
                                                   children: [
                                                     _buildDetailRow(Icons.add_circle_outline, 'Entrata Incasso Lordo:', '+${lordo.toStringAsFixed(2)} €', const Color(0xFF10B981)),
-                                                    const SizedBox(height: 4),
-                                                    _buildDetailRow(Icons.remove_circle_outline, 'Accantonamento Tasse:', '-${tasseTotali.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
-                                                    const Divider(color: Colors.white12, height: 10),
-                                                    _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spedibile Netto:', '${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+                                                    const SizedBox(height: 6),
+                                                    _buildDetailRow(Icons.remove_circle_outline, 'Saldo Tasse (Anno Y):', '-${totaleSaldoY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
+                                                    const SizedBox(height: 6),
+                                                    _buildDetailRow(Icons.history_toggle_off_rounded, 'Acconti (Anno Y+1):', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
+                                                    const Divider(color: Colors.white12, height: 14),
+                                                    _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFFEF4444), isBold: true),
+                                                    const SizedBox(height: 6),
+                                                    _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
                                                   ],
                                                 ),
                                               ),
 
-                                              const SizedBox(height: 12),
+                                              const SizedBox(height: 14),
 
                                               // SELEZIONE CONTO A TENDINA IN-LINE
                                               const Text('SELEZIONA CONTO DI ACCREDITO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
@@ -494,72 +511,52 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                 ),
                                               ),
 
-                                              const SizedBox(height: 14),
+                                              const SizedBox(height: 16),
 
-                                              // AZIONI: CESTINO + CONFERMA INCASSO
-                                              Row(
-                                                children: [
-                                                  // 🗑️ CESTINO DENTRO VISTA ESPANSA
-                                                  InkWell(
-                                                    onTap: () => _confermaEliminazione(context, f),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.all(12),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
-                                                      ),
-                                                      child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                                                    ),
+                                              // PULSANTE CONFERMA INCASSO (A LARGHEZZA PIENA)
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: const Color(0xFF2DD4BF),
+                                                    foregroundColor: Colors.black,
+                                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                                    elevation: 0,
                                                   ),
-                                                  const SizedBox(width: 10),
+                                                  onPressed: () {
+                                                    if (_contoSelezionato != null) {
+                                                      final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
 
-                                                  // PULSANTE CONFERMA INCASSO
-                                                  Expanded(
-                                                    child: ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: const Color(0xFF2DD4BF),
-                                                        foregroundColor: Colors.black,
-                                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                        elevation: 0,
-                                                      ),
-                                                      onPressed: () {
-                                                        if (_contoSelezionato != null) {
-                                                          final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
+                                                      // 1. INCASSO REALE CON TOTALE COMPLETO DI ACCONTI
+                                                      context.read<WalletProvider>().incassaFatturaPiva(
+                                                        idFattura: id,
+                                                        cliente: nomeCliente,
+                                                        importoLordo: lordo,
+                                                        importoTasse: tasseTotaliAccantonare,
+                                                        contoDestinazione: _contoSelezionato!,
+                                                      );
 
-                                                          // 1. INCASSO REALE NEL WALLET PROVIDER PASSANDO L'ID FATTURA
-                                                          context.read<WalletProvider>().incassaFatturaPiva(
-                                                            idFattura: id,
-                                                            cliente: nomeCliente,
-                                                            importoLordo: lordo,
-                                                            importoTasse: tasseTotali,
-                                                            contoDestinazione: _contoSelezionato!,
-                                                          );
+                                                      // 2. CALLBACK LOCALE SE PRESENTE
+                                                      if (widget.onIncasse != null) {
+                                                        widget.onIncasse!(
+                                                          id,
+                                                          _contoSelezionato!,
+                                                          lordo,
+                                                          tasseTotaliAccantonare,
+                                                          dataFormatted,
+                                                        );
+                                                      }
 
-                                                          // 2. CALLBACK LOCALE SE PRESENTE
-                                                          if (widget.onIncasse != null) {
-                                                            widget.onIncasse!(
-                                                              id,
-                                                              _contoSelezionato!,
-                                                              lordo,
-                                                              tasseTotali,
-                                                              dataFormatted,
-                                                            );
-                                                          }
-
-                                                          // 3. CHIUDI MODALE
-                                                          Navigator.pop(context);
-                                                        }
-                                                      },
-                                                      child: const Text(
-                                                        'Conferma Incasso e Accantona',
-                                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                                      ),
-                                                    ),
+                                                      // 3. CHIUDI MODALE
+                                                      Navigator.pop(context);
+                                                    }
+                                                  },
+                                                  child: const Text(
+                                                    'Conferma Incasso e Accantona',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                   ),
-                                                ],
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -581,24 +578,31 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
     );
   }
 
+  // HELPER ROW FLESSIBILE SENZA PROBLEMI DI OVERFLOW
   Widget _buildDetailRow(IconData icon, String label, String value, Color color, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isBold ? Colors.white : Colors.white70,
-                fontSize: 11,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+        Expanded(
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isBold ? Colors.white : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
