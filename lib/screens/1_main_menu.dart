@@ -119,7 +119,7 @@ class _MainMenuState extends State<MainMenu> {
     );
   }
 
-  // 🟢 PULSANTE CENTRALE RIALZATO CHE APRE LO SCONTRINO!
+  // 🟢 PULSANTE CENTRALE RIALZATO CHE APRE DIRETTAMENTE USCITA!
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
@@ -127,7 +127,7 @@ class _MainMenuState extends State<MainMenu> {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => const AddMovementSheet(),
+          builder: (context) => const AddMovementSheet(initialTab: 'uscita'), // 👈 Passiamo 'uscita'!
         );
       },
       child: Container(

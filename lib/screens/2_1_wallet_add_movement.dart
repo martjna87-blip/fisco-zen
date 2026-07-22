@@ -5,14 +5,20 @@ import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
 
 class AddMovementSheet extends StatefulWidget {
-  const AddMovementSheet({super.key});
+  final String initialTab; // 👈 Aggiungiamo la scelta dinamica
+
+  const AddMovementSheet({
+    super.key,
+    this.initialTab = 'riepilogo', // Di default apre il riepilogo
+  });
 
   @override
   State<AddMovementSheet> createState() => _AddMovementSheetState();
 }
 
 class _AddMovementSheetState extends State<AddMovementSheet> {
-  String _tipoMovimento = 'riepilogo'; // 'riepilogo', 'uscita' o 'entrata'
+  late String _tipoMovimento; // 👈 Diciamo a Flutter che lo imposteremo dopo
+
   final ImagePicker _picker = ImagePicker();
   bool _isAnalyzing = false;
   String _vistaRiepilogo = 'categoria'; // 'categoria' o 'data'
@@ -125,9 +131,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   IconData _iconaCorrente = Icons.shopping_cart_outlined;
 
-  @override
+ @override
   void initState() {
     super.initState();
+    _tipoMovimento = widget.initialTab; // 👈 Imposta la scheda passata dal bottone!
     _noteController.addListener(_suggerisciCategoriaAuto);
   }
 

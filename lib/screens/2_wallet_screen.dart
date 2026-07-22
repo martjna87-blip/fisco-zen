@@ -136,7 +136,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               context: context,
                               isScrollControlled: true,
                               backgroundColor: Colors.transparent,
-                              builder: (context) => const AddMovementSheet(),
+                              builder: (context) => const AddMovementSheet(initialTab: 'riepilogo'), // 👈 Apre Riepilogo
                             );
                           },
                         ),
