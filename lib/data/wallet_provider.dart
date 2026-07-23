@@ -114,6 +114,27 @@ class WalletProvider extends ChangeNotifier {
     _caricaDatiDaLocalStorage();
   }
 
+  // 🗑️ 1. ELIMINA UN CONTO
+  void deleteAccount(String accountId) {
+    // Blocco di sicurezza: deve esserci sempre almeno 1 conto attivo
+    if (_accounts.length <= 1) {
+      throw Exception('Impossibile eliminare: deve esserci almeno un conto attivo.');
+    }
+    _accounts.removeWhere((a) => a.id == accountId);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // ✏️ 2. MODIFICA IMPORTO / SALDO DEL CONTO
+  void updateAccountAmount(String accountId, double newAmount) {
+    final idx = _accounts.indexWhere((a) => a.id == accountId);
+    if (idx != -1) {
+      _accounts[idx].amount = newAmount;
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+  
   // 📥 LETTURA ISTANTANEA DA LOCALSTORAGE
   void _caricaDatiDaLocalStorage() {
     try {

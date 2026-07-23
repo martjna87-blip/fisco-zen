@@ -20,6 +20,118 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     super.dispose();
   }
 
+  // 🗑️ DIALOG DI CONFERMA ELIMINAZIONE CONTO
+  void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141417),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 8),
+            Text('Elimina Conto', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Vuoi davvero eliminare il conto "${account.title}"?\nQuesta azione non potrà essere annullata.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              try {
+                context.read<WalletProvider>().deleteAccount(account.id);
+                Navigator.pop(ctx);
+                setState(() {
+                  _contoEspansoIndex = null;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Conto "${account.title}" eliminato.'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              } catch (e) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$e'.replaceAll('Exception: ', '')),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              }
+            },
+            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✏️ DIALOG MODIFICA IMPORTO SALDO CONTO
+  void _mostraDialogModificaSaldo(BuildContext context, AccountModel account) {
+    final TextEditingController controller = TextEditingController(
+      text: account.amount.toStringAsFixed(2),
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C21),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Modifica Saldo: ${account.title}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            labelText: 'Nuovo Saldo Apertura (€)',
+            labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final nuovoSaldo = double.tryParse(controller.text.replaceAll(',', '.')) ?? account.amount;
+              context.read<WalletProvider>().updateAccountAmount(account.id, nuovoSaldo);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Saldo di "${account.title}" aggiornato!'),
+                  backgroundColor: const Color(0xFF10B981),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2DD4BF),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Salva Saldo', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // SCROLL AUTOMATICO REGOLATO FLUIDO
   void _scrollToOffset(double deltaPixels) {
     Future.delayed(const Duration(milliseconds: 180), () {
@@ -740,11 +852,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                       child: Column(
                                                         crossAxisAlignment: CrossAxisAlignment.start,
                                                         children: [
-                                                          // PULSANTE VEDI DETTAGLIO MOVIMENTI
+                                                          // 1. PULSANTE VEDI DETTAGLIO MOVIMENTI
                                                           InkWell(
-                                                            onTap: () {
-                                                              _mostraDettaglioMovimentiConto(context, account);
-                                                            },
+                                                            onTap: () => _mostraDettaglioMovimentiConto(context, account),
                                                             borderRadius: BorderRadius.circular(10),
                                                             child: Container(
                                                               width: double.infinity,
@@ -767,45 +877,48 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                               ),
                                                             ),
                                                           ),
-                                                          const SizedBox(height: 12),
-                                                          const Text('MODIFICA RAPIDA SALDO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                          const SizedBox(height: 6),
+                                                          const SizedBox(height: 10),
+
+                                                          // 2. PULSANTI AZIONE: MODIFICA SALDO E ELIMINA CONTO
                                                           Row(
                                                             children: [
+                                                              // TASTO MATITA: MODIFICA IMPORTO
                                                               Expanded(
-                                                                child: Container(
-                                                                  height: 38,
-                                                                  decoration: BoxDecoration(
-                                                                    color: Colors.black.withOpacity(0.3),
-                                                                    borderRadius: BorderRadius.circular(10),
-                                                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                                                  ),
-                                                                  child: TextField(
-                                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                                                    decoration: InputDecoration(
-                                                                      hintText: '${account.amount.toStringAsFixed(2)} €',
-                                                                      hintStyle: const TextStyle(color: Colors.white24, fontSize: 11),
-                                                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                                      border: InputBorder.none,
+                                                                child: InkWell(
+                                                                  onTap: () => _mostraDialogModificaSaldo(context, account),
+                                                                  borderRadius: BorderRadius.circular(10),
+                                                                  child: Container(
+                                                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                                                    decoration: BoxDecoration(
+                                                                      color: Colors.white.withOpacity(0.08),
+                                                                      borderRadius: BorderRadius.circular(10),
+                                                                      border: Border.all(color: Colors.white12),
                                                                     ),
-                                                                    onSubmitted: (val) {
-                                                                      final nuovoSaldo = double.tryParse(val.replaceAll(',', '.')) ?? account.amount;
-                                                                      final differenza = nuovoSaldo - account.amount;
-                                                                      if (differenza != 0) {
-                                                                        context.read<WalletProvider>().addTransaction(
-                                                                              title: 'Rettifica Saldo (${account.title})',
-                                                                              amount: differenza.abs(),
-                                                                              isIncome: differenza > 0,
-                                                                              category: 'Risparmi',
-                                                                              accountId: account.id,
-                                                                            );
-                                                                      }
-                                                                      setState(() {
-                                                                        _contoEspansoIndex = null;
-                                                                      });
-                                                                    },
+                                                                    child: const Row(
+                                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                                      children: [
+                                                                        Icon(Icons.edit_rounded, color: Colors.white70, size: 14),
+                                                                        SizedBox(width: 6),
+                                                                        Text('Modifica Saldo', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                                      ],
+                                                                    ),
                                                                   ),
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 8),
+
+                                                              // TASTO CESTINO: ELIMINA CONTO
+                                                              InkWell(
+                                                                onTap: () => _confermaEliminazioneConto(context, account),
+                                                                borderRadius: BorderRadius.circular(10),
+                                                                child: Container(
+                                                                  padding: const EdgeInsets.all(8),
+                                                                  decoration: BoxDecoration(
+                                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                                    borderRadius: BorderRadius.circular(10),
+                                                                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                                                                  ),
+                                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
                                                                 ),
                                                               ),
                                                             ],
@@ -814,7 +927,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                       ),
                                                     ),
                                                   ],
-                                                ],
+                                                ], // 👈 QUESTA ERA LA PARENTESI QUADRA MANCANTE!
                                               ),
                                             );
                                           },
