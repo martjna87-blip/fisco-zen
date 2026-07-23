@@ -107,8 +107,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // ✏️ DIALOG MODIFICA IMPORTO SALDO CONTO
-  void _mostraDialogModificaSaldo(BuildContext context, AccountModel account) {
+  // ✏️ DIALOG MODIFICA NOME E SALDO CONTO
+  void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
+    final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
       text: account.amount.toStringAsFixed(2),
     );
@@ -118,18 +119,37 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1C1C21),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Modifica Saldo: ${account.title}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            labelText: 'Nuovo Saldo Apertura (€)',
-            labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
+        title: const Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomeController,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Nome Conto',
+                  labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  labelText: 'Nuovo Saldo (€)',
+                  labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -139,22 +159,33 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
           ),
           ElevatedButton(
             onPressed: () {
+              final nuovoNome = nomeController.text.trim();
               final nuovoSaldo = double.tryParse(controller.text.replaceAll(',', '.')) ?? account.amount;
-              context.read<WalletProvider>().updateAccountAmount(account.id, nuovoSaldo);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Saldo di "${account.title}" aggiornato!'),
-                  backgroundColor: const Color(0xFF10B981),
-                ),
-              );
+
+              if (nuovoNome.isNotEmpty) {
+                context.read<WalletProvider>().updateAccountDetails(
+                      accountId: account.id,
+                      newTitle: nuovoNome,
+                      newAmount: nuovoSaldo,
+                    );
+                Navigator.pop(ctx);
+                setState(() {
+                  _contoEspansoIndex = null;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Conto "$nuovoNome" aggiornato!'),
+                    backgroundColor: const Color(0xFF10B981),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2DD4BF),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Salva Saldo', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Salva', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -858,15 +889,22 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                         ),
                                         const SizedBox(height: 8),
 
-                                        ListView.builder(
+                                        ReorderableListView.builder(
                                           shrinkWrap: true,
                                           physics: const NeverScrollableScrollPhysics(),
                                           itemCount: accounts.length,
+                                          onReorder: (oldIndex, newIndex) {
+                                            setState(() {
+                                              _contoEspansoIndex = null;
+                                            });
+                                            context.read<WalletProvider>().reorderAccounts(oldIndex, newIndex);
+                                          },
                                           itemBuilder: (context, index) {
                                             final account = accounts[index];
                                             final bool isEspanso = _contoEspansoIndex == index;
 
                                             return AnimatedContainer(
+                                              key: ValueKey(account.id),
                                               duration: const Duration(milliseconds: 200),
                                               margin: const EdgeInsets.only(bottom: 10),
                                               decoration: BoxDecoration(
@@ -894,6 +932,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                       padding: const EdgeInsets.all(12),
                                                       child: Row(
                                                         children: [
+                                                          const Icon(Icons.drag_handle_rounded, color: Colors.white24, size: 18),
+                                                          const SizedBox(width: 8),
+
                                                           Container(
                                                             padding: const EdgeInsets.all(8),
                                                             decoration: BoxDecoration(
@@ -901,7 +942,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                               shape: BoxShape.circle,
                                                             ),
                                                             child: Icon(
-                                                              _getAccountIcon(account), // 👈 Usa l'helper automatico!
+                                                              _getAccountIcon(account),
                                                               color: account.color,
                                                               size: 18,
                                                             ),
@@ -974,7 +1015,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                             children: [
                                                               Expanded(
                                                                 child: InkWell(
-                                                                  onTap: () => _mostraDialogModificaSaldo(context, account),
+                                                                  onTap: () => _mostraDialogModificaConto(context, account),
                                                                   borderRadius: BorderRadius.circular(10),
                                                                   child: Container(
                                                                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -988,7 +1029,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                                       children: [
                                                                         Icon(Icons.edit_rounded, color: Colors.white70, size: 14),
                                                                         SizedBox(width: 6),
-                                                                        Text('Modifica Saldo', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                                        Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                                                                       ],
                                                                     ),
                                                                   ),
@@ -1020,7 +1061,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                             );
                                           },
                                         ),
-
                                         const SizedBox(height: 12),
                                       ],
                                     ),

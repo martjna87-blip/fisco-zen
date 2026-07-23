@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 class AccountModel {
   final String id;
-  final String title;
+  String title; // 👈 RIMOSSO 'final' PER PERMETTERE LA MODIFICA DEL NOME
   final String subtitle;
   double amount;
   final Color color;
@@ -83,7 +83,9 @@ class WalletProvider extends ChangeNotifier {
   List<AccountModel> _accounts = [
     AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
     AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
-    AccountModel(id: '3', title: 'Salvadanaio Emergenze / Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+    AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+    AccountModel(id: '4', title: 'Salvadanaio Acconto Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
@@ -424,7 +426,9 @@ class WalletProvider extends ChangeNotifier {
     _accounts = [
       AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
       AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
-      AccountModel(id: '3', title: 'Salvadanaio Emergenze / Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+      AccountModel(id: '4', title: 'Salvadanaio Acconto Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+
     ];
 
     _spesoBisogni = 0.00;
@@ -435,6 +439,33 @@ class WalletProvider extends ChangeNotifier {
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();
 
+    notifyListeners();
+  }
+
+    // ✏️ MODIFICA NOME E SALDO CONTO
+  void updateAccountDetails({
+    required String accountId,
+    required String newTitle,
+    required double newAmount,
+  }) {
+    final idx = _accounts.indexWhere((a) => a.id == accountId);
+    if (idx != -1) {
+      _accounts[idx].title = newTitle;
+      _accounts[idx].amount = newAmount;
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+
+    // 🔀 RIORDINA LA LISTA DEI CONTI
+  void reorderAccounts(int oldIndex, int newIndex) {
+    if (oldIndex < newIndex) {
+      newIndex -= 1; // Aggiustamento indice richiesto da Flutter quando si sposta verso il basso
+    }
+    final AccountModel item = _accounts.removeAt(oldIndex);
+    _accounts.insert(newIndex, item);
+
+    _salvaDatiInLocalStorage(); // Salva il nuovo ordine nella memoria
     notifyListeners();
   }
 }
