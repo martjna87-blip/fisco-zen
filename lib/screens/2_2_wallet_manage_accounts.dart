@@ -20,6 +20,35 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     super.dispose();
   }
 
+  // 🎨 ASSEGNA IL COLORE IN BASE ALLA TIPOLOGIA
+  Color _getAccountTypeColor(String tipo) {
+    switch (tipo) {
+      case 'Carta Prepagata / Debito':
+        return const Color(0xFFF59E0B);
+      case 'Riserva / Accumulo':
+        return const Color(0xFF3B82F6);
+      case 'Conto Titoli / Investimenti':
+        return const Color(0xFFA855F7);
+      case 'Conto Corrente':
+      default:
+        return const Color(0xFF2DD4BF);
+    }
+  }
+
+  // 🏛️ RICONOSCE L'ICONA IN AUTOMATICO
+  IconData _getAccountIcon(AccountModel account) {
+    final text = '${account.title} ${account.subtitle}'.toLowerCase();
+    if (text.contains('carta') || text.contains('prepagata') || text.contains('debito')) {
+      return Icons.credit_card_rounded;
+    } else if (text.contains('salvadanaio') || text.contains('riserva') || text.contains('accumulo')) {
+      return Icons.savings_outlined;
+    } else if (text.contains('titoli') || text.contains('investiment')) {
+      return Icons.show_chart_rounded;
+    } else {
+      return Icons.account_balance_outlined;
+    }
+  }
+  
   // 🗑️ DIALOG DI CONFERMA ELIMINAZIONE CONTO
   void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
     showDialog(
@@ -291,9 +320,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // DIALOG NUOVO CONTO CON SELETTORE IN-LINE INTEGRATO
+  // DIALOG NUOVO CONTO COMPLETAMENTE CUSTOMIZZABILE
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeController = TextEditingController();
+    final TextEditingController dettaglioController = TextEditingController();
     final TextEditingController saldoController = TextEditingController();
     String tipoSelezionato = 'Conto Corrente';
     bool isTipoEspanso = false;
@@ -317,11 +347,12 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 1. NOME CONTO
                 TextField(
                   controller: nomeController,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
-                    labelText: 'Nome Conto o Carta',
+                    labelText: 'Nome Conto o Carta (es. Hype, Fineco)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
@@ -329,20 +360,22 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                // 2. DETTAGLIO / SOTTOTITOLO OPZIONALE
                 TextField(
-                  controller: saldoController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  controller: dettaglioController,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
-                    labelText: 'Saldo Iniziale (€)',
+                    labelText: 'Dettaglio / Note (es. IBAN •• 4092)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Colors.white54, size: 16),
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                // 3. SELETTORE TIPOLOGIA CONTO
                 const Text('TIPOLOGIA CONTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
 
@@ -358,6 +391,22 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     });
                   },
                 ),
+                const SizedBox(height: 12),
+
+                // 4. SALDO INIZIALE
+                TextField(
+                  controller: saldoController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Saldo Iniziale (€)',
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 16),
+                  ),
+                ),
               ],
             ),
           ),
@@ -369,6 +418,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
             ElevatedButton(
               onPressed: () {
                 final nome = nomeController.text.trim();
+                final dettaglioText = dettaglioController.text.trim();
                 final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
 
                 if (nome.isEmpty) {
@@ -383,12 +433,15 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
                 try {
                   final provider = context.read<WalletProvider>();
+                  final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
+                  final coloreConto = _getAccountTypeColor(tipoSelezionato);
 
+                  // Aggiunge il conto assegnando colore e sottotitolo corretti
                   provider.addAccount(
                     title: nome,
-                    subtitle: tipoSelezionato,
+                    subtitle: sottotitoloFinale,
                     initialAmount: saldo,
-                    color: const Color(0xFF2DD4BF),
+                    color: coloreConto,
                   );
 
                   if (saldo > 0) {
@@ -431,6 +484,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
+  
   // DIALOG GIROCONTO CON SELETTORI IN-LINE INTEGRATI
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
@@ -847,9 +901,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                               shape: BoxShape.circle,
                                                             ),
                                                             child: Icon(
-                                                              account.id == '1'
-                                                                  ? Icons.account_balance_outlined
-                                                                  : (account.id == '2' ? Icons.credit_card_rounded : Icons.savings_outlined),
+                                                              _getAccountIcon(account), // 👈 Usa l'helper automatico!
                                                               color: account.color,
                                                               size: 18,
                                                             ),
