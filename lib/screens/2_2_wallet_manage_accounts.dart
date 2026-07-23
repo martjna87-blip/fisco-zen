@@ -148,7 +148,13 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   // FUNZIONE PER APRIRE IL DETTAGLIO MOVIMENTI DEL CONTO REALI
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
-    final movimentiConto = transactions.where((t) => t.title.contains(account.title) || account.title.contains(t.title)).toList();
+
+    // 👈 FILTRO INTELLIGENTE PER ID O TITOLO
+    final movimentiConto = transactions.where((t) =>
+      t.accountId == account.id ||
+      t.title.contains(account.title) ||
+      account.title.contains(t.title)
+    ).toList();
 
     showDialog(
       context: context,

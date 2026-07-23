@@ -320,14 +320,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ? _sottocategoriaSelezionata 
         : _sottocategoriaEntrataSelezionata;
 
-    String? accountId;
-    if (_contoSelezionato.contains('Carta Spese')) {
-      accountId = '2';
-    } else if (_contoSelezionato.contains('Salvadanaio')) {
-      accountId = '3';
-    } else {
-      accountId = '1';
-    }
+    // 👈 Cerca l'account reale che corrisponde al nome selezionato
+    final accounts = context.read<WalletProvider>().accounts;
+    final matchingAccount = accounts.firstWhere(
+      (acc) => acc.title == _contoSelezionato || _contoSelezionato.contains(acc.title),
+      orElse: () => accounts.first,
+    );
+
+    final String accountId = matchingAccount.id;
 
     context.read<WalletProvider>().addTransaction(
       title: descrizione,

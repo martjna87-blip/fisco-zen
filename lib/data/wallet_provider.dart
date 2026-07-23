@@ -43,6 +43,7 @@ class TransactionModel {
   final bool isIncome;
   final String category;
   final DateTime date;
+  final String? accountId; // 👈 NUOVO CAMPO
 
   TransactionModel({
     required this.id,
@@ -52,6 +53,7 @@ class TransactionModel {
     required this.isIncome,
     required this.category,
     required this.date,
+    this.accountId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -62,6 +64,7 @@ class TransactionModel {
         'isIncome': isIncome,
         'category': category,
         'date': date.toIso8601String(),
+        'accountId': accountId,
       };
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => TransactionModel(
@@ -72,6 +75,7 @@ class TransactionModel {
         isIncome: json['isIncome'] as bool,
         category: json['category'] as String,
         date: DateTime.parse(json['date'] as String),
+        accountId: json['accountId'] as String?,
       );
 }
 
@@ -194,9 +198,17 @@ class WalletProvider extends ChangeNotifier {
     required bool isIncome,
     required String category,
     String? accountId,
-    DateTime? date, // 👈 AGGIUNTA PARAMETRO DATA
+    DateTime? date,
   }) {
     final DateTime dataUso = date ?? DateTime.now();
+
+    // 1. Trova il conto di destinazione
+    final targetAccount = _accounts.firstWhere(
+      (acc) => acc.id == (accountId ?? '1'),
+      orElse: () => _accounts.first,
+    );
+
+    // 2. Crea la transazione salvando l'ID del conto
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -204,16 +216,13 @@ class WalletProvider extends ChangeNotifier {
       amount: amount,
       isIncome: isIncome,
       category: category,
-      date: dataUso, // 👈 USA LA DATA PASSATA
+      date: dataUso,
+      accountId: targetAccount.id, // 👈 Collega il movimento al conto
     );
 
     _transactions.insert(0, newTx);
 
-    final targetAccount = _accounts.firstWhere(
-      (acc) => acc.id == (accountId ?? '1'),
-      orElse: () => _accounts.first,
-    );
-
+    // 3. Aggiorna i saldi e le statistiche
     if (isIncome) {
       targetAccount.amount += amount;
     } else {
