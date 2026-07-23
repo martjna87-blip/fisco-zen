@@ -360,6 +360,33 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
+  // ➕ METODO PER AGGIUNGERE UN NUOVO CONTO (CORRETTO)
+  void addAccount({
+    required String title,
+    required String subtitle,
+    required double initialAmount,
+    required Color color,
+  }) {
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    final newAccount = AccountModel(
+      id: newId,
+      title: title,
+      subtitle: subtitle,
+      amount: initialAmount,
+      color: color,
+    );
+
+    // 1. Usa la lista privata _accounts (che è modificabile)
+    _accounts.add(newAccount);
+
+    // 2. Salva il nuovo conto nel LocalStorage
+    _salvaDatiInLocalStorage();
+
+    // 3. Aggiorna l'interfaccia
+    notifyListeners();
+  }
+
   // 🔄 RESET GLOBALE
   void resetTuttiIDati() {
     html.window.localStorage.clear();

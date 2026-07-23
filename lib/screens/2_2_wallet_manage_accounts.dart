@@ -200,16 +200,57 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 final nome = nomeController.text.trim();
                 final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
 
-                if (nome.isNotEmpty) {
+                // 1. Controlla che il campo nome non sia vuoto
+                if (nome.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Inserisci un nome per il conto!'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final provider = context.read<WalletProvider>();
+
+                  // 2. Registra il conto nel Provider
+                  provider.addAccount(
+                    title: nome,
+                    subtitle: tipoSelezionato,
+                    initialAmount: saldo,
+                    color: const Color(0xFF2DD4BF),
+                  );
+
+                  // 3. Se c'è un saldo iniziale, registra la transazione
                   if (saldo > 0) {
-                    context.read<WalletProvider>().addTransaction(
-                          title: 'Saldo Iniziale: $nome',
-                          amount: saldo,
-                          isIncome: true,
-                          category: 'Risparmi',
-                        );
+                    provider.addTransaction(
+                      title: 'Saldo Iniziale: $nome',
+                      amount: saldo,
+                      isIncome: true,
+                      category: 'Risparmi',
+                    );
                   }
+
+                  // 4. Chiudi la finestra di dialogo
                   Navigator.pop(context);
+
+                  // 5. Avviso di successo
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Conto "$nome" creato con successo!'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                } catch (e) {
+                  // 🔴 Se manca addAccount o c'è un errore nel provider, l'app mostra la causa precisa in un banner rosso
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Errore creazione conto: $e'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
