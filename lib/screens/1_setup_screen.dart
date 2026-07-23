@@ -20,9 +20,23 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
   String? codiceAtecoSelezionato;
 
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController(); // 👈 1. Aggiunto controller
   String _searchQuery = '';
 
   late AnimationController _waveController;
+
+  // 👈 2. Aggiunta funzione per scorrere fino in fondo
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   final List<Map<String, dynamic>> _databaseAteco = [
     {'codice': '85.52.09', 'descrizione': 'Altra formazione culturale (corsi di lingua, musica, danza, pittura, formazione privata)', 'coef': 0.78},
@@ -63,6 +77,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
   void dispose() {
     _waveController.dispose();
     _searchController.dispose();
+    _scrollController.dispose(); // 👈 Aggiunto il dispose
     super.dispose();
   }
 
@@ -91,6 +106,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
           ),
           SafeArea(
             child: SingleChildScrollView(
+              controller: _scrollController, // 👈 Aggiunto il controller qui
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
                 child: Column(
@@ -255,10 +271,13 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                         final isSelected = codiceAtecoSelezionato == item['codice'];
                                         final double coef = (item['coef'] as num).toDouble();
                                         return ListTile(
-                                          onTap: () => setState(() {
-                                            coefficienteRedditivita = coef;
-                                            codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
-                                          }),
+                                          onTap: () {
+                                            setState(() {
+                                              coefficienteRedditivita = coef;
+                                              codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
+                                            });
+                                            _scrollToBottom(); // 👈 Fa scattare lo scroll
+                                          },
                                           title: Row(
                                             children: [
                                               Text(
@@ -294,10 +313,13 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                       title: 'Consulenza & Digital (78%)',
                                       subtitle: 'Freelance, IT, Marketing, Formazione, Psicologi',
                                       isSelected: coefficienteRedditivita == 0.78,
-                                      onTap: () => setState(() {
-                                        coefficienteRedditivita = 0.78;
-                                        codiceAtecoSelezionato = '74.10.21 - Consulenza & Digital';
-                                      }),
+                                      onTap: () {
+                                        setState(() {
+                                          coefficienteRedditivita = 0.78;
+                                          codiceAtecoSelezionato = '74.10.21 - Consulenza & Digital';
+                                        });
+                                        _scrollToBottom(); // 👈 Scroll per Consulenza
+                                      },
                                     ),
                                     const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
                                     _buildRevolutListTile(
@@ -305,10 +327,13 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                       title: 'Commercio & Agenti (67%)',
                                       subtitle: 'E-commerce, Negozi, Intermediazione',
                                       isSelected: coefficienteRedditivita == 0.67,
-                                      onTap: () => setState(() {
-                                        coefficienteRedditivita = 0.67;
-                                        codiceAtecoSelezionato = '47.91.10 - Commercio & Agenti';
-                                      }),
+                                      onTap: () {
+                                        setState(() {
+                                          coefficienteRedditivita = 0.67;
+                                          codiceAtecoSelezionato = '47.91.10 - Commercio & Agenti';
+                                        });
+                                        _scrollToBottom(); // 👈 Scroll per Commercio
+                                      },
                                     ),
                                     const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
                                     _buildRevolutListTile(
@@ -316,10 +341,13 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                       title: 'Artigiani & Ristorazione (40%)',
                                       subtitle: 'Produzione, Bar, Ristoranti, Estetisti',
                                       isSelected: coefficienteRedditivita == 0.40,
-                                      onTap: () => setState(() {
-                                        coefficienteRedditivita = 0.40;
-                                        codiceAtecoSelezionato = '56.10.11 - Artigiani & Ristorazione';
-                                      }),
+                                      onTap: () {
+                                        setState(() {
+                                          coefficienteRedditivita = 0.40;
+                                          codiceAtecoSelezionato = '56.10.11 - Artigiani & Ristorazione';
+                                        });
+                                        _scrollToBottom(); // 👈 Scroll per Artigiani
+                                      },
                                     ),
                                   ],
                                 ),
