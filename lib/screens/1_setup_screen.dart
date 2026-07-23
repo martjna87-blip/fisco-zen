@@ -354,7 +354,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                         ),
                         const SizedBox(height: 24),
 
-                        // BOTTONE CHE PASSA LE SCELTE ALLA HOME
+                        // BOTTONE CHE PASSA LE SCELTE ALLA HOME PI
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -370,8 +370,6 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                                 ? '47.91.10 - Commercio & Agenti'
                                                 : '56.10.11 - Artigiani & Ristorazione');
 
-                                    // NUOVO NAVIGATOR PER PARTITA IVA
-                                    // INVIA I DATI AL MAIN MENU
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -385,15 +383,16 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                     );
                                   },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
+                              backgroundColor: const Color(0xFF2DD4BF), // 👈 Verde Acqua
+                              foregroundColor: Colors.black, // 👈 Testo Nero
                               disabledBackgroundColor: const Color(0xFF1F2937),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                             child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('Home', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                Text('Home PI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), // 👈 Scritta aggiornata
                                 SizedBox(width: 8),
                                 Icon(Icons.arrow_forward_rounded, size: 18),
                               ],
@@ -405,14 +404,12 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
 
                     // 2️⃣ SEZIONE PER DIPENDENTE
                     if (tipoProfilo == 'dipendente') ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 54,
                         child: ElevatedButton(
                           onPressed: () {
-                            // NUOVO NAVIGATOR PER DIPENDENTE
-                            // INVIA I DATI AL MAIN MENU
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
@@ -423,15 +420,15 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3B82F6),
-                            foregroundColor: Colors.white,
+                            backgroundColor: const Color(0xFF2DD4BF), // 👈 Verde Acqua
+                            foregroundColor: Colors.black, // 👈 Testo Nero
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('Dashboard Dipendente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text('Home Dipendente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), // 👈 Scritta aggiornata
                               SizedBox(width: 8),
                               Icon(Icons.arrow_forward_rounded, size: 18),
                             ],
