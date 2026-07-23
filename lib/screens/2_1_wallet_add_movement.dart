@@ -813,7 +813,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             ),
                           ],
                         ),
-                        if (_tipoMovimento != 'riepilogo')
+                        if (isSpesa)
                           InkWell(
                             onTap: _scansionaScontrinoModal,
                             borderRadius: BorderRadius.circular(20),
@@ -856,6 +856,19 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // INDICATORE VISIVO SWIPE (PALLINI E LINEE)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildPageDot(_tipoMovimento == 'riepilogo', const Color(0xFF2DD4BF)),
+                                    const SizedBox(width: 6),
+                                    _buildPageDot(_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa', const Color(0xFFEF4444)),
+                                    const SizedBox(width: 6),
+                                    _buildPageDot(_tipoMovimento == 'entrata', const Color(0xFF10B981)),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
                                 // SELETTORE TAB: RIEPILOGO | USCITA | ENTRATA
                                 Container(
                                   padding: const EdgeInsets.all(4),
@@ -896,26 +909,53 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                                 const SizedBox(height: 12),
 
-                                // CONTENUTO FORM O RIEPILOGO
+                                // CONTENUTO FORM O RIEPILOGO CON SWIPE
                                 Expanded(
-                                  child: _tipoMovimento == 'riepilogo'
-                                      ? _buildSchermataRiepilogo()
-                                      : SingleChildScrollView(
-                                          controller: _scrollController,
-                                          physics: const BouncingScrollPhysics(),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.35),
-                                              borderRadius: BorderRadius.circular(18),
-                                              border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // BOTTONE RAPIDO SCANSIONE SULL'IMPORTO
-                                                if (isSpesa) ...[
-                                                  Align(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onHorizontalDragEnd: (details) {
+                                      if (details.primaryVelocity == null) return;
+
+                                      // 👈 SWIPE A SINISTRA (Riepilogo -> Uscita -> Entrata)
+                                      if (details.primaryVelocity! < -250) {
+                                        if (_tipoMovimento == 'riepilogo') {
+                                          setState(() => _tipoMovimento = 'uscita');
+                                        } else if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') {
+                                          setState(() => _tipoMovimento = 'entrata');
+                                        }
+                                      } 
+                                      // 👉 SWIPE A DESTRA (Entrata -> Uscita -> Riepilogo)
+                                      else if (details.primaryVelocity! > 250) {
+                                        if (_tipoMovimento == 'entrata') {
+                                          setState(() => _tipoMovimento = 'uscita');
+                                        } else if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') {
+                                          setState(() => _tipoMovimento = 'riepilogo');
+                                        }
+                                      }
+                                    },
+                                    child: _tipoMovimento == 'riepilogo'
+                                        ? _buildSchermataRiepilogo()
+                                        : SingleChildScrollView(
+                                            controller: _scrollController,
+                                            physics: const BouncingScrollPhysics(),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.35),
+                                                borderRadius: BorderRadius.circular(18),
+                                                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  
+                                                // BOTTONE RAPIDO SCANSIONE (SPAZIO RISERVATO PER SIMMETRIA)
+                                                Visibility(
+                                                  visible: isSpesa,
+                                                  maintainSize: true,
+                                                  maintainAnimation: true,
+                                                  maintainState: true,
+                                                  child: Align(
                                                     alignment: Alignment.centerRight,
                                                     child: TextButton.icon(
                                                       onPressed: _scansionaScontrinoModal,
@@ -923,7 +963,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                       label: const Text('Scansiona Ticket / Foto', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                                                     ),
                                                   ),
-                                                ],
+                                                ),
 
                                                 // IMPORTO
                                                 Center(
@@ -960,7 +1000,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   controller: _noteController,
                                                   style: const TextStyle(color: Colors.white, fontSize: 13),
                                                   decoration: InputDecoration(
-                                                    labelText: isSpesa ? 'Descrizione' : 'Descrizione (es. Stipendio)',
+                                                    labelText: isSpesa ? 'Descrizione' : 'Descrizione',
                                                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                                                     filled: true,
                                                     fillColor: Colors.black.withOpacity(0.35),
@@ -1341,6 +1381,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                             ),
                                           ),
                                         ),
+                                  ), // 👈 AGGIUNTA CHIUSURA DI GESTUREDETECTOR
                                 ),
                               ],
                             ),
@@ -1915,15 +1956,28 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.black : Colors.white54,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white54,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
           ),
         ),
+    );
+  }
+
+  // 👈 NUOVO HELPER PER PALLINI / LINEE DELLO SWIPE
+  Widget _buildPageDot(bool isActive, Color color) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: isActive ? 20 : 6, // Se attivo diventa una linea, altrimenti resta un pallino
+      height: 6,
+      decoration: BoxDecoration(
+        color: isActive ? color : Colors.white24,
+        borderRadius: BorderRadius.circular(3),
       ),
     );
   }
