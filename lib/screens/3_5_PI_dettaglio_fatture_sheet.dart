@@ -459,6 +459,40 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 12),
+
+                    // ==========================================
+                    // 🔲 RIQUADRO 3: TASTO CHIUDI BOTTOM GLASS
+                    // ==========================================
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF18181B).withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: Colors.white.withOpacity(0.15)),
+                          ),
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'Annulla e Chiudi',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
