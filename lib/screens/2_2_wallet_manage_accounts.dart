@@ -145,17 +145,67 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     });
   }
 
-  // FUNZIONE PER APRIRE IL DETTAGLIO MOVIMENTI DEL CONTO REALI
+  // FUNZIONE PER APRIRE IL DETTAGLIO MOVIMENTI DEL CONTO REALI CON DIVISORI PER MESE
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
 
-    // 👈 FILTRO INTELLIGENTE PER ID O TITOLO
+    // 1. FILTRO INTELLIGENTE PER ID O TITOLO
     final movimentiConto = transactions.where((t) =>
       t.accountId == account.id ||
       t.title.contains(account.title) ||
       account.title.contains(t.title)
     ).toList();
 
+    // 2. ORDINAMENTO PER DATA (dal più recente al più vecchio)
+    movimentiConto.sort((a, b) => b.date.compareTo(a.date));
+
+    // Nomi dei mesi in italiano
+    const List<String> nomiMesi = [
+      'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+      'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+    ];
+
+    // 3. COSTRUZIONE DELLA LISTA DI WIDGET CON DIVISORI
+    List<Widget> elementiLista = [];
+    String? meseAnnoCorrente;
+
+    for (var tx in movimentiConto) {
+      String meseAnno = '${nomiMesi[tx.date.month - 1].toUpperCase()} ${tx.date.year}';
+
+      // Se il mese cambia, aggiunge la riga divisoria in grigio chiaro/trasparente
+      if (meseAnno != meseAnnoCorrente) {
+        meseAnnoCorrente = meseAnno;
+        elementiLista.add(
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08), // Grigio chiaro coerente col tema scuro
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              meseAnno,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Riga movimento standard
+      final String sign = tx.isIncome ? '+' : '-';
+      final String impFormatted = '$sign${tx.amount.toStringAsFixed(2)} €';
+      final String dataStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}';
+
+      elementiLista.add(_buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome));
+    }
+
+    // 4. MOSTRA DIALOG
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -180,8 +230,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Divider(color: Colors.white12, height: 1),
-              const SizedBox(height: 12),
-              movimentiConto.isEmpty
+              const SizedBox(height: 8),
+              elementiLista.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Text(
@@ -189,13 +239,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                         style: TextStyle(color: Colors.white38, fontSize: 12),
                       ),
                     )
-                  : Column(
-                      children: movimentiConto.map((tx) {
-                        final String sign = tx.isIncome ? '+' : '-';
-                        final String impFormatted = '$sign${tx.amount.toStringAsFixed(2)} €';
-                        final String dataStr = '${tx.date.day}/${tx.date.month}';
-                        return _buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome);
-                      }).toList(),
+                  : ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.45, // Evita overflow su liste lunghe
+                      ),
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          children: elementiLista,
+                        ),
+                      ),
                     ),
             ],
           ),
@@ -318,7 +371,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 final nome = nomeController.text.trim();
                 final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
 
-                // 1. Controlla che il campo nome non sia vuoto
                 if (nome.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -332,7 +384,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 try {
                   final provider = context.read<WalletProvider>();
 
-                  // 2. Registra il conto nel Provider
                   provider.addAccount(
                     title: nome,
                     subtitle: tipoSelezionato,
@@ -340,7 +391,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     color: const Color(0xFF2DD4BF),
                   );
 
-                  // 3. Se c'è un saldo iniziale, registra la transazione
                   if (saldo > 0) {
                     provider.addTransaction(
                       title: 'Saldo Iniziale: $nome',
@@ -350,10 +400,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     );
                   }
 
-                  // 4. Chiudi la finestra di dialogo
                   Navigator.pop(context);
 
-                  // 5. Avviso di successo
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Conto "$nome" creato con successo!'),
@@ -361,7 +409,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     ),
                   );
                 } catch (e) {
-                  // 🔴 Se manca addAccount o c'è un errore nel provider, l'app mostra la causa precisa in un banner rosso
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Errore creazione conto: $e'),
@@ -601,7 +648,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
 
-    // 📍 STRUTTURA DIALOG A DOPPIO RIQUADRO IDENTICA A REGISTRA FATTURA
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(
@@ -615,7 +661,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
           height: screenSize.height * 0.88,
           child: Stack(
             children: [
-              // 1. IMMAGINE SFONDO ATMOSFERICA
               Positioned.fill(
                 child: Image.network(
                   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
@@ -626,19 +671,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 ),
               ),
 
-              // 2. OVERLAY SCURO SFUMATO
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.75),
                 ),
               ),
 
-              // 3. CONTENUTO CON HEADER CIRCOLARE E SCHEDE GLASS
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER CON BOTTONE (X) CIRCOLARE IDENTICO A REGISTRA FATTURA ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -698,9 +740,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
                     const SizedBox(height: 12),
 
-                    // ==========================================
-                    // 🔲 RIQUADRO 1: CORPO PRINCIPALE GLASSMORPHIC
-                    // ==========================================
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
@@ -716,7 +755,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // INNER CARD SALDO COMPLESSIVO
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
@@ -750,7 +788,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
                                 const SizedBox(height: 14),
 
-                                // CONTENUTO SCROLLABILE LISTA CONTI
                                 Expanded(
                                   child: SingleChildScrollView(
                                     controller: _scrollController,
@@ -767,7 +804,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                         ),
                                         const SizedBox(height: 8),
 
-                                        // LISTA CONTI DINAMICA DAL PROVIDER
                                         ListView.builder(
                                           shrinkWrap: true,
                                           physics: const NeverScrollableScrollPhysics(),
@@ -788,7 +824,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                               ),
                                               child: Column(
                                                 children: [
-                                                  // RIGA TESTATA CLICCABILE
                                                   InkWell(
                                                     onTap: () {
                                                       setState(() {
@@ -849,7 +884,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                     ),
                                                   ),
 
-                                                  // CONTENUTO IN-LINE INTEGRATO APPARTENENTE ALLA CELLA
                                                   if (isEspanso) ...[
                                                     const Divider(color: Colors.white12, height: 1),
                                                     Container(
@@ -858,7 +892,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                       child: Column(
                                                         crossAxisAlignment: CrossAxisAlignment.start,
                                                         children: [
-                                                          // 1. PULSANTE VEDI DETTAGLIO MOVIMENTI
                                                           InkWell(
                                                             onTap: () => _mostraDettaglioMovimentiConto(context, account),
                                                             borderRadius: BorderRadius.circular(10),
@@ -885,10 +918,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                           ),
                                                           const SizedBox(height: 10),
 
-                                                          // 2. PULSANTI AZIONE: MODIFICA SALDO E ELIMINA CONTO
                                                           Row(
                                                             children: [
-                                                              // TASTO MATITA: MODIFICA IMPORTO
                                                               Expanded(
                                                                 child: InkWell(
                                                                   onTap: () => _mostraDialogModificaSaldo(context, account),
@@ -913,7 +944,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                               ),
                                                               const SizedBox(width: 8),
 
-                                                              // TASTO CESTINO: ELIMINA CONTO
                                                               InkWell(
                                                                 onTap: () => _confermaEliminazioneConto(context, account),
                                                                 borderRadius: BorderRadius.circular(10),
@@ -933,7 +963,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                       ),
                                                     ),
                                                   ],
-                                                ], // 👈 QUESTA ERA LA PARENTESI QUADRA MANCANTE!
+                                                ],
                                               ),
                                             );
                                           },
@@ -954,9 +984,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     if (!isKeyboardOpen) ...[
                       const SizedBox(height: 12),
 
-                      // ==========================================
-                      // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
-                      // ==========================================
                       ClipRRect(
                         borderRadius: BorderRadius.circular(18),
                         child: BackdropFilter(
