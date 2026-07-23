@@ -134,6 +134,34 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final listaTutteIncassate = walletProvider.fattureIncassate;
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
 
+    // METODO PER ESTRARRE SOLO GIORNO E MESE (es. "18/05")
+  String _formattaGiornoMese(dynamic rawData) {
+    if (rawData == null) return '';
+    if (rawData is DateTime) {
+      final g = rawData.day.toString().padLeft(2, '0');
+      final m = rawData.month.toString().padLeft(2, '0');
+      return '$g/$m';
+    }
+    if (rawData is String) {
+      final parti = rawData.split(RegExp(r'[/.-]'));
+      if (parti.length >= 2) {
+        // Formato "18/05/2026"
+        if (parti[0].length <= 2) {
+          final g = parti[0].padLeft(2, '0');
+          final m = parti[1].padLeft(2, '0');
+          return '$g/$m';
+        } 
+        // Formato "2026-05-18"
+        else if (parti[0].length == 4 && parti.length >= 3) {
+          final m = parti[1].padLeft(2, '0');
+          final g = parti[2].padLeft(2, '0');
+          return '$g/$m';
+        }
+      }
+    }
+    return '';
+  }
+
     // Calcolo Totali Fiscale sulla LISTA FILTRATA
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
@@ -334,7 +362,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                             final double totaleAccantonareCard = totaleTasseY + totaleAccontiY1;
                                             final double nettoRimanenteCard = lordo - totaleAccantonareCard;
 
-                                            return Container(
+                                           return Container(
                                               margin: const EdgeInsets.only(bottom: 10),
                                               padding: const EdgeInsets.all(12),
                                               decoration: BoxDecoration(
@@ -349,10 +377,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
                                                       Expanded(
-                                                        child: Text(
-                                                          '${f['cliente']} (${f['numero'] ?? 'Fattura'})',
-                                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                          overflow: TextOverflow.ellipsis,
+                                                        child: Builder(
+                                                          builder: (context) {
+                                                            final dataShort = _formattaGiornoMese(f['data']);
+                                                            final dataLabel = dataShort.isNotEmpty ? ' • $dataShort' : '';
+                                                            return Text(
+                                                              '${f['cliente']} (${f['numero'] ?? 'Fattura'})$dataLabel',
+                                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                              overflow: TextOverflow.ellipsis,
+                                                            );
+                                                          },
                                                         ),
                                                       ),
                                                       Row(
