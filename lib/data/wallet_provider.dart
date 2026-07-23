@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 
 class AccountModel {
   final String id;
-  String title; // 👈 RIMOSSO 'final' PER PERMETTERE LA MODIFICA DEL NOME
+  String title; 
   final String subtitle;
   double amount;
+  double virtualTaxAmount; // 👈 NOVITÀ: Quota tasse accantonata su questo conto
   final Color color;
 
   AccountModel({
@@ -15,6 +16,7 @@ class AccountModel {
     required this.title,
     required this.subtitle,
     required this.amount,
+    this.virtualTaxAmount = 0.0, // Di default è 0
     required this.color,
   });
 
@@ -23,6 +25,7 @@ class AccountModel {
         'title': title,
         'subtitle': subtitle,
         'amount': amount,
+        'virtualTaxAmount': virtualTaxAmount, // 👈 Salvataggio in memoria
         'color': color.value,
       };
 
@@ -31,6 +34,7 @@ class AccountModel {
         title: json['title'] as String,
         subtitle: json['subtitle'] as String,
         amount: (json['amount'] as num).toDouble(),
+        virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0, // 👈 Se vecchi dati non lo hanno, mette 0
         color: Color(json['color'] as int),
       );
 }
@@ -89,7 +93,31 @@ class WalletProvider extends ChangeNotifier {
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
-  double get patrimonioNetto => _accounts.fold(0.0, (sum, acc) => sum + acc.amount);
+// ==========================================
+  // ⚙️ CONFIGURAZIONE PARTITA IVA (Fase 1)
+  // ==========================================
+  bool isPartitaIVA = true; 
+  double taxRate = 0.30; // Stima Tasse (es. 30%)
+  double accontiVersatiAnnoPrecedente = 100.0; // 👈 L'acconto dell'anno scorso!
+
+  // ==========================================
+  // 📊 MATEMATICA E STATISTICHE GLOBALI
+  // ==========================================
+
+  // 1. Saldo Reale in Banca (La somma dei conti reali)
+  double get patrimonioNetto => _accounts.fold(0.0, (sum, item) => sum + item.amount);
+
+  // 2. Fondo Tasse Lordo (Tutte le tasse generate dagli incassi)
+  double get _tasseLordeAccantonate => _accounts.fold(0.0, (sum, item) => sum + item.virtualTaxAmount);
+
+  // 3. FONDO TASSE DA VERSARE (Tiene conto dell'Acconto!)
+  double get fondoTasseDaVersare {
+    double fondo = _tasseLordeAccantonate - accontiVersatiAnnoPrecedente;
+    return fondo > 0 ? fondo : 0.0; // Non scende mai sotto zero
+  }
+
+  // 4. NETTO SPENDIBILE 🟢 (Il vero potere d'acquisto)
+  double get nettoSpendibile => patrimonioNetto - fondoTasseDaVersare;
 
   double _spesoBisogni = 0.00;
   double get spesoBisogni => _spesoBisogni;
@@ -227,6 +255,12 @@ class WalletProvider extends ChangeNotifier {
     // 3. Aggiorna i saldi e le statistiche
     if (isIncome) {
       targetAccount.amount += amount;
+      
+      // 👈 MAGIA P.IVA: Se è un'entrata, calcola subito le tasse virtuali!
+      if (isPartitaIVA && category != 'Giroconto') {
+        targetAccount.virtualTaxAmount += (amount * taxRate);
+      }
+      
     } else {
       targetAccount.amount -= amount;
       if (category == 'Bisogni') _spesoBisogni += amount;
@@ -467,5 +501,91 @@ class WalletProvider extends ChangeNotifier {
 
     _salvaDatiInLocalStorage(); // Salva il nuovo ordine nella memoria
     notifyListeners();
+  }
+
+    // ==========================================
+  // 💸 PAGAMENTO F24 (Caso B & Delta)
+  // ==========================================
+  void pagaF24({
+    required String accountId,
+    required double importoF24,
+    required DateTime data,
+  }) {
+    final targetAccount = _accounts.firstWhere((acc) => acc.id == accountId);
+
+    // 1. Scala i soldi veri dal conto (La banca scende)
+    targetAccount.amount -= importoF24;
+
+    // 2. Registra il movimento come uscita per non far sballare lo storico
+    final newTx = TransactionModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: 'Pagamento F24 / Tasse',
+      subtitle: 'Tasse',
+      amount: importoF24,
+      isIncome: false,
+      category: 'Tasse', 
+      date: data,
+      accountId: targetAccount.id,
+    );
+    _transactions.insert(0, newTx);
+
+    // 3. 🎯 GESTIONE DEL "SECCHIO TASSE" GLOBALE (Scala il debito)
+    double remainingToDeduct = importoF24;
+
+    // Prima svuota le tasse virtuali dal conto che ha pagato
+    if (targetAccount.virtualTaxAmount >= remainingToDeduct) {
+      targetAccount.virtualTaxAmount -= remainingToDeduct;
+      remainingToDeduct = 0;
+    } else {
+      remainingToDeduct -= targetAccount.virtualTaxAmount;
+      targetAccount.virtualTaxAmount = 0;
+
+      // Se l'F24 era più alto, preleva la tassa virtuale dagli altri conti
+      for (var acc in _accounts) {
+        if (remainingToDeduct <= 0) break;
+        if (acc.virtualTaxAmount >= remainingToDeduct) {
+          acc.virtualTaxAmount -= remainingToDeduct;
+          remainingToDeduct = 0;
+        } else {
+          remainingToDeduct -= acc.virtualTaxAmount;
+          acc.virtualTaxAmount = 0;
+        }
+      }
+    }
+
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+
+  // ==========================================
+  // 🔄 GIROCONTO INTELLIGENTE (Caso A)
+  // ==========================================
+  void eseguiGiroconto({
+    required String daAccountId,
+    required String aAccountId,
+    required double importo,
+    required bool isAccantonamentoTasse,
+  }) {
+    final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
+    final accA = _accounts.firstWhere((a) => a.id == aAccountId);
+
+    // 1. Spostamento Fisico Bancario
+    accDa.amount -= importo;
+    accA.amount += importo;
+
+    // 2. Se è un "Salvadanaio Tasse", sposta anche il "Vincolo virtuale"
+    if (isAccantonamentoTasse) {
+      if (accDa.virtualTaxAmount >= importo) {
+        accDa.virtualTaxAmount -= importo;
+      } else {
+        accDa.virtualTaxAmount = 0; 
+      }
+      accA.virtualTaxAmount += importo;
+    }
+
+    // 3. Registra i due movimenti figurativi (1 uscita, 1 entrata)
+    addTransaction(title: 'Giroconto a ${accA.title}', amount: importo, isIncome: false, category: 'Giroconto', accountId: accDa.id);
+    addTransaction(title: 'Giroconto da ${accDa.title}', amount: importo, isIncome: true, category: 'Giroconto', accountId: accA.id);
   }
 }
