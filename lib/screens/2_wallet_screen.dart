@@ -49,7 +49,6 @@ class _WalletScreenState extends State<WalletScreen> {
         builder: (context, setDialogState) {
           final importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
           
-          // Calcoli dinamici per feedback UX
           final double percentuale = tasseScoperte > 0 ? (importoInserito / tasseScoperte).clamp(0.0, 2.0) : 1.0;
           final double percentualeText = tasseScoperte > 0 ? (importoInserito / tasseScoperte * 100) : 100;
           final double extraCuscinetto = importoInserito > tasseScoperte ? importoInserito - tasseScoperte : 0.0;
@@ -75,7 +74,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 📊 BARRA DI AVANZAMENTO DINAMICA (GOAL TRACKER)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -101,7 +99,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
-                          value: (percentuale / 1.0).clamp(0.0, 1.0), // Si riempie fino a 100%
+                          value: (percentuale / 1.0).clamp(0.0, 1.0),
                           minHeight: 8,
                           backgroundColor: Colors.white10,
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -118,7 +116,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     controller: importoController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    onChanged: (_) => setDialogState(() {}), // Rinfresca i calcoli della barra in tempo reale!
+                    onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
                       labelText: 'Importo da accantonare (€)',
                       labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -171,6 +169,7 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
@@ -180,17 +179,12 @@ class _WalletScreenState extends State<WalletScreen> {
     final spesoRisparmi = walletProvider.spesoRisparmi;
     final movimenti = walletProvider.transactions;
     
-    // 🎯 LOGICA RESIDUO: Tasse Totali Calcolate VS Riserva già Messa al Sicuro
     final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    
-    // Calcoliamo la liquidità già presente nei salvadanai tasse
     final double riservaGiaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
-    // Residuo scoperto (se la riserva supera le tasse, il residuo diventa 0 € e riconosce i cuscinetti!)
     final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
-
     final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
 
     return Scaffold(
@@ -199,7 +193,7 @@ class _WalletScreenState extends State<WalletScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO (STESSA STRUTTURA & ALTEZZA 280PX)
+            // 🎯 HEADER PORTAFOGLIO (STESSA STRUTTURA SPECULARE 280PX)
             Stack(
               alignment: Alignment.center,
               children: [
@@ -232,22 +226,53 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 🎯 3. CONTENUTO CENTRATO IDENTICO
+                // 🏷️ 3. PILLOLA RIEPILOGO IN ALTO A DESTRA
+                Positioned(
+                  top: 10,
+                  right: 16,
+                  child: SafeArea(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AnnualSummarySheet(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                      label: const Text(
+                        'Riepilogo',
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 🎯 4. CONTENUTO CENTRATO CLEAN
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text(
                       'Portafoglio netto',
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
                     ),
                     const SizedBox(height: 6),
-                    const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // TOTALE GRANDE
                         Text(
                           '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
                           style: const TextStyle(
@@ -258,7 +283,6 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         
-                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (CON BOTTONE ACCANTONA)
                         if (widget.isPiva) ...[
                           const SizedBox(width: 14),
                           Column(
@@ -279,13 +303,11 @@ class _WalletScreenState extends State<WalletScreen> {
                                 children: [
                                   const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
                                   const SizedBox(width: 6),
-                                  // 👈 MOSTRA SEMPRE L'ANCORA FISCALE REALE (es. 444 €)
                                   Text(
                                     '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
                                     style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(width: 8),
-                                  // 👈 SE C'È RESIDUO MOSTRA 'ACCANTONA', ALTRIMENTI 'PROTETTE'
                                   if (residuoTasseDaCoprire > 0) 
                                     InkWell(
                                       onTap: () => _mostraDialogAccantonamentoTasse(context, residuoTasseDaCoprire),
@@ -329,107 +351,23 @@ class _WalletScreenState extends State<WalletScreen> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 16),
-
-                    // BOTTONE RIEPILOGO ANNUALE
-
-
-                    FilledButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AnnualSummarySheet(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.show_chart_rounded, size: 18, color: Color(0xFF2DD4BF)),
-                      label: const Text(
-                        'Riepilogo Annuale',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.08),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(color: Colors.white.withOpacity(0.18)),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      ),
-                    ),
                   ],
                 ),
               ],
             ),
 
-            // CONTENUTO SCROLLABILE
+            // CONTENUTO SCROLLABILE SPECULARE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-                  
-                  // 3 QUADRANTI AZIONE
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildActionSquareCard(
-                          icon: Icons.add_circle_outline_rounded,
-                          title: 'Movimenti',
-                          value: 'Entrata / Uscita',
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const AddMovementSheet(initialTab: 'riepilogo'), // 👈 Apre Riepilogo
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildActionSquareCard(
-                          icon: Icons.account_balance_wallet_outlined,
-                          title: 'Gestione\nConti',
-                          value: '3 Attivi',
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => ManageAccountsSheet(isPiva: widget.isPiva), // 👈 Passa la scelta Dipendente/P.IVA alla schermata
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildActionSquareCard(
-                          icon: Icons.pie_chart_outline_rounded,
-                          title: 'Pilotaggio\nBudget',
-                          value: 'Pianificazione',
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const BudgetPilotSheet(),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 16),
-
-                  // 🛡️ CARD GOAL TRACKER (VISIBILE SE P.IVA)
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE (In cima al contenuto)
                   if (widget.isPiva) ...[
                     Builder(
                       builder: (context) {
-                        final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
                         final double riservaAccantonata = walletProvider.accounts
                             .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
                             .fold(0.0, (sum, acc) => sum + acc.amount);
@@ -439,7 +377,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         final double cuscinettoExtra = riservaAccantonata > tasseTotaliCalcolate ? riservaAccantonata - tasseTotaliCalcolate : 0.0;
 
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 16),
+                          margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             color: const Color(0xFF141417).withOpacity(0.92),
@@ -530,7 +468,62 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ],
 
-                  // BARRA EQUILIBRIO
+                  // 2. 3 QUADRANTI AZIONE (SUBITO SOTTO IL SERBATOIO ALLA STESSA ALTEZZA SPECULARE)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionSquareCard(
+                          icon: Icons.add_circle_outline_rounded,
+                          title: 'Movimenti',
+                          value: 'Entrata / Uscita',
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => const AddMovementSheet(initialTab: 'riepilogo'),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildActionSquareCard(
+                          icon: Icons.account_balance_wallet_outlined,
+                          title: 'Gestione\nConti',
+                          value: '3 Attivi',
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => ManageAccountsSheet(isPiva: widget.isPiva),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildActionSquareCard(
+                          icon: Icons.pie_chart_outline_rounded,
+                          title: 'Pilotaggio\nBudget',
+                          value: 'Pianificazione',
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => const BudgetPilotSheet(),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 3. BARRA EQUILIBRIO
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -569,7 +562,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 20),
 
-                  // GRAFICO A TORTA
+                  // 4. GRAFICO A TORTA
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -656,7 +649,8 @@ class _WalletScreenState extends State<WalletScreen> {
                           isIncome: tx.isIncome,
                         )),
 
-                  const SizedBox(height: 24),
+                  // 👈 5. SPAZIO INVISIBILE ABBONDANTE PER NON COPRIRE CON LA BOTTOM NAV BAR
+                  const SizedBox(height: 120),
                 ],
               ),
             ),

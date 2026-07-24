@@ -182,13 +182,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final fattureIncassate = walletProvider.fattureIncassate;
 
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
-    
     final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
     final double nettoStimatoInSospeso = totaleInSospeso - tasseStimateInSospeso;
-
     final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
-
     final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
+
+    final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double riservaGiaAccantonata = walletProvider.accounts
+        .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, acc) => sum + acc.amount);
+
+    final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
+    final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -196,11 +201,11 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO (STESSA ALTEZZA 280PX)
+            // 🎯 HEADER PORTAFOGLIO (280PX)
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. IMMAGINE
+                // 1. IMMAGINE DI SFONDO
                 Container(
                   height: 280,
                   decoration: const BoxDecoration(
@@ -229,85 +234,129 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 🔄 3. RESET SPOSTATO IN ALTO A DESTRA
+                // 🔄 3. TASTO RESET IN ALTO A SINISTRA (DISCRETO PER TEST)
                 Positioned(
                   top: 10,
-                  right: 16,
+                  left: 16,
                   child: SafeArea(
                     child: IconButton(
                       onPressed: () => _mostraConfermaResetGlobale(context, walletProvider),
-                      icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 22),
+                      icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 20),
                       tooltip: 'Reset Dati',
                       style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444).withOpacity(0.15),
+                        backgroundColor: const Color(0xFFEF4444).withOpacity(0.12),
                       ),
                     ),
                   ),
                 ),
 
-                // 🎯 4. CONTENUTO CENTRATO
+                // 🏷️ 4. PILLOLA ATECO IN ALTO A DESTRA
+                Positioned(
+                  top: 10,
+                  right: 16,
+                  child: SafeArea(
+                    child: FilledButton.icon(
+                      onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                      icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                      label: Text(
+                        'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 🎯 5. CONTENUTO CENTRATO CLEAN (SENZA BOTTONI INGLESI / WALLET SOTTO)
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text(
                       'Portafoglio netto', 
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                      style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, letterSpacing: -1),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // BOTTONI VETRO UNIFICATI
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        FilledButton.icon(
-                          onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                          icon: const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2DD4BF)),
-                          label: Text(
-                            'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.08),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(color: Colors.white.withOpacity(0.18)),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          ),
+                        Text(
+                          '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                          style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, letterSpacing: -1),
                         ),
-
-                        const SizedBox(width: 8),
-
-                        FilledButton.icon(
-                          onPressed: () {
-                            if (widget.onSwipeToWallet != null) {
-                              widget.onSwipeToWallet!(); 
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const WalletScreen(isPiva: true)),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
-                          label: const Text(
-                            'Wallet',
-                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.08),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(color: Colors.white.withOpacity(0.18)),
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${nettoReale.toStringAsFixed(0)} €',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 8),
+                                if (residuoTasseDaCoprire > 0) 
+                                  InkWell(
+                                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                                      ),
+                                      child: const Text(
+                                        'Accantona',
+                                        style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                        SizedBox(width: 3),
+                                        Text(
+                                          'Protette',
+                                          style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -316,138 +365,31 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            // CONTENUTO
+            // CONTENUTO SCROLLABILE SPECULARE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => _mostraDialogIncassoFatture(walletProvider),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF18181B),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF27272A)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 18),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Fatture da Incassare',
-                                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
-                            ],
-                          ),
-                          
-                          const SizedBox(height: 12),
-
-                          Text(
-                            _formattaValuta(totaleInSospeso),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Lordo Totale in attesa di saldo',
-                            style: TextStyle(color: Colors.white38, fontSize: 10),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        'Netto Stimato',
-                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '+${_formattaValuta(nettoStimatoInSospeso)}',
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                Container(height: 24, width: 1, color: const Color(0xFFF59E0B).withOpacity(0.3)),
-
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        'Tasse Stimate',
-                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '-${_formattaValuta(tasseStimateInSospeso)}',
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 12),
 
-                  // 🛡️ CARD GOAL TRACKER: SERBATOIO & COPERTURA TASSE
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE (In cima al contenuto, esattamente come nel Wallet)
                   Builder(
                     builder: (context) {
-                      final walletProvider = context.watch<WalletProvider>();
-                      
-                      // 1. Ancora Fiscale: Tasse totali calcolate su tutti i conti
-                      final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-                      
-                      // 2. Liquidità salvata nei salvadanai tasse
                       final double riservaAccantonata = walletProvider.accounts
                           .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
                           .fold(0.0, (sum, acc) => sum + acc.amount);
 
-                      // 3. Calcoli percentuale & cuscinetto
                       final double percentuale = tasseTotaliCalcolate > 0 ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 2.0) : 1.0;
                       final double percentualeText = tasseTotaliCalcolate > 0 ? (riservaAccantonata / tasseTotaliCalcolate * 100) : 100;
                       final double cuscinettoExtra = riservaAccantonata > tasseTotaliCalcolate ? riservaAccantonata - tasseTotaliCalcolate : 0.0;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF18181B),
+                          color: const Color(0xFF141417).withOpacity(0.92),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF27272A)),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,6 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
+                  // 2. I 3 QUADRANTI D'AZIONE (POSIZIONATI SUBITO SOTTO IL SERBATOIO PER PERFETTA SIMMETRIA COL WALLET)
                   Row(
                     children: [
                       Expanded(
@@ -575,7 +518,112 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+
+                  // 3. FATTURE DA INCASSARE
+                  GestureDetector(
+                    onTap: () => _mostraDialogIncassoFatture(walletProvider),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141417).withOpacity(0.92),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Fatture da Incassare',
+                                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 12),
+
+                          Text(
+                            _formattaValuta(totaleInSospeso),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Lordo Totale in attesa di saldo',
+                            style: TextStyle(color: Colors.white38, fontSize: 10),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'Netto Stimato',
+                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '+${_formattaValuta(nettoStimatoInSospeso)}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                Container(height: 24, width: 1, color: const Color(0xFFF59E0B).withOpacity(0.3)),
+
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'Tasse Stimate',
+                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '-${_formattaValuta(tasseStimateInSospeso)}',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 👈 4. SPAZIO INVISIBILE ABBONDANTE PER NON COPRIRE CON LA BOTTOM NAV BAR!
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
