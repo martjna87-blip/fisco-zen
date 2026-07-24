@@ -797,6 +797,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     // Se riceve 'false' (Dipendente), spegne tutto istantaneamente.
     final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
+    // 👈 NUOVO CALCOLO PRUDENZIALE: Somma le tasse lorde di tutti i conti ignorando l'acconto
+    final double totaleTasseLorde = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double nettoReale = saldoTotale - totaleTasseLorde;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(
@@ -957,7 +961,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
-                                                    '${walletProvider.nettoSpendibile.toStringAsFixed(2)} €',
+                                                    '${nettoReale.toStringAsFixed(2)} €',
                                                     style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                   ),
                                                 ],
@@ -977,7 +981,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
-                                                    '${walletProvider.fondoTasseDaVersare.toStringAsFixed(2)} €',
+                                                    '${totaleTasseLorde.toStringAsFixed(2)} €',
                                                     style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                   ),
                                                 ],
@@ -1085,8 +1089,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                                 '${account.amount.toStringAsFixed(2)} €',
                                                                 style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                               ),
-                                                              // 👈 WIDGET P.IVA: ICONA SOLDI VERDE + ICONA SALVADANAIO BLU
-                                                              if (mostraPiva) ...[
+                                                              // 👈 WIDGET P.IVA: Visibile SOLO sul Conto Principale
+                                                              if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
                                                                 const SizedBox(height: 3),
                                                                 Row(
                                                                   mainAxisSize: MainAxisSize.min,

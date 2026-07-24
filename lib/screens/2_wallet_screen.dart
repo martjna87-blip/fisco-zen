@@ -26,6 +26,10 @@ class _WalletScreenState extends State<WalletScreen> {
     final spesoRisparmi = walletProvider.spesoRisparmi;
     final movimenti = walletProvider.transactions;
     
+    // 👈 NUOVO CALCOLO PRUDENZIALE PER L'HEADER DELLA HOME
+    final double totaleTasseLorde = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double nettoReale = patrimonioNetto - totaleTasseLorde;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0C),
       body: SingleChildScrollView(
@@ -75,18 +79,59 @@ class _WalletScreenState extends State<WalletScreen> {
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 42,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -1,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // TOTALE GRANDE
+                        Text(
+                          '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        
+                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (SU 2 RIGHE)
+                        if (widget.isPiva) ...[
+                          const SizedBox(width: 14), // Spazio tra il numerone e i micro-dati
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Netto: ${nettoReale.toStringAsFixed(0)} €',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Tasse: ${totaleTasseLorde.toStringAsFixed(0)} €',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
 
                     // BOTTONE RIEPILOGO ANNUALE
+
+
                     FilledButton.icon(
                       onPressed: () {
                         Navigator.push(
