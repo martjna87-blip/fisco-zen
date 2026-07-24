@@ -7,7 +7,6 @@ import '2_wallet_screen.dart';
 import '2_1_wallet_add_movement.dart'; 
 
 class MainMenu extends StatefulWidget {
-  // Riceviamo i dati dal SetupScreen
   final bool hasPartitaIva;
   final String? codiceAtecoIniziale;
   final double? coefficienteIniziale;
@@ -32,19 +31,19 @@ class _MainMenuState extends State<MainMenu> {
   @override
   void initState() {
     super.initState();
-    // 🗂️ QUI CARICHIAMO LE TUE VERE SCHERMATE
     _screens = [
-      // Indice 0: La tua VERA Dashboard
+      // Indice 0: GESTISCE TUTTO (Swipe P.IVA oppure solo Wallet per Dipendente)
       MainDashboardWrapper(
         hasPartitaIva: widget.hasPartitaIva,
         codiceAtecoIniziale: widget.codiceAtecoIniziale,
         coefficienteIniziale: widget.coefficienteIniziale,
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
       ),
-      // Indice 1: Il tuo VERO Wallet
-      const WalletScreen(), 
-      // Indice 2 e 3: Pagine provvisorie in attesa di essere create
+      // Indice 1: Schermata "fantasma" (non verrà mai chiamata dal menù in basso)
+      const SizedBox.shrink(), 
+      // Indice 2: Avvisi
       const Center(child: Text('Notifiche / Scadenze (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
+      // Indice 3: Profilo
       const Center(child: Text('Profilo & Impostazioni (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
     ];
   }
@@ -53,9 +52,8 @@ class _MainMenuState extends State<MainMenu> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      // 👇 ABBIAMO AVVOLTO L'INDEXEDSTACK IN UNA SAFEAREA
       body: SafeArea(
-        bottom: false, // 🟢 Lasciamo a false sotto per non rovinare l'effetto vetro della barra
+        bottom: false,
         child: IndexedStack(
           index: _currentIndex,
           children: _screens,
@@ -66,20 +64,19 @@ class _MainMenuState extends State<MainMenu> {
     );
   }
 
-  // ✨ BARRA DI NAVIGAZIONE EFFETTO VETRO
   Widget _buildGlassBottomNav() {
     return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 14),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Container(
-            height: 70,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF18181B).withOpacity(0.75),
-              borderRadius: BorderRadius.circular(30),
+              color: const Color(0xFF141417).withOpacity(0.82),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
             child: Row(
@@ -99,27 +96,40 @@ class _MainMenuState extends State<MainMenu> {
   }
 
   Widget _buildNavItem({required IconData icon, required int index, required String label}) {
+    // Il tasto si illumina se è selezionato
     final isSelected = _currentIndex == index;
+    
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() {
+          if (index == 0 || index == 1) {
+            // 🎯 NEUTRALIZZAZIONE: Sia cliccando su Home che su Wallet, 
+            // forziamo l'app a stare nell'indice 0 (MainDashboardWrapper).
+            // Lo swipe gestirà la vista tra le due schede.
+            _currentIndex = 0;
+          } else {
+            // Per Avvisi (2) e Profilo (3) navighiamo normalmente.
+            _currentIndex = index;
+          }
+        });
+      },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Icon(
           icon,
           color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
-          size: 26,
+          size: 22,
         ),
       ),
     );
   }
 
-  // 🟢 PULSANTE CENTRALE RIALZATO CHE APRE DIRETTAMENTE USCITA!
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
@@ -127,24 +137,24 @@ class _MainMenuState extends State<MainMenu> {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => const AddMovementSheet(initialTab: 'uscita'), // 👈 Passiamo 'uscita'!
+          builder: (context) => const AddMovementSheet(initialTab: 'uscita'),
         );
       },
       child: Container(
-        height: 50,
-        width: 50,
+        height: 44,
+        width: 44,
         decoration: BoxDecoration(
           color: const Color(0xFF2DD4BF),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2DD4BF).withOpacity(0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF2DD4BF).withOpacity(0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: const Icon(Icons.add_rounded, color: Colors.black, size: 30),
+        child: const Icon(Icons.add_rounded, color: Colors.black, size: 24),
       ),
     );
   }
