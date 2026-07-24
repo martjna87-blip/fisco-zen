@@ -518,7 +518,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   }
 
   
-  // DIALOG GIROCONTO INTELLIGENTE (CON GESTIONE RISERVA TASSE P.IVA)
+  // DIALOG GIROCONTO STANDARD PER TRASFERIMENTO LIQUIDITÀ
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
 
@@ -526,7 +526,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     String aConto = accounts[1].title;
     bool isDaContoEspanso = false;
     bool isAContoEspanso = false;
-    bool isAccantonamentoTasse = false; // 👈 NOVITÀ: Interruttore Caso A
 
     final List<String> nomiConti = accounts.map((c) => c.title).toList();
     final TextEditingController importoController = TextEditingController();
@@ -535,9 +534,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final walletProvider = context.read<WalletProvider>();
-          final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
-
           return AlertDialog(
             backgroundColor: const Color(0xFF1C1C21),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -617,7 +613,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     final accDa = accounts.firstWhere((a) => a.title == daConto);
                     final accA = accounts.firstWhere((a) => a.title == aConto);
 
-                    // 🎯 Richiama la logica avanzata creata nel provider
+                    // Giroconto puro di liquidità
                     provider.eseguiGiroconto(
                       daAccountId: accDa.id,
                       aAccountId: accA.id,
@@ -629,14 +625,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          isAccantonamentoTasse
-                              ? 'Giroconto eseguito: ${importo.toStringAsFixed(2)} € riservati alle tasse!'
-                              : 'Giroconto di ${importo.toStringAsFixed(2)} € eseguito!',
-                        ),
-                        backgroundColor: isAccantonamentoTasse 
-                            ? const Color(0xFF3B82F6) 
-                            : const Color(0xFF10B981),
+                        content: Text('Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo!'),
+                        backgroundColor: const Color(0xFF10B981),
                       ),
                     );
                   }
