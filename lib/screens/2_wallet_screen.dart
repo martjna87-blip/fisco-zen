@@ -17,6 +17,94 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
+  // 🛡️ DIALOG RAPIDO: METTI AL SICURO LE TASSE
+  void _mostraDialogAccantonamentoTasse(BuildContext context, double tasseScoperte) {
+    final walletProvider = context.read<WalletProvider>();
+    final accounts = walletProvider.accounts;
+    
+    if (accounts.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Devi avere almeno due conti per accantonare le tasse.')));
+      return;
+    }
+
+    // Pre-compila con l'importo esatto, ma l'utente può modificarlo
+    final TextEditingController importoController = TextEditingController(text: tasseScoperte.toStringAsFixed(2));
+    
+    // Trova il conto principale e il salvadanaio tasse
+    String daContoId = accounts[0].id;
+    String aContoId = accounts.firstWhere((a) => a.title.toLowerCase().contains('tasse'), orElse: () => accounts[1]).id;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C21),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 22),
+            SizedBox(width: 8),
+            Text('Accantona Tasse', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'L\'importo suggerito copre le tasse generate finora. Puoi modificarlo per accantonare di più o di meno.',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: importoController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: 'Importo da accantonare (€)',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 20),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+              if (importo > 0) {
+                walletProvider.eseguiGiroconto(
+                  daAccountId: daContoId,
+                  aAccountId: aContoId,
+                  importo: importo,
+                  isAccantonamentoTasse: true, // 👈 Passa "true" per attivare lo spostamento del vincolo!
+                );
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Hai messo al sicuro ${importo.toStringAsFixed(2)} €! 🎉'),
+                    backgroundColor: const Color(0xFF3B82F6),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Metti al Sicuro', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
@@ -95,7 +183,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         
-                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (SOLO NUMERI E ICONE)
+                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (CON BOTTONE ACCANTONA)
                         if (widget.isPiva) ...[
                           const SizedBox(width: 14),
                           Column(
@@ -120,6 +208,25 @@ class _WalletScreenState extends State<WalletScreen> {
                                     '${totaleTasseLorde.toStringAsFixed(0)} €',
                                     style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
+                                  const SizedBox(width: 8),
+                                  // 👈 NUOVO BOTTONE: METTI AL SICURO RAPIDO
+                                  if (totaleTasseLorde > 0) 
+                                    InkWell(
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context, totaleTasseLorde),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                                        ),
+                                        child: const Text(
+                                          'Accantona',
+                                          style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],

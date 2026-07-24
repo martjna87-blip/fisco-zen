@@ -600,53 +600,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       prefixIcon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 18),
                     ),
                   ),
-
-                  // 👈 NOVITÀ P.IVA: Interruttore Sposta Riserva Tasse (Visibile SOLO per P.IVA)
-                  if (mostraPiva) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isAccantonamentoTasse 
-                            ? const Color(0xFF3B82F6).withOpacity(0.12) 
-                            : Colors.white.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isAccantonamentoTasse 
-                              ? const Color(0xFF3B82F6).withOpacity(0.4) 
-                              : Colors.white12,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Sposta Riserva Tasse 🛡️',
-                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Trasferisce il vincolo virtuale delle tasse sul conto di destinazione',
-                                  style: TextStyle(color: Colors.white38, fontSize: 9),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: isAccantonamentoTasse,
-                            activeColor: const Color(0xFF3B82F6),
-                            onChanged: (val) {
-                              setDialogState(() => isAccantonamentoTasse = val);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -669,7 +622,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       daAccountId: accDa.id,
                       aAccountId: accA.id,
                       importo: importo,
-                      isAccantonamentoTasse: isAccantonamentoTasse,
+                      isAccantonamentoTasse: false,
                     );
 
                     Navigator.pop(context);
