@@ -93,12 +93,34 @@ class WalletProvider extends ChangeNotifier {
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
+
 // ==========================================
-  // ⚙️ CONFIGURAZIONE PARTITA IVA (Fase 1)
+  // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
   // ==========================================
-  bool isPartitaIVA = true; 
-  double taxRate = 0.30; // Stima Tasse (es. 30%)
-  double accontiVersatiAnnoPrecedente = 100.0; // 👈 L'acconto dell'anno scorso!
+  bool isPartitaIVA = false; 
+  double accontiVersatiAnnoPrecedente = 100.0; // 👈 Credito tasse dell'anno scorso
+  
+  // Parametri Fiscali (Regime Forfettario Ateco)
+  double coeffRedditivita = 0.78; // Ateco 78%
+  double aliquotaImposta = 0.05;  // Imposta Sostitutiva 5%
+  double aliquotaInps = 0.2607;   // INPS Gestione Separata 26.07%
+
+  // 🎯 CALCOLO PRECISO DELL'ALIQUOTA FISCALE REALE (Totalizza 44.402%)
+  double get aliquotaFiscaleReale {
+    final imponibile = coeffRedditivita;                 // 0.78 su 1€
+    final saldoInps = imponibile * aliquotaInps;         // ~20.335%
+    final saldoImposta = imponibile * aliquotaImposta;   // ~3.900%
+    final accontoInps = saldoInps * 0.80;                // ~16.268%
+    final accontoImposta = saldoImposta * 1.00;          // ~3.900%
+    return saldoInps + saldoImposta + accontoInps + accontoImposta;
+  }
+
+  // 🔄 Cambia profilo (P.IVA vs Dipendente) e aggiorna subito l'interfaccia
+  void setPartitaIVA(bool value) {
+    isPartitaIVA = value;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
 
   // ==========================================
   // 📊 MATEMATICA E STATISTICHE GLOBALI
@@ -131,8 +153,8 @@ class WalletProvider extends ChangeNotifier {
   double _fatturatoTotale = 0.00;
   double get fatturatoTotale => _fatturatoTotale;
 
-  final double _coefficienteRedditivita = 0.78;
-  double get stimaTasseAccantonate => (_fatturatoTotale * _coefficienteRedditivita) * 0.35;
+  // Stima Globale collegata alla matematica Ateco esatta!
+  double get stimaTasseAccantonate => _fatturatoTotale * aliquotaFiscaleReale;
   double get nettoPiva => _fatturatoTotale - stimaTasseAccantonate;
 
   List<TransactionModel> _transactions = [];
@@ -174,6 +196,13 @@ class WalletProvider extends ChangeNotifier {
     try {
       final storage = html.window.localStorage;
 
+      // 👈 Caricamento Preferenze e Parametri Fiscali
+      isPartitaIVA = (storage['isPartitaIVA'] ?? 'false') == 'true';
+      coeffRedditivita = double.tryParse(storage['coeffRedditivita'] ?? '') ?? 0.78;
+      aliquotaImposta = double.tryParse(storage['aliquotaImposta'] ?? '') ?? 0.05;
+      aliquotaInps = double.tryParse(storage['aliquotaInps'] ?? '') ?? 0.2607;
+      accontiVersatiAnnoPrecedente = double.tryParse(storage['accontiVersatiAnnoPrecedente'] ?? '') ?? 100.0;
+
       _spesoBisogni = double.tryParse(storage['spesoBisogni'] ?? '') ?? 0.0;
       _spesoSvago = double.tryParse(storage['spesoSvago'] ?? '') ?? 0.0;
       _spesoRisparmi = double.tryParse(storage['spesoRisparmi'] ?? '') ?? 0.0;
@@ -207,6 +236,13 @@ class WalletProvider extends ChangeNotifier {
   void _salvaDatiInLocalStorage() {
     try {
       final storage = html.window.localStorage;
+
+      // 👈 Salva lo stato P.IVA, parametri fiscali e acconti
+      storage['isPartitaIVA'] = isPartitaIVA.toString();
+      storage['coeffRedditivita'] = coeffRedditivita.toString();
+      storage['aliquotaImposta'] = aliquotaImposta.toString();
+      storage['aliquotaInps'] = aliquotaInps.toString();
+      storage['accontiVersatiAnnoPrecedente'] = accontiVersatiAnnoPrecedente.toString();
 
       storage['spesoBisogni'] = _spesoBisogni.toString();
       storage['spesoSvago'] = _spesoSvago.toString();
@@ -256,9 +292,9 @@ class WalletProvider extends ChangeNotifier {
     if (isIncome) {
       targetAccount.amount += amount;
       
-      // 👈 MAGIA P.IVA: Se è un'entrata, calcola subito le tasse virtuali!
-      if (isPartitaIVA && category != 'Giroconto') {
-        targetAccount.virtualTaxAmount += (amount * taxRate);
+      // 🎯 CALCOLO TASSE ATECO: Applica l'aliquota reale (44.402%)
+      if ((isPartitaIVA || category == 'P.IVA') && category != 'Giroconto') {
+        targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
       }
       
     } else {
