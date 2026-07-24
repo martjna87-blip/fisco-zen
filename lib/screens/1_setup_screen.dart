@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // 👈 IMPORT MANCANTE DEL PROVIDER
+import '../data/wallet_provider.dart';   // 👈 IMPORT DEL NOSTRO WALLET PROVIDER
 import '../widgets_shared/fluid_wave_painter.dart';
 import '2_wallet_screen.dart';
 import '3_home_PI_screen.dart';
@@ -370,6 +372,9 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                                                 ? '47.91.10 - Commercio & Agenti'
                                                 : '56.10.11 - Artigiani & Ristorazione');
 
+                                    // 🎯 Imposta la P.IVA nel provider prima di cambiare schermata
+                                    context.read<WalletProvider>().setPartitaIVA(true);
+
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -410,6 +415,9 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                         height: 54,
                         child: ElevatedButton(
                           onPressed: () {
+                            // 🎯 Imposta la modalità Dipendente nel provider
+                            context.read<WalletProvider>().setPartitaIVA(false);
+
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(

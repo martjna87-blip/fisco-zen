@@ -152,7 +152,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               context: context,
                               isScrollControlled: true,
                               backgroundColor: Colors.transparent,
-                              builder: (context) => const ManageAccountsSheet(),
+                              builder: (context) => ManageAccountsSheet(isPiva: widget.isPiva), // 👈 Passa la scelta Dipendente/P.IVA alla schermata
                             );
                           },
                         ),
