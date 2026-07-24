@@ -597,22 +597,39 @@ class WalletProvider extends ChangeNotifier {
     final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
     final accA = _accounts.firstWhere((a) => a.id == aAccountId);
 
-    // 1. Spostamento Fisico Bancario
-    accDa.amount -= importo;
-    accA.amount += importo;
-
-    // 2. Se è un "Salvadanaio Tasse", sposta anche il "Vincolo virtuale"
+    // 1. SPOSTAMENTO DEL VINCOLO FISCALE (La Magia delle Tasse 🛡️)
     if (isAccantonamentoTasse) {
-      if (accDa.virtualTaxAmount >= importo) {
-        accDa.virtualTaxAmount -= importo;
-      } else {
-        accDa.virtualTaxAmount = 0; 
+      // Non possiamo spostare più tasse di quante ne abbiamo effettivamente accantonate sul conto di partenza
+      double tasseDaSpostare = importo;
+      if (tasseDaSpostare > accDa.virtualTaxAmount) {
+        tasseDaSpostare = accDa.virtualTaxAmount; 
       }
-      accA.virtualTaxAmount += importo;
+
+      // Togliamo la responsabilità dal conto di partenza e la diamo a quello di destinazione
+      accDa.virtualTaxAmount -= tasseDaSpostare;
+      accA.virtualTaxAmount += tasseDaSpostare;
     }
 
-    // 3. Registra i due movimenti figurativi (1 uscita, 1 entrata)
-    addTransaction(title: 'Giroconto a ${accA.title}', amount: importo, isIncome: false, category: 'Giroconto', accountId: accDa.id);
-    addTransaction(title: 'Giroconto da ${accDa.title}', amount: importo, isIncome: true, category: 'Giroconto', accountId: accA.id);
+    // 2. SPOSTAMENTO DEI SOLDI FISICI E STORICO MOVIMENTI
+    // (Usiamo addTransaction che aggiornerà automaticamente i saldi reali e salverà tutto,
+    // escludendo le tasse perché la category è 'Giroconto')
+    
+    addTransaction(
+      title: 'Giroconto verso ${accA.title}', 
+      amount: importo, 
+      isIncome: false, 
+      category: 'Giroconto', 
+      accountId: accDa.id
+    );
+    
+    addTransaction(
+      title: 'Giroconto da ${accDa.title}', 
+      amount: importo, 
+      isIncome: true, 
+      category: 'Giroconto', 
+      accountId: accA.id
+    );
+    
+    // Il notifyListeners e il salvataggio avvengono già dentro addTransaction!
   }
 }

@@ -95,9 +95,9 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         
-                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (SU 2 RIGHE)
+                        // 👈 WIDGET P.IVA: DETTAGLIO AFFIANCATO AL TOTALE (SOLO NUMERI E ICONE)
                         if (widget.isPiva) ...[
-                          const SizedBox(width: 14), // Spazio tra il numerone e i micro-dati
+                          const SizedBox(width: 14),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -106,7 +106,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                   const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Netto: ${nettoReale.toStringAsFixed(0)} €',
+                                    '${nettoReale.toStringAsFixed(0)} €',
                                     style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -117,7 +117,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                   const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Tasse: ${totaleTasseLorde.toStringAsFixed(0)} €',
+                                    '${totaleTasseLorde.toStringAsFixed(0)} €',
                                     style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                 ],
