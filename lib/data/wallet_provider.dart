@@ -586,7 +586,7 @@ class WalletProvider extends ChangeNotifier {
 
 
   // ==========================================
-  // 🔄 GIROCONTO INTELLIGENTE (Caso A)
+  // 🔄 GIROCONTO INTELLIGENTE (Con Gestione Cuscinetto Extra)
   // ==========================================
   void eseguiGiroconto({
     required String daAccountId,
@@ -597,39 +597,37 @@ class WalletProvider extends ChangeNotifier {
     final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
     final accA = _accounts.firstWhere((a) => a.id == aAccountId);
 
-    // 1. SPOSTAMENTO DEL VINCOLO FISCALE (La Magia delle Tasse 🛡️)
+    // Controlli di sicurezza di base
+    if (importo <= 0 || accDa.amount < importo) return;
+
+    // 1. GESTIONE DEL VINCOLO FISCALE
     if (isAccantonamentoTasse) {
-      // Non possiamo spostare più tasse di quante ne abbiamo effettivamente accantonate sul conto di partenza
+      // Trasferiamo la quota tasse fino al massimo disponibile sul conto di partenza
       double tasseDaSpostare = importo;
       if (tasseDaSpostare > accDa.virtualTaxAmount) {
-        tasseDaSpostare = accDa.virtualTaxAmount; 
+        tasseDaSpostare = accDa.virtualTaxAmount; // Se si sposta di più, sposta tutte le tasse disponibili
       }
 
-      // Togliamo la responsabilità dal conto di partenza e la diamo a quello di destinazione
       accDa.virtualTaxAmount -= tasseDaSpostare;
       accA.virtualTaxAmount += tasseDaSpostare;
+      // L'eccedenza di 'importo' rimarrà sul conto di destinazione come saldo reale puro (Cuscinetto)
     }
 
-    // 2. SPOSTAMENTO DEI SOLDI FISICI E STORICO MOVIMENTI
-    // (Usiamo addTransaction che aggiornerà automaticamente i saldi reali e salverà tutto,
-    // escludendo le tasse perché la category è 'Giroconto')
-    
+    // 2. REGISTRAZIONE MOVIMENTO FISICO & STORICO
     addTransaction(
-      title: 'Giroconto verso ${accA.title}', 
-      amount: importo, 
-      isIncome: false, 
-      category: 'Giroconto', 
-      accountId: accDa.id
+      title: isAccantonamentoTasse ? 'Accantonamento Tasse 🛡️' : 'Giroconto verso ${accA.title}',
+      amount: importo,
+      isIncome: false,
+      category: 'Giroconto',
+      accountId: accDa.id,
     );
-    
+
     addTransaction(
-      title: 'Giroconto da ${accDa.title}', 
-      amount: importo, 
-      isIncome: true, 
-      category: 'Giroconto', 
-      accountId: accA.id
+      title: isAccantonamentoTasse ? 'Ricezione Riserva Tasse 🛡️' : 'Giroconto da ${accDa.title}',
+      amount: importo,
+      isIncome: true,
+      category: 'Giroconto',
+      accountId: accA.id,
     );
-    
-    // Il notifyListeners e il salvataggio avvengono già dentro addTransaction!
   }
 }
