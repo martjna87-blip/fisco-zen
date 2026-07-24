@@ -97,7 +97,7 @@ class WalletProvider extends ChangeNotifier {
 // ==========================================
   // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
   // ==========================================
-  bool isPartitaIVA = false; 
+  bool isPartitaIVA = true; 
   double accontiVersatiAnnoPrecedente = 100.0; // 👈 Credito tasse dell'anno scorso
   
   // Parametri Fiscali (Regime Forfettario Ateco)
@@ -196,8 +196,8 @@ class WalletProvider extends ChangeNotifier {
     try {
       final storage = html.window.localStorage;
 
-      // 👈 Caricamento Preferenze e Parametri Fiscali
-      isPartitaIVA = (storage['isPartitaIVA'] ?? 'false') == 'true';
+      // 👈 Caricamento Preferenze e Parametri Fiscali (Default 'true')
+      isPartitaIVA = (storage['isPartitaIVA'] ?? 'true') == 'true';
       coeffRedditivita = double.tryParse(storage['coeffRedditivita'] ?? '') ?? 0.78;
       aliquotaImposta = double.tryParse(storage['aliquotaImposta'] ?? '') ?? 0.05;
       aliquotaInps = double.tryParse(storage['aliquotaInps'] ?? '') ?? 0.2607;
@@ -380,25 +380,15 @@ class WalletProvider extends ChangeNotifier {
 
     _fatturatoTotale += importoLordo;
 
+    // Registra solo l'entrata reale: il calcolo della tassa virtuale avviene in automatico!
     addTransaction(
       title: 'Incasso: $cliente',
       amount: importoLordo,
       isIncome: true,
       category: 'P.IVA',
       accountId: targetAccount.id,
-      date: dataObj, // 👈 ASSEGNA LA DATA CORRETTA ALLA TRANSAZIONE
+      date: dataObj,
     );
-
-    if (importoTasse > 0) {
-      addTransaction(
-        title: 'Accantonamento Tasse ($cliente)',
-        amount: importoTasse,
-        isIncome: false,
-        category: 'Risparmi',
-        accountId: targetAccount.id,
-        date: dataObj, // 👈 ASSEGNA LA DATA CORRETTA ALLA TRANSAZIONE
-      );
-    }
 
     _salvaDatiInLocalStorage();
     notifyListeners();
@@ -501,6 +491,7 @@ class WalletProvider extends ChangeNotifier {
 
     ];
 
+    isPartitaIVA = true; // 👈 Mantiene attivo il profilo P.IVA anche dopo il reset
     _spesoBisogni = 0.00;
     _spesoSvago = 0.00;
     _spesoRisparmi = 0.00;

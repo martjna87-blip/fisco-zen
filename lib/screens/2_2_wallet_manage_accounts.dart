@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
-  const ManageAccountsSheet({super.key});
+  final bool? isPiva; // 👈 Dichiarazione della variabile mancante
+
+  const ManageAccountsSheet({super.key, this.isPiva});
 
   @override
   State<ManageAccountsSheet> createState() => _ManageAccountsSheetState();
@@ -516,7 +518,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   }
 
   
-  // DIALOG GIROCONTO CON SELETTORI IN-LINE INTEGRATI
+  // DIALOG GIROCONTO INTELLIGENTE (CON GESTIONE RISERVA TASSE P.IVA)
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
 
@@ -524,6 +526,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     String aConto = accounts[1].title;
     bool isDaContoEspanso = false;
     bool isAContoEspanso = false;
+    bool isAccantonamentoTasse = false; // 👈 NOVITÀ: Interruttore Caso A
 
     final List<String> nomiConti = accounts.map((c) => c.title).toList();
     final TextEditingController importoController = TextEditingController();
@@ -531,113 +534,170 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1C1C21),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Giroconto Tra Conti', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('DA CONTO (ADDEBITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
+        builder: (context, setDialogState) {
+          final walletProvider = context.read<WalletProvider>();
+          final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
-                _buildDialogInlineSelector(
-                  selectedValue: daConto,
-                  isExpanded: isDaContoEspanso,
-                  items: nomiConti,
-                  onToggle: () => setDialogState(() {
-                    isDaContoEspanso = !isDaContoEspanso;
-                    if (isDaContoEspanso) isAContoEspanso = false;
-                  }),
-                  onSelect: (val) {
-                    setDialogState(() {
-                      daConto = val;
-                      isDaContoEspanso = false;
-                    });
-                  },
-                ),
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C1C21),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Giroconto Tra Conti', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DA CONTO (ADDEBITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
 
-                const SizedBox(height: 12),
-                const Text('A CONTO (ACCREDITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-
-                _buildDialogInlineSelector(
-                  selectedValue: aConto,
-                  isExpanded: isAContoEspanso,
-                  items: nomiConti,
-                  onToggle: () => setDialogState(() {
-                    isAContoEspanso = !isAContoEspanso;
-                    if (isAContoEspanso) isDaContoEspanso = false;
-                  }),
-                  onSelect: (val) {
-                    setDialogState(() {
-                      aConto = val;
-                      isAContoEspanso = false;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 12),
-                TextField(
-                  controller: importoController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                  decoration: InputDecoration(
-                    labelText: 'Importo Trasferimento (€)',
-                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 18),
+                  _buildDialogInlineSelector(
+                    selectedValue: daConto,
+                    isExpanded: isDaContoEspanso,
+                    items: nomiConti,
+                    onToggle: () => setDialogState(() {
+                      isDaContoEspanso = !isDaContoEspanso;
+                      if (isDaContoEspanso) isAContoEspanso = false;
+                    }),
+                    onSelect: (val) {
+                      setDialogState(() {
+                        daConto = val;
+                        isDaContoEspanso = false;
+                      });
+                    },
                   ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
-                if (daConto != aConto && importo > 0) {
-                  final provider = context.read<WalletProvider>();
-                  
-                  final accDa = accounts.firstWhere((a) => a.title == daConto);
-                  final accA = accounts.firstWhere((a) => a.title == aConto);
 
-                  provider.addTransaction(
-                    title: 'Giroconto verso ${accA.title}',
-                    amount: importo,
-                    isIncome: false,
-                    category: 'Risparmi',
-                    accountId: accDa.id,
-                  );
+                  const SizedBox(height: 12),
+                  const Text('A CONTO (ACCREDITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
 
-                  provider.addTransaction(
-                    title: 'Giroconto da ${accDa.title}',
-                    amount: importo,
-                    isIncome: true,
-                    category: 'Risparmi',
-                    accountId: accA.id,
-                  );
+                  _buildDialogInlineSelector(
+                    selectedValue: aConto,
+                    isExpanded: isAContoEspanso,
+                    items: nomiConti,
+                    onToggle: () => setDialogState(() {
+                      isAContoEspanso = !isAContoEspanso;
+                      if (isAContoEspanso) isDaContoEspanso = false;
+                    }),
+                    onSelect: (val) {
+                      setDialogState(() {
+                        aConto = val;
+                        isAContoEspanso = false;
+                      });
+                    },
+                  ),
 
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2DD4BF),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: importoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'Importo Trasferimento (€)',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      prefixIcon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 18),
+                    ),
+                  ),
+
+                  // 👈 NOVITÀ P.IVA: Interruttore Sposta Riserva Tasse (Visibile SOLO per P.IVA)
+                  if (mostraPiva) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isAccantonamentoTasse 
+                            ? const Color(0xFF3B82F6).withOpacity(0.12) 
+                            : Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isAccantonamentoTasse 
+                              ? const Color(0xFF3B82F6).withOpacity(0.4) 
+                              : Colors.white12,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Sposta Riserva Tasse 🛡️',
+                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Trasferisce il vincolo virtuale delle tasse sul conto di destinazione',
+                                  style: TextStyle(color: Colors.white38, fontSize: 9),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: isAccantonamentoTasse,
+                            activeColor: const Color(0xFF3B82F6),
+                            onChanged: (val) {
+                              setDialogState(() => isAccantonamentoTasse = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              child: const Text('Esegui Giroconto', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+                  if (daConto != aConto && importo > 0) {
+                    final provider = context.read<WalletProvider>();
+                    
+                    final accDa = accounts.firstWhere((a) => a.title == daConto);
+                    final accA = accounts.firstWhere((a) => a.title == aConto);
+
+                    // 🎯 Richiama la logica avanzata creata nel provider
+                    provider.eseguiGiroconto(
+                      daAccountId: accDa.id,
+                      aAccountId: accA.id,
+                      importo: importo,
+                      isAccantonamentoTasse: isAccantonamentoTasse,
+                    );
+
+                    Navigator.pop(context);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isAccantonamentoTasse
+                              ? 'Giroconto eseguito: ${importo.toStringAsFixed(2)} € riservati alle tasse!'
+                              : 'Giroconto di ${importo.toStringAsFixed(2)} € eseguito!',
+                        ),
+                        backgroundColor: isAccantonamentoTasse 
+                            ? const Color(0xFF3B82F6) 
+                            : const Color(0xFF10B981),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2DD4BF),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Esegui Giroconto', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -732,6 +792,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final walletProvider = context.watch<WalletProvider>();
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
+
+    // 🎯 La schermata obbedisce a quello che gli ordina la Home (widget.isPiva).
+    // Se riceve 'false' (Dipendente), spegne tutto istantaneamente.
+    final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -848,25 +912,80 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: Colors.white.withOpacity(0.08)),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('PATRIMONIO LIQUIDO TOTALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('PATRIMONIO LIQUIDO TOTALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
+                                            onPressed: () => _mostraDialogGiroconto(accounts),
+                                            tooltip: 'Esegui Giroconto',
                                           ),
                                         ],
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                                        onPressed: () => _mostraDialogGiroconto(accounts),
-                                        tooltip: 'Esegui Giroconto',
-                                      ),
+
+                                      // 👈 WIDGET P.IVA: NETTO SPENDIBILE (VERDE + MONEY) E FONDO TASSE (BLU + SALVADANAIO)
+                                      if (mostraPiva) ...[
+                                        const SizedBox(height: 12),
+                                        const Divider(color: Colors.white12, height: 1),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Row(
+                                                    children: [
+                                                      Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                                      SizedBox(width: 4),
+                                                      Text('NETTO SPENDIBILE', style: TextStyle(color: Color(0xFF10B981), fontSize: 8, fontWeight: FontWeight.bold)),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '${walletProvider.nettoSpendibile.toStringAsFixed(2)} €',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                children: [
+                                                  const Row(
+                                                    mainAxisAlignment: MainAxisAlignment.end,
+                                                    children: [
+                                                      Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                                      SizedBox(width: 4),
+                                                      Text('FONDO TASSE DA VERSARE', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 8, fontWeight: FontWeight.bold)),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '${walletProvider.fondoTasseDaVersare.toStringAsFixed(2)} €',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -965,6 +1084,28 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                                 '${account.amount.toStringAsFixed(2)} €',
                                                                 style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                               ),
+                                                              // 👈 WIDGET P.IVA: ICONA SOLDI VERDE + ICONA SALVADANAIO BLU
+                                                              if (mostraPiva) ...[
+                                                                const SizedBox(height: 3),
+                                                                Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
+                                                                    const SizedBox(width: 2),
+                                                                    Text(
+                                                                      '${(account.amount - account.virtualTaxAmount).toStringAsFixed(0)} €',
+                                                                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    const SizedBox(width: 8),
+                                                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
+                                                                    const SizedBox(width: 2),
+                                                                    Text(
+                                                                      '${account.virtualTaxAmount.toStringAsFixed(0)} € tasse',
+                                                                      style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ],
                                                               Icon(
                                                                 isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                                                                 color: Colors.white38,
