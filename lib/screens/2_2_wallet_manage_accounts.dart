@@ -1009,6 +1009,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                         const SizedBox(height: 8),
 
                                         ReorderableListView.builder(
+                                          buildDefaultDragHandles: false, // 👈 RIMUOOVE LA LINETTA AUTOMATICA A DESTRA
                                           shrinkWrap: true,
                                           physics: const NeverScrollableScrollPhysics(),
                                           itemCount: accounts.length,
