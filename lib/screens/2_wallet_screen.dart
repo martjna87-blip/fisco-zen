@@ -236,7 +236,7 @@ class _WalletScreenState extends State<WalletScreen> {
               alignment: Alignment.center,
               children: [
                 Container(
-                  height: 280,
+                  height: 220, // 👈 ALTEZZA RIDOTTA
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
@@ -248,7 +248,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 Container(
-                  height: 280,
+                  height: 220, // 👈 ALTEZZA RIDOTTA
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -298,7 +298,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 0), // 👈 SPAZIO RIMOSSO PER ALZARE IL TESTO
                     const Text(
                       'Portafoglio netto',
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
