@@ -292,8 +292,8 @@ class WalletProvider extends ChangeNotifier {
     if (isIncome) {
       targetAccount.amount += amount;
       
-      // 🎯 CALCOLO TASSE ATECO: Applica l'aliquota reale (44.402%)
-      if ((isPartitaIVA || category == 'P.IVA') && category != 'Giroconto') {
+      // 🎯 CALCOLO TASSE ATECO: Applica l'aliquota reale SOLO se è un incasso P.IVA
+      if (category == 'P.IVA') {
         targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
       }
       
