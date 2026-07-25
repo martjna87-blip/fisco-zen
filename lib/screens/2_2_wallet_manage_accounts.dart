@@ -884,33 +884,48 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                         ],
                                       ),
 
-                                      // 👈 WIDGET P.IVA: NETTO E TASSE INCOLONNATI
+                                      // 👈 WIDGET P.IVA: NETTO E TASSE PERFETTAMENTE ALLINEATI
                                       if (mostraPiva) ...[
                                         const SizedBox(height: 12),
                                         const Divider(color: Colors.white12, height: 1),
                                         const SizedBox(height: 12),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                        Table(
+                                          columnWidths: const {
+                                            0: IntrinsicColumnWidth(), // Adatta la colonna all'etichetta più lunga
+                                            1: FixedColumnWidth(12),   // Spazio fisso in mezzo
+                                            2: FlexColumnWidth(),      // Il resto dello spazio ai numeri
+                                          },
+                                          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                                           children: [
-                                            Row(
+                                            TableRow(
                                               children: [
-                                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
-                                                const SizedBox(width: 6),
-                                                const Text('NETTO SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                const SizedBox(width: 6),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
+                                                    const SizedBox(width: 6),
+                                                    const Text('NETTO SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                const SizedBox.shrink(),
                                                 Text(
                                                   '${nettoReale.toStringAsFixed(2)} €',
                                                   style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 8),
-                                            Row(
+                                            const TableRow(children: [SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8)]), // Spaziatura verticale
+                                            TableRow(
                                               children: [
-                                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
-                                                const SizedBox(width: 6),
-                                                const Text('FONDO TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                const SizedBox(width: 6),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
+                                                    const SizedBox(width: 6),
+                                                    const Text('FONDO TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                const SizedBox.shrink(),
                                                 Text(
                                                   '${totaleTasseLorde.toStringAsFixed(2)} €',
                                                   style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
@@ -955,195 +970,121 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                           },
                                           itemBuilder: (context, index) {
                                             final account = accounts[index];
-                                            final bool isEspanso = _contoEspansoIndex == index;
 
-                                            return AnimatedContainer(
+                                            return Container(
                                               key: ValueKey(account.id),
-                                              duration: const Duration(milliseconds: 200),
                                               margin: const EdgeInsets.only(bottom: 10),
                                               decoration: BoxDecoration(
                                                 color: Colors.black.withOpacity(0.35),
                                                 borderRadius: BorderRadius.circular(16),
-                                                border: Border.all(
-                                                  color: isEspanso ? account.color.withOpacity(0.5) : Colors.white.withOpacity(0.08),
-                                                ),
+                                                border: Border.all(color: Colors.white.withOpacity(0.08)),
                                               ),
-                                              child: Column(
-                                                children: [
-                                                  InkWell(
-                                                    onTap: () {
-                                                      setState(() {
-                                                        if (_contoEspansoIndex == index) {
-                                                          _contoEspansoIndex = null;
-                                                        } else {
-                                                          _contoEspansoIndex = index;
-                                                          _scrollToOffset(120);
-                                                        }
-                                                      });
-                                                    },
-                                                    borderRadius: BorderRadius.circular(16),
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.all(12),
-                                                      child: Row(
-                                                        children: [
-                                                          const Icon(Icons.drag_handle_rounded, color: Colors.white24, size: 18),
-                                                          const SizedBox(width: 8),
+                                              child: InkWell(
+                                                onTap: () => _mostraDettaglioMovimentiConto(context, account), // 👈 TAP APRE I MOVIMENTI
+                                                borderRadius: BorderRadius.circular(16),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                                                  child: Row(
+                                                    children: [
+                                                      // 👈 DRAG HANDLE RIPARATO
+                                                      ReorderableDragStartListener(
+                                                        index: index,
+                                                        child: const Padding(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8),
+                                                          child: Icon(Icons.drag_handle_rounded, color: Colors.white38, size: 20),
+                                                        ),
+                                                      ),
 
-                                                          Container(
-                                                            padding: const EdgeInsets.all(8),
-                                                            decoration: BoxDecoration(
-                                                              color: account.color.withOpacity(0.15),
-                                                              shape: BoxShape.circle,
-                                                            ),
-                                                            child: Icon(
-                                                              _getAccountIcon(account),
-                                                              color: account.color,
-                                                              size: 18,
-                                                            ),
+                                                      Container(
+                                                        padding: const EdgeInsets.all(8),
+                                                        decoration: BoxDecoration(
+                                                          color: account.color.withOpacity(0.15),
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        child: Icon(
+                                                          _getAccountIcon(account),
+                                                          color: account.color,
+                                                          size: 18,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(account.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 2),
+                                                            Text(account.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                                        children: [
+                                                          Text(
+                                                            '${account.amount.toStringAsFixed(2)} €',
+                                                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                                                           ),
-                                                          const SizedBox(width: 12),
-                                                          Expanded(
-                                                            child: Column(
+                                                          if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
+                                                            const SizedBox(height: 4),
+                                                            Column(
                                                               crossAxisAlignment: CrossAxisAlignment.start,
                                                               children: [
-                                                                Text(account.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                                                const SizedBox(height: 2),
-                                                                Text(account.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                          Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                                            children: [
-                                                              Text(
-                                                                '${account.amount.toStringAsFixed(2)} €',
-                                                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                                              ),
-                                                              // 👈 WIDGET P.IVA: Visibile SOLO sul Conto Principale (Solo Icone + Numeri)
-                                                              if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
-                                                                const SizedBox(height: 4),
-                                                                Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.start, // 👈 ALLINEA LE ICONE A PIOMBO TRA LORO
+                                                                Row(
+                                                                  mainAxisSize: MainAxisSize.min,
                                                                   children: [
-                                                                    Row(
-                                                                      mainAxisSize: MainAxisSize.min,
-                                                                      children: [
-                                                                        const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                                                        const SizedBox(width: 4),
-                                                                        Text(
-                                                                          '${(account.amount - account.virtualTaxAmount).toStringAsFixed(2)} €',
-                                                                          style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
-                                                                        ),
-                                                                      ],
+                                                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
+                                                                    const SizedBox(width: 4),
+                                                                    Text(
+                                                                      (account.amount - account.virtualTaxAmount).toStringAsFixed(2), // 👈 TOLTO IL SIMBOLO €
+                                                                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
                                                                     ),
-                                                                    const SizedBox(height: 2),
-                                                                    Row(
-                                                                      mainAxisSize: MainAxisSize.min,
-                                                                      children: [
-                                                                        const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                                                        const SizedBox(width: 4),
-                                                                        Text(
-                                                                          '${account.virtualTaxAmount.toStringAsFixed(2)} €',
-                                                                          style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
-                                                                        ),
-                                                                      ],
+                                                                  ],
+                                                                ),
+                                                                const SizedBox(height: 2),
+                                                                Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
+                                                                    const SizedBox(width: 4),
+                                                                    Text(
+                                                                      account.virtualTaxAmount.toStringAsFixed(2), // 👈 TOLTO IL SIMBOLO €
+                                                                      style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
                                                                     ),
                                                                   ],
                                                                 ),
                                                               ],
-                                                              const SizedBox(height: 4),
-                                                              Icon(
-                                                                isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                                color: Colors.white38,
-                                                                size: 16,
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-
-                                                  if (isEspanso) ...[
-                                                    const Divider(color: Colors.white12, height: 1),
-                                                    Container(
-                                                      padding: const EdgeInsets.all(12),
-                                                      color: Colors.black.withOpacity(0.15),
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          InkWell(
-                                                            onTap: () => _mostraDettaglioMovimentiConto(context, account),
-                                                            borderRadius: BorderRadius.circular(10),
-                                                            child: Container(
-                                                              width: double.infinity,
-                                                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                              decoration: BoxDecoration(
-                                                                color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                                                                borderRadius: BorderRadius.circular(10),
-                                                                border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-                                                              ),
-                                                              child: const Row(
-                                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                                children: [
-                                                                  Icon(Icons.list_alt_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                                                  SizedBox(width: 6),
-                                                                  Text(
-                                                                    'Vedi Dettaglio Movimenti',
-                                                                    style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
-                                                                  ),
-                                                                ],
-                                                              ),
                                                             ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                      
+                                                      // 👈 MENU A TENDINA (MODIFICA / ELIMINA)
+                                                      PopupMenuButton<String>(
+                                                        icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),
+                                                        color: const Color(0xFF1C1C21),
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                        offset: const Offset(0, 40),
+                                                        onSelected: (value) {
+                                                          if (value == 'edit') _mostraDialogModificaConto(context, account);
+                                                          if (value == 'delete') _confermaEliminazioneConto(context, account);
+                                                        },
+                                                        itemBuilder: (context) => [
+                                                          const PopupMenuItem(
+                                                            value: 'edit',
+                                                            child: Row(children: [Icon(Icons.edit_rounded, color: Colors.white, size: 16), SizedBox(width: 8), Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 12))]),
                                                           ),
-                                                          const SizedBox(height: 10),
-
-                                                          Row(
-                                                            children: [
-                                                              Expanded(
-                                                                child: InkWell(
-                                                                  onTap: () => _mostraDialogModificaConto(context, account),
-                                                                  borderRadius: BorderRadius.circular(10),
-                                                                  child: Container(
-                                                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                                                    decoration: BoxDecoration(
-                                                                      color: Colors.white.withOpacity(0.08),
-                                                                      borderRadius: BorderRadius.circular(10),
-                                                                      border: Border.all(color: Colors.white12),
-                                                                    ),
-                                                                    child: const Row(
-                                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                                      children: [
-                                                                        Icon(Icons.edit_rounded, color: Colors.white70, size: 14),
-                                                                        SizedBox(width: 6),
-                                                                        Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: 8),
-
-                                                              InkWell(
-                                                                onTap: () => _confermaEliminazioneConto(context, account),
-                                                                borderRadius: BorderRadius.circular(10),
-                                                                child: Container(
-                                                                  padding: const EdgeInsets.all(8),
-                                                                  decoration: BoxDecoration(
-                                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                                    borderRadius: BorderRadius.circular(10),
-                                                                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
-                                                                  ),
-                                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
-                                                                ),
-                                                              ),
-                                                            ],
+                                                          const PopupMenuItem(
+                                                            value: 'delete',
+                                                            child: Row(children: [Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16), SizedBox(width: 8), Text('Elimina Conto', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12))]),
                                                           ),
                                                         ],
                                                       ),
-                                                    ),
-                                                  ],
-                                                ],
+                                                    ],
+                                                  ),
+                                                ),
                                               ),
                                             );
                                           },
@@ -1160,38 +1101,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       ),
                     ),
 
-                    if (!isKeyboardOpen) ...[
-                      const SizedBox(height: 12),
-
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF18181B).withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.white.withOpacity(0.15)),
-                            ),
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text(
-                                'Annulla e Chiudi',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    // 👈 Bottone rimosso per ottimizzare la UX
                   ],
                 ),
               ),
