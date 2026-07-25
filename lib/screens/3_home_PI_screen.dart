@@ -421,13 +421,62 @@ class _HomeScreenState extends State<HomeScreen> {
                   top: 10,
                   left: 16,
                   child: SafeArea(
-                    child: IconButton(
-                      onPressed: () => _mostraConfermaResetGlobale(context, walletProvider),
-                      icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 20),
-                      tooltip: 'Reset Dati',
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444).withOpacity(0.12),
-                      ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => _mostraConfermaResetGlobale(context, walletProvider),
+                          icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 20),
+                          tooltip: 'Reset Dati',
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444).withOpacity(0.12),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // 👈 TASTINO TEST MODE FREE / PRO
+                        InkWell(
+                          onTap: () {
+                            walletProvider.toggleProUser();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  walletProvider.isProUser 
+                                      ? '✨ Modalità PRO Attivata (Test)' 
+                                      : '🔒 Modalità FREE Attivata (Test)',
+                                ),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor: walletProvider.isProUser 
+                                    ? const Color(0xFFA855F7) 
+                                    : const Color(0xFFF59E0B),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: walletProvider.isProUser 
+                                  ? const Color(0xFFA855F7).withOpacity(0.2) 
+                                  : const Color(0xFFF59E0B).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: walletProvider.isProUser 
+                                    ? const Color(0xFFA855F7) 
+                                    : const Color(0xFFF59E0B),
+                              ),
+                            ),
+                            child: Text(
+                              walletProvider.isProUser ? '✨ PRO' : '🔒 FREE',
+                              style: TextStyle(
+                                color: walletProvider.isProUser 
+                                    ? const Color(0xFFA855F7) 
+                                    : const Color(0xFFF59E0B),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

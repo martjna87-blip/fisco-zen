@@ -94,6 +94,10 @@ class WalletProvider extends ChangeNotifier {
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
 
+  // 👈 STATO PER IL TEST PRO / FREE
+  bool _isProUser = false;
+  bool get isProUser => _isProUser;
+
 // ==========================================
   // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
   // ==========================================
@@ -743,5 +747,11 @@ class WalletProvider extends ChangeNotifier {
       category: 'Giroconto',
       accountId: accA.id,
     );
+  }
+
+  // 👈 FUNZIONE PER CAMBIARE STATO PRO/FREE AL TAP
+  void toggleProUser() {
+    _isProUser = !_isProUser;
+    notifyListeners();
   }
 }

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 
 class RegistraFatturaSheet extends StatefulWidget {
-  final Function? onFatturaSalvata;
+  final Function(String cliente, double importo, String dataFormattata)? onFatturaSalvata;
 
   const RegistraFatturaSheet({
     super.key,
@@ -20,7 +20,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   final _clienteController = TextEditingController();
   final _importoController = TextEditingController();
   DateTime _dataSelezionata = DateTime.now();
-  bool _isManualOpen = true;
 
   @override
   void dispose() {
@@ -30,7 +29,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     super.dispose();
   }
 
-  // APERTURA CALENDARIO
   Future<void> _selezionaData(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -63,6 +61,63 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final giorno = dt.day.toString().padLeft(2, '0');
     final mese = dt.month.toString().padLeft(2, '0');
     return '$giorno/$mese/${dt.year}';
+  }
+
+  void _mostraPaywallPro(String funzionalita) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF18181B),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFA855F7).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFA855F7), size: 36),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Sblocca $funzionalita',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Importa le fatture in 2 secondi senza digitare nulla a mano grazie all\'Intelligenza Artificiale.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Usa il tasto PRO/FREE nell\'Header della Home per provare la modalità IA!'),
+                    backgroundColor: Color(0xFFA855F7),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFA855F7),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Passa a PRO (7 Giorni Gratis)', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _salvaFattura() {
@@ -102,10 +157,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     if (widget.onFatturaSalvata != null) {
       try {
-        widget.onFatturaSalvata!(cliente, importo, dataFormattata, numero);
-      } catch (_) {
         widget.onFatturaSalvata!(cliente, importo, dataFormattata);
-      }
+      } catch (_) {}
     }
 
     Navigator.pop(context);
@@ -120,11 +173,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isPro = context.watch<WalletProvider>().isProUser;
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     
     final isKeyboardOpen = bottomInset > 0;
-    final dialogHeight = isKeyboardOpen ? screenSize.height * 0.78 : screenSize.height * 0.88;
+    final dialogHeight = isKeyboardOpen ? screenSize.height * 0.78 : screenSize.height * 0.82;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -142,7 +196,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             height: dialogHeight,
             child: Stack(
               children: [
-                // 1. IMMAGINE DI SFONDO ATMOSFERICA
                 Positioned.fill(
                   child: Image.network(
                     'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
@@ -152,20 +205,16 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     ),
                   ),
                 ),
-
-                // 2. OVERLAY SCURO SFUMATO
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withOpacity(0.75),
                   ),
                 ),
-
-                // 3. CONTENUTO CON HEADER FLUTTUANTE & RIQUADRI GLASS
                 Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
-                      // --- HEADER FLUTTUANTE ---
+                      // HEADER CON TASTO "X"
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -203,9 +252,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
                       const SizedBox(height: 12),
 
-                      // ==========================================
-                      // 🔲 RIQUADRO 1: MODALITÀ DI REGISTRAZIONE
-                      // ==========================================
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(22),
@@ -224,7 +270,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'SCEGLI MODALITÀ DI REGISTRAZIONE',
+                                      'ACQUISIZIONE RAPIDA IA',
                                       style: TextStyle(
                                         color: Colors.white54,
                                         fontSize: 10,
@@ -232,200 +278,141 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                         letterSpacing: 0.8,
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 10),
 
-                                    // OPTION PRO: FOTO
-                                    _buildOptionTile(
-                                      icon: Icons.camera_alt_outlined,
-                                      color: const Color(0xFFF59E0B),
-                                      title: 'Scansiona con Fotocamera',
-                                      subtitle: 'Acquisizione automatica da cartaceo (OCR)',
-                                      isPro: true,
-                                    ),
-
-                                    const SizedBox(height: 8),
-
-                                    // OPTION PRO: FILE
-                                    _buildOptionTile(
-                                      icon: Icons.note_add_outlined,
-                                      color: const Color(0xFFF59E0B),
-                                      title: 'Carica File / PDF / XML',
-                                      subtitle: 'Importa da cassetto fiscale o file locale',
-                                      isPro: true,
-                                    ),
-
-                                    const SizedBox(height: 8),
-
-                                    // INSERIMENTO MANUALE (ACCORDION)
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.35),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: _isManualOpen
-                                              ? const Color(0xFF2DD4BF).withOpacity(0.4)
-                                              : Colors.white.withOpacity(0.1),
+                                    // 🎯 CARD PRO AFFIANCATE
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _buildProCard(
+                                            icon: Icons.camera_alt_outlined,
+                                            title: 'Fotocamera',
+                                            subtitle: 'Scan OCR',
+                                            isPro: isPro,
+                                            onTap: () {
+                                              if (isPro) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Apertura fotocamera OCR...')),
+                                                );
+                                              } else {
+                                                _mostraPaywallPro('Scansione OCR');
+                                              }
+                                            },
+                                          ),
                                         ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: _buildProCard(
+                                            icon: Icons.note_add_outlined,
+                                            title: 'Carica File',
+                                            subtitle: 'PDF / XML',
+                                            isPro: isPro,
+                                            onTap: () {
+                                              if (isPro) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Apertura selettore file...')),
+                                                );
+                                              } else {
+                                                _mostraPaywallPro('Importazione PDF/XML');
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 16),
+                                    const Divider(color: Colors.white12, height: 1),
+                                    const SizedBox(height: 14),
+
+                                    const Text(
+                                      'INSERIMENTO MANUALE',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
                                       ),
-                                      child: Theme(
-                                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                                        child: ExpansionTile(
-                                          initiallyExpanded: true,
-                                          onExpansionChanged: (val) => setState(() => _isManualOpen = val),
-                                          leading: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.edit_note_rounded, color: Color(0xFF2DD4BF), size: 20),
-                                          ),
-                                          title: const Text(
-                                            'Inserimento Manuale',
-                                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                          ),
-                                          subtitle: const Text(
-                                            'Compila numero, cliente, importo e data',
-                                            style: TextStyle(color: Colors.white54, fontSize: 10),
-                                          ),
-                                          childrenPadding: const EdgeInsets.all(12),
-                                          children: [
-                                            // 1. CAMPO NUMERO FATTURA (SOPRA AL CLIENTE)
-                                            TextField(
-                                              controller: _numeroController,
-                                              style: const TextStyle(color: Colors.white, fontSize: 13),
-                                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                                              decoration: InputDecoration(
-                                                labelText: 'Numero Fattura (es. 45/2026)',
-                                                labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                prefixIcon: const Icon(Icons.tag_rounded, color: Color(0xFF2DD4BF), size: 18),
-                                                filled: true,
-                                                fillColor: Colors.black.withOpacity(0.4),
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                                ),
-                                                focusedBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
-                                                ),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
+                                    ),
+                                    const SizedBox(height: 10),
 
-                                            // 2. CAMPO CLIENTE
-                                            TextField(
-                                              controller: _clienteController,
-                                              style: const TextStyle(color: Colors.white, fontSize: 13),
-                                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                                              decoration: InputDecoration(
-                                                labelText: 'Nome Cliente / Azienda',
-                                                labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF2DD4BF), size: 18),
-                                                filled: true,
-                                                fillColor: Colors.black.withOpacity(0.4),
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                                ),
-                                                focusedBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
-                                                ),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    // 1. RIGA NUMERO E DATA AFFIANCATI (50/50)
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            controller: _numeroController,
+                                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                                            decoration: _buildInputDecoration('N° Fattura', Icons.tag_rounded),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: InkWell(
+                                            onTap: () => _selezionaData(context),
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.4),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: Colors.white.withOpacity(0.1)),
                                               ),
-                                            ),
-                                            const SizedBox(height: 10),
-
-                                            // 3. CAMPO IMPORTO
-                                            TextField(
-                                              controller: _importoController,
-                                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                              style: const TextStyle(color: Colors.white, fontSize: 13),
-                                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                                              decoration: InputDecoration(
-                                                labelText: 'Importo Lordo (€)',
-                                                labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
-                                                filled: true,
-                                                fillColor: Colors.black.withOpacity(0.4),
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                                ),
-                                                focusedBorder: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
-                                                ),
-                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-
-                                            // 4. CAMPO SELEZIONE DATA CON CALENDARIO (SOTTO ALL'IMPORTO)
-                                            InkWell(
-                                              onTap: () => _selezionaData(context),
-                                              borderRadius: BorderRadius.circular(12),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.4),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                                ),
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 18),
-                                                        const SizedBox(width: 12),
-                                                        Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            const Text(
-                                                              'Data Fattura',
-                                                              style: TextStyle(color: Colors.white54, fontSize: 10),
-                                                            ),
-                                                            const SizedBox(height: 2),
-                                                            Text(
-                                                              _formattaData(_dataSelezionata),
-                                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      _formattaData(_dataSelezionata),
+                                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    const Icon(Icons.arrow_drop_down_rounded, color: Colors.white54, size: 22),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 14),
-
-                                            // BOTTONE SALVA
-                                            SizedBox(
-                                              width: double.infinity,
-                                              height: 44,
-                                              child: ElevatedButton(
-                                                onPressed: _salvaFattura,
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF2DD4BF),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                  elevation: 0,
-                                                ),
-                                                child: const Text(
-                                                  'Registra e Salva Fattura',
-                                                  style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
                                                   ),
-                                                ),
+                                                ],
                                               ),
                                             ),
-                                          ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+
+                                    // 2. CLIENTE
+                                    TextField(
+                                      controller: _clienteController,
+                                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      decoration: _buildInputDecoration('Nome Cliente / Azienda', Icons.person_outline),
+                                    ),
+                                    const SizedBox(height: 10),
+
+                                    // 3. IMPORTO LORDO IN EVIDENZA
+                                    TextField(
+                                      controller: _importoController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 18, fontWeight: FontWeight.bold),
+                                      decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    // BOTTONE SALVA
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 46,
+                                      child: ElevatedButton(
+                                        onPressed: _salvaFattura,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2DD4BF),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text(
+                                          'Registra e Salva Fattura',
+                                          style: TextStyle(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -436,42 +423,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                           ),
                         ),
                       ),
-
-                      if (!isKeyboardOpen) ...[
-                        const SizedBox(height: 12),
-
-                        // ==========================================
-                        // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
-                        // ==========================================
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF18181B).withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: Colors.white.withOpacity(0.15)),
-                              ),
-                              child: TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: const Text(
-                                  'Annulla e Chiudi',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -483,68 +434,83 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     );
   }
 
-  Widget _buildOptionTile({
+  Widget _buildProCard({
     required IconData icon,
-    required Color color,
     required String title,
     required String subtitle,
     required bool isPro,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 18),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isPro ? const Color(0xFFA855F7).withOpacity(0.5) : Colors.white.withOpacity(0.08),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    if (isPro) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isPro ? const Color(0xFFA855F7).withOpacity(0.15) : Colors.white10,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: isPro ? const Color(0xFFA855F7) : const Color(0xFFF59E0B), size: 18),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      if (!isPro) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('PRO', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 8, fontWeight: FontWeight.bold)),
                         ),
-                        child: const Text(
-                          'PRO',
-                          style: TextStyle(color: Color(0xFFF59E0B), fontSize: 8, fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.white54, fontSize: 10),
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 18),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+      prefixIcon: Icon(icon, color: const Color(0xFF2DD4BF), size: 18),
+      filled: true,
+      fillColor: Colors.black.withOpacity(0.4),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     );
   }
 }
