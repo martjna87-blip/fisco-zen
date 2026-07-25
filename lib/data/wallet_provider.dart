@@ -427,12 +427,56 @@ class WalletProvider extends ChangeNotifier {
     }
 
     String numeroFattura = '';
+    String dataEmissioneFormattata = '';
 
     if (idFattura != null) {
       final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
       if (idx != -1) {
         final f = _fattureDaIncassare.removeAt(idx);
-        numeroFattura = f['numero']?.toString() ?? ''; // 👈 RECUPERIAMO IL NUMERO FATTURA!
+        numeroFattura = f['numero']?.toString() ?? ''; 
+        
+        // 👈 ESTRAZIONE DATA SUPER-BLINDATA (Legge format italiani: 25/07, 25 Luglio, o ISO)
+        if (f['data'] != null) {
+          String rawData = f['data'].toString();
+          bool parsed = false;
+
+          // 1. Formato testuale "25 Luglio 2026"
+          final mesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+          for (int i = 0; i < mesi.length; i++) {
+            if (rawData.contains(mesi[i])) {
+              final parts = rawData.split(' ');
+              if (parts.isNotEmpty) {
+                dataEmissioneFormattata = '${parts[0].padLeft(2, '0')}/${(i + 1).toString().padLeft(2, '0')}';
+                parsed = true;
+                break;
+              }
+            }
+          }
+
+          // 2. Formato con slash "25/07/2026"
+          if (!parsed && rawData.contains('/')) {
+            final parts = rawData.split('/');
+            if (parts.length >= 2) {
+              dataEmissioneFormattata = '${parts[0].padLeft(2, '0')}/${parts[1].padLeft(2, '0')}';
+              parsed = true;
+            }
+          }
+
+          // 3. Formato Standard ISO "2026-07-25"
+          if (!parsed) {
+            try {
+              final dt = DateTime.parse(rawData);
+              dataEmissioneFormattata = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
+              parsed = true;
+            } catch (_) {}
+          }
+
+          // Fallback di emergenza
+          if (!parsed) {
+            dataEmissioneFormattata = rawData.length > 5 ? rawData.substring(0, 5) : rawData;
+          }
+        }
+
         _fattureIncassate.add({
           ...f,
           'dataIncasso': dataFinale,
@@ -444,9 +488,10 @@ class WalletProvider extends ChangeNotifier {
 
     _fatturatoTotale += importoLordo;
 
-    // 👈 CREIAMO UN TITOLO COMPLETO CON NOME E NUMERO FATTURA
+    // 👈 TITOLO DEFINITIVO
+    final String suffissoData = dataEmissioneFormattata.isNotEmpty ? ' (del $dataEmissioneFormattata)' : '';
     final String titoloTransazione = numeroFattura.isNotEmpty 
-        ? 'Fattura n.$numeroFattura - $cliente' 
+        ? 'Fattura n.$numeroFattura$suffissoData - $cliente' 
         : 'Incasso: $cliente';
 
     // Registra l'entrata nel Wallet con il nuovo titolo dettagliato
