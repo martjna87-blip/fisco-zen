@@ -297,7 +297,68 @@ class WalletProvider extends ChangeNotifier {
         targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
       }
       
-    } else {
+    } else {// 🚀 INCASSA FATTURA (CON GESTIONE DATA CUSTOM)
+  void incassaFatturaPiva({
+    String? idFattura,
+    required String cliente,
+    required double importoLordo,
+    required double importoTasse,
+    required String contoDestinazione,
+    String? dataIncasso, // 👈 PARAMETRO RICEVUTO DALLA SCHERMATA
+  }) {
+    final targetAccount = _accounts.firstWhere(
+      (acc) => acc.title.contains(contoDestinazione) || contoDestinazione.contains(acc.title),
+      orElse: () => _accounts.first,
+    );
+
+    final String dataFinale = dataIncasso ?? 'Oggi';
+
+    // Conversione della stringa data in oggetto DateTime per la transazione
+    DateTime dataObj = DateTime.now();
+    if (dataIncasso != null) {
+      try {
+        final parti = dataIncasso.split(' ');
+        if (parti.length >= 3) {
+          final g = int.parse(parti[0]);
+          final a = int.parse(parti[2]);
+          final mesi = [
+            'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+            'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+          ];
+          final m = mesi.indexOf(parti[1]) + 1;
+          if (m > 0) dataObj = DateTime(a, m, g);
+        }
+      } catch (_) {}
+    }
+
+    if (idFattura != null) {
+      final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
+      if (idx != -1) {
+        final f = _fattureDaIncassare.removeAt(idx);
+        _fattureIncassate.add({
+          ...f,
+          'dataIncasso': dataFinale, // 👈 SALVA LA DATA SCELTA (ES. GIUGNO)
+          'importoTasse': importoTasse,
+          'contoAccredito': contoDestinazione,
+        });
+      }
+    }
+
+    _fatturatoTotale += importoLordo;
+
+    // Registra solo l'entrata reale: il calcolo della tassa virtuale avviene in automatico!
+    addTransaction(
+      title: 'Incasso: $cliente',
+      amount: importoLordo,
+      isIncome: true,
+      category: 'P.IVA',
+      accountId: targetAccount.id,
+      date: dataObj,
+    );
+
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
       targetAccount.amount -= amount;
       if (category == 'Bisogni') _spesoBisogni += amount;
       if (category == 'Svago') _spesoSvago += amount;
