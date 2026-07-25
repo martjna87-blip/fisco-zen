@@ -325,25 +325,11 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                   ),
                                                   const SizedBox(width: 8),
 
-                                                  // 🗑️ CESTINO INTESTAZIONE (CANCELLAZIONE ISTANTANEA)
-                                                  InkWell(
-                                                    onTap: () => _confermaEliminazione(context, f),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.all(6),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-
+                                                  // 👈 FRECCETTA APERTURA PULITA (CESTINO RIMOZIONE SICURA ALL'INTERNO)
                                                   Icon(
                                                     isEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                                                     color: Colors.white54,
-                                                    size: 18,
+                                                    size: 20,
                                                   ),
                                                 ],
                                               ),
@@ -360,7 +346,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              // DETTAGLI INCASSO (LAYOUT CORRETTO SENZA OVERFLOW)
+                                              // DETTAGLI INCASSO (NETTO VERDE + BLU TASSE UNIFICATO)
                                               Container(
                                                 padding: const EdgeInsets.all(12),
                                                 decoration: BoxDecoration(
@@ -372,13 +358,13 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                   children: [
                                                     _buildDetailRow(Icons.add_circle_outline, 'Entrata Incasso Lordo:', '+${lordo.toStringAsFixed(2)} €', const Color(0xFF10B981)),
                                                     const SizedBox(height: 6),
+                                                    _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '+${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+                                                    const SizedBox(height: 6),
+                                                    _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
+                                                    const Divider(color: Colors.white12, height: 14),
                                                     _buildDetailRow(Icons.remove_circle_outline, 'Saldo Tasse (Anno Y):', '-${totaleSaldoY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
                                                     const SizedBox(height: 6),
                                                     _buildDetailRow(Icons.history_toggle_off_rounded, 'Acconti (Anno Y+1):', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                                                    const Divider(color: Colors.white12, height: 14),
-                                                    _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFFEF4444), isBold: true),
-                                                    const SizedBox(height: 6),
-                                                    _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
                                                   ],
                                                 ),
                                               ),
@@ -556,6 +542,20 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                   child: const Text(
                                                     'Conferma Incasso e Accantona',
                                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              const SizedBox(height: 10),
+
+                                              // 🗑️ PULSANTE ELIMINA PROTETTO IN FONDO ALLA SCHEDA
+                                              Center(
+                                                child: TextButton.icon(
+                                                  onPressed: () => _confermaEliminazione(context, f),
+                                                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 15),
+                                                  label: const Text(
+                                                    'Elimina questa fattura',
+                                                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
                                                   ),
                                                 ),
                                               ),

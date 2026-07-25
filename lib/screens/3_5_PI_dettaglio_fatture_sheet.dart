@@ -23,6 +23,7 @@ class DettaglioFattureSheet extends StatefulWidget {
 
 class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
   int _meseSelezionato = 0; // 0 = Anno Intero, 1 = Gen, 2 = Feb, ecc.
+  final Set<String> _expandedFattureIds = {}; // 👈 TRACCIA LE CARD APERTE AL TAP
 
   final List<String> _mesiStr = [
     'Anno', 'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giug',
@@ -332,7 +333,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                                 const SizedBox(height: 10),
 
-                                // LISTA FATTURE
+                                // LISTA FATTURE SINTETICA CON ACCORDION
                                 Expanded(
                                   child: fattureFiltrate.isEmpty
                                       ? Center(
@@ -348,6 +349,9 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                           itemCount: fattureFiltrate.length,
                                           itemBuilder: (context, index) {
                                             final f = fattureFiltrate[index];
+                                            final String fId = f['id']?.toString() ?? index.toString();
+                                            final bool isExpanded = _expandedFattureIds.contains(fId);
+
                                             final double lordo = (f['importo'] as num).toDouble();
                                             final double imponibile = lordo * widget.coefficienteRedditivita;
 
@@ -362,75 +366,138 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                             final double totaleAccantonareCard = totaleTasseY + totaleAccontiY1;
                                             final double nettoRimanenteCard = lordo - totaleAccantonareCard;
 
-                                           return Container(
-                                              margin: const EdgeInsets.only(bottom: 10),
-                                              padding: const EdgeInsets.all(12),
+                                            return Container(
+                                              margin: const EdgeInsets.only(bottom: 8),
                                               decoration: BoxDecoration(
                                                 color: Colors.black.withOpacity(0.4),
                                                 borderRadius: BorderRadius.circular(16),
-                                                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                                border: Border.all(
+                                                  color: isExpanded
+                                                      ? const Color(0xFF2DD4BF).withOpacity(0.4)
+                                                      : Colors.white.withOpacity(0.1),
+                                                ),
                                               ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              child: InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    if (isExpanded) {
+                                                      _expandedFattureIds.remove(fId);
+                                                    } else {
+                                                      _expandedFattureIds.add(fId);
+                                                    }
+                                                  });
+                                                },
+                                                borderRadius: BorderRadius.circular(16),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(12),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
-                                                      Expanded(
-                                                        child: Builder(
-                                                          builder: (context) {
-                                                            final dataShort = _formattaGiornoMese(f['data']);
-                                                            final dataLabel = dataShort.isNotEmpty ? ' • $dataShort' : '';
-                                                            return Text(
-                                                              '${f['cliente']} (${f['numero'] ?? 'Fattura'})$dataLabel',
-                                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                              overflow: TextOverflow.ellipsis,
-                                                            );
-                                                          },
-                                                        ),
-                                                      ),
+                                                      // RIGA PRINCIPALE (NOME & LORDO)
                                                       Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                         children: [
-                                                          Text(
-                                                            '+${lordo.toStringAsFixed(2)} €',
-                                                            style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.bold),
-                                                          ),
-                                                          const SizedBox(width: 8),
-
-                                                          // 🗑️ CESTINO CANCELLAZIONE ISTANTANEA
-                                                          InkWell(
-                                                            onTap: () => _confermaEliminazione(context, f),
-                                                            borderRadius: BorderRadius.circular(8),
-                                                            child: Container(
-                                                              padding: const EdgeInsets.all(5),
-                                                              decoration: BoxDecoration(
-                                                                color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                                borderRadius: BorderRadius.circular(8),
-                                                              ),
-                                                              child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(
+                                                                  '${f['cliente']} (${f['numero'] ?? 'Fattura'})',
+                                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                                if (_formattaGiornoMese(f['data']).isNotEmpty)
+                                                                  Text(
+                                                                    'Incassata il ${_formattaGiornoMese(f['data'])}',
+                                                                    style: const TextStyle(color: Colors.white54, fontSize: 10),
+                                                                  ),
+                                                              ],
                                                             ),
+                                                          ),
+                                                          Row(
+                                                            children: [
+                                                              Text(
+                                                                '+${lordo.toStringAsFixed(2)} €',
+                                                                style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.bold),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              Icon(
+                                                                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                                color: Colors.white54,
+                                                                size: 18,
+                                                              ),
+                                                            ],
                                                           ),
                                                         ],
                                                       ),
+
+                                                      const SizedBox(height: 8),
+
+                                                      // RIGA SINTETICA NETTO / TASSE (INVERTITI + BLU TASSE UNIFICATO)
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            'Netto: +${nettoRimanenteCard.toStringAsFixed(2)} €',
+                                                            style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
+                                                          ),
+                                                          Text(
+                                                            'Tasse: -${totaleAccantonareCard.toStringAsFixed(2)} €',
+                                                            style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.w600),
+                                                          ),
+                                                        ],
+                                                      ),
+
+                                                      // SPACCATO ANALITICO FISCALE (APERTURA AL TAP)
+                                                      if (isExpanded) ...[
+                                                        const SizedBox(height: 10),
+                                                        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                                                        const SizedBox(height: 8),
+                                                        _buildRowDetail('Saldo INPS', '${inpsY.toStringAsFixed(2)} €', Colors.white70),
+                                                        const SizedBox(height: 2),
+                                                        _buildRowDetail('Saldo Imposta', '${impostaY.toStringAsFixed(2)} €', Colors.white70),
+                                                        const SizedBox(height: 2),
+                                                        _buildRowDetail('Totale Saldo', '${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
+                                                        Divider(color: Colors.white.withOpacity(0.12), height: 10),
+                                                        _buildRowDetail('Acconto INPS', '${accontoInpsY1.toStringAsFixed(2)} €', Colors.white70),
+                                                        const SizedBox(height: 2),
+                                                        _buildRowDetail('Acconto Imposta', '${accontoImpostaY1.toStringAsFixed(2)} €', Colors.white70),
+                                                        const SizedBox(height: 2),
+                                                        _buildRowDetail('Totale Acconto', '${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
+                                                        Divider(color: Colors.white.withOpacity(0.12), height: 10),
+                                                        _buildRowDetail('Totale Tasse da Accantonare:', '-${totaleAccantonareCard.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
+                                                        const SizedBox(height: 2),
+                                                        _buildRowDetail('Netto Rimanente Reale:', '+${nettoRimanenteCard.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+                                                        const SizedBox(height: 10),
+
+                                                        // PULSANTE ELIMINA PULITO E PROTETTO IN FONDOCARD
+                                                        Align(
+                                                          alignment: Alignment.centerRight,
+                                                          child: InkWell(
+                                                            onTap: () => _confermaEliminazione(context, f),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                            child: Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFFEF4444).withOpacity(0.12),
+                                                                borderRadius: BorderRadius.circular(8),
+                                                                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                                                              ),
+                                                              child: const Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                                                  SizedBox(width: 4),
+                                                                  Text('Elimina Fattura', style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ],
                                                   ),
-                                                  const SizedBox(height: 8),
-                                                  _buildRowDetail('Saldo INPS', '${inpsY.toStringAsFixed(2)} €', Colors.white70),
-                                                  const SizedBox(height: 2),
-                                                  _buildRowDetail('Saldo Imposta', '${impostaY.toStringAsFixed(2)} €', Colors.white70),
-                                                  const SizedBox(height: 2),
-                                                  _buildRowDetail('Totale Saldo', '${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
-                                                  Divider(color: Colors.white.withOpacity(0.12), height: 10),
-                                                  _buildRowDetail('Acconto INPS', '${accontoInpsY1.toStringAsFixed(2)} €', Colors.white70),
-                                                  const SizedBox(height: 2),
-                                                  _buildRowDetail('Acconto Imposta', '${accontoImpostaY1.toStringAsFixed(2)} €', Colors.white70),
-                                                  const SizedBox(height: 2),
-                                                  _buildRowDetail('Totale Acconto', '${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                                                  Divider(color: Colors.white.withOpacity(0.12), height: 10),
-                                                  _buildRowDetail('Totale Tasse da Accantonare:', '${totaleAccantonareCard.toStringAsFixed(2)} €', const Color(0xFFEF4444), isBold: true),
-                                                  const SizedBox(height: 2),
-                                                  _buildRowDetail('Netto Rimanente Reale:', '${nettoRimanenteCard.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
-                                                ],
+                                                ),
                                               ),
                                             );
                                           },
@@ -443,20 +510,20 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
 
                     // ==========================================
-                    // 🔲 RIQUADRO 2: RIEPILOGO FISCALE (FILTRATO)
+                    // 🔲 RIEPILOGO FISCALE COMPATTO (STICKY BOTTOM)
                     // ==========================================
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(20),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFF18181B).withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
                           ),
                           child: Column(
@@ -481,48 +548,14 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                               const SizedBox(height: 6),
                               _buildRowDetail('Totale Incassato Lordo:', '${lordoTotale.toStringAsFixed(2)} €', Colors.white, isBold: true),
                               const SizedBox(height: 2),
-                              _buildRowDetail('Totale Saldo', '${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
+                              _buildRowDetail('Totale Saldo:', '-${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
                               const SizedBox(height: 2),
-                              _buildRowDetail('Totale Acconto', '${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                              Divider(color: Colors.white.withOpacity(0.2), height: 10),
-                              _buildRowDetail('Totale Tasse da Accantonare:', '${grandTotaleAccantonare.toStringAsFixed(2)} €', const Color(0xFFEF4444), isBold: true),
+                              _buildRowDetail('Totale Acconto:', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
+                              Divider(color: Colors.white.withOpacity(0.15), height: 10),
+                              _buildRowDetail('Totale Tasse da Accantonare:', '-${grandTotaleAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
                               const SizedBox(height: 2),
-                              _buildRowDetail('Totale Netto Rimanente:', '${nettoTotaleRimanente.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+                              _buildRowDetail('Totale Netto Rimanente:', '+${nettoTotaleRimanente.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
                             ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // ==========================================
-                    // 🔲 RIQUADRO 3: TASTO CHIUDI BOTTOM GLASS
-                    // ==========================================
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF18181B).withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.white.withOpacity(0.15)),
-                          ),
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Text(
-                              'Annulla e Chiudi',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
                           ),
                         ),
                       ),
