@@ -235,7 +235,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                     const SizedBox(height: 12),
 
                     // ==========================================
-                    // 🔲 RIQUADRO 1: PROFILO, SCUDO HERO, DETTAGLI & ACCORDION
+                    // 🔲 MACRO-SCHEDA 1: PROFILO FISCALE & SCUDO HERO
                     // ==========================================
                     Expanded(
                       child: ClipRRect(
@@ -255,7 +255,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // CASELLA PROFILO FISCALE UTENTE
+                                  // 🎯 CARD UNIFICATA PROFILO FISCALE + CAMBIO ATECO INTEGRATO
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(12),
@@ -267,27 +267,125 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'INFORMAZIONI PROFILO FISCALE',
-                                          style: TextStyle(
-                                            color: Colors.white54,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.8,
-                                          ),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'PROFILO FISCALE ATECO',
+                                              style: TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                            // 👈 TASTO "CAMBIA" INTEGRATO IN ALTO
+                                            InkWell(
+                                              onTap: _toggleAtecoAccordion,
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    // 👈 ICONA ALLINEATA ALLA HOME (Spunta ATECO)
+                                                    const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 12),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      _isModificaEspansa ? 'Chiudi' : 'Cambia',
+                                                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         const SizedBox(height: 8),
+
                                         _buildRow('Codice ATECO:', _atecoSelezionato, isBold: true),
                                         _buildRow('Coeff. Redditività:', '${(_coeffSelezionato * 100).toInt()}%'),
                                         _buildRow('Imposta Sostitutiva:', '${(widget.aliquotaImposta * 100).toInt()}% (Startup)'),
                                         _buildRow('Contributi INPS:', '${(widget.aliquotaInps * 100).toStringAsFixed(2)}%'),
+
+                                        // 👈 SELETTORE ATECO INLINE (APARTEMENTE IN CIMA)
+                                        if (_isModificaEspansa) ...[
+                                          const SizedBox(height: 8),
+                                          Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                                          const SizedBox(height: 8),
+                                          Column(
+                                            children: _listaAteco.map((item) {
+                                              final bool isSelected = item['codice'] == _atecoSelezionato;
+                                              final double coeff = item['coeff'] as double;
+
+                                              return InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _atecoSelezionato = item['codice'] as String;
+                                                    _coeffSelezionato = coeff;
+                                                    _isModificaEspansa = false;
+                                                  });
+                                                  widget.onAtecoCambiato(_atecoSelezionato, _coeffSelezionato);
+                                                },
+                                                child: Container(
+                                                  width: double.infinity,
+                                                  margin: const EdgeInsets.only(bottom: 6),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    color: isSelected
+                                                        ? const Color(0xFF2DD4BF).withOpacity(0.15)
+                                                        : Colors.black.withOpacity(0.2),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(
+                                                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.transparent,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          item['codice'] as String,
+                                                          style: TextStyle(
+                                                            color: isSelected ? Colors.white : Colors.white70,
+                                                            fontSize: 11,
+                                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF2DD4BF).withOpacity(0.2),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: Text(
+                                                          '${(coeff * 100).toInt()}%',
+                                                          style: const TextStyle(
+                                                            color: Color(0xFF2DD4BF),
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
 
                                   const SizedBox(height: 10),
 
-                                  // HERO CARD TASSE REALI SU INCASSATO CON SCUDO (SALDO + ACCONTI)
+                                  // 🛡️ HERO CARD ACCANTONAMENTO REALE CON SCUDO
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(14),
@@ -336,7 +434,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
 
                                   const SizedBox(height: 10),
 
-                                  // DETTAGLIO CALCOLO FISCALE CASSA (INCASSATO)
+                                  // 🔲 MACRO-SCHEDA 2: DETTAGLIO FISCALE TABELLARE
                                   Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
@@ -365,32 +463,32 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                                         ),
                                         _buildRow('Imponibile Fiscale:', '${fiscaliIncassato['imponibile']!.toStringAsFixed(2)} €'),
                                         Divider(color: Colors.white.withOpacity(0.12), height: 12),
-                                       _buildRow(
-  'Saldo Tasse:',
-  '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €',
-  color: const Color(0xFFF59E0B),
-  onInfoTap: () => _mostraInfoTasse(
-    context,
-    'Saldo Tasse Anno Corrente',
-    'Rappresenta le tasse reali sul fatturato incassato sull\'Imponibile Fiscale (${(_coeffSelezionato * 100).toInt()}%):\n\n'
-    '• INPS: ${(widget.aliquotaInps * 100).toStringAsFixed(2)}%\n'
-    '• Imposta Sostitutiva: ${(widget.aliquotaImposta * 100).toInt()}%\n\n'
-    'Totale Saldo = ${((widget.aliquotaInps + widget.aliquotaImposta) * 100).toStringAsFixed(2)}% sull\'Imponibile.',
-  ),
-),
-_buildRow(
-  'Acconto Tasse',
-  '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €',
-  color: const Color(0xFFF97316),
-  onInfoTap: () => _mostraInfoTasse(
-    context,
-    'Acconti Anno Successivo',
-    'Sono i contributi e le tasse che lo Stato chiede di anticipare per l\'anno a venire:\n\n'
-    '• Acconto INPS: 80% dell\'INPS calcolato quest\'anno\n'
-    '• Acconto Imposta: 100% dell\'Imposta calcolata quest\'anno\n\n'
-    'Accantonarli ora ti evita brutte sorprese alla prossima dichiarazione dei redditi!',
-  ),
-),
+                                        _buildRow(
+                                          'Saldo Tasse:',
+                                          '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €',
+                                          color: const Color(0xFFF59E0B),
+                                          onInfoTap: () => _mostraInfoTasse(
+                                            context,
+                                            'Saldo Tasse Anno Corrente',
+                                            'Rappresenta le tasse reali sul fatturato incassato sull\'Imponibile Fiscale (${(_coeffSelezionato * 100).toInt()}%):\n\n'
+                                            '• INPS: ${(widget.aliquotaInps * 100).toStringAsFixed(2)}%\n'
+                                            '• Imposta Sostitutiva: ${(widget.aliquotaImposta * 100).toInt()}%\n\n'
+                                            'Totale Saldo = ${((widget.aliquotaInps + widget.aliquotaImposta) * 100).toStringAsFixed(2)}% sull\'Imponibile.',
+                                          ),
+                                        ),
+                                        _buildRow(
+                                          'Acconto Tasse:',
+                                          '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €',
+                                          color: const Color(0xFFF97316),
+                                          onInfoTap: () => _mostraInfoTasse(
+                                            context,
+                                            'Acconti Anno Successivo',
+                                            'Sono i contributi e le tasse che lo Stato chiede di anticipare per l\'anno a venire:\n\n'
+                                            '• Acconto INPS: 80% dell\'INPS calcolato quest\'anno\n'
+                                            '• Acconto Imposta: 100% dell\'Imposta calcolata quest\'anno\n\n'
+                                            'Accantonarli ora ti evita brutte sorprese alla prossima dichiarazione dei redditi!',
+                                          ),
+                                        ),
                                         Divider(color: Colors.white.withOpacity(0.12), height: 12),
                                         _buildRow('Totale da Accantonare:', '-${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
                                         _buildRow('Netto Spendibile Reale:', '${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €', color: const Color(0xFF2DD4BF), isBold: true),
@@ -401,7 +499,7 @@ _buildRow(
                                   if (widget.totaleFatturatoInSospeso > 0) ...[
                                     const SizedBox(height: 10),
 
-                                    // BOX EVIDENZIATO SOSPESI CON ACCONTI
+                                    // BOX SOSPESI
                                     Container(
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(12),
@@ -438,172 +536,7 @@ _buildRow(
                                       ),
                                     ),
                                   ],
-
-                                  const SizedBox(height: 10),
-
-                                  // MENU ESPANDIBILE ATECO (ACCORDION CON AUTO-SCROLL)
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.35),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: _isModificaEspansa
-                                            ? const Color(0xFF2DD4BF).withOpacity(0.5)
-                                            : Colors.white.withOpacity(0.08),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        InkWell(
-                                          onTap: _toggleAtecoAccordion,
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: const Icon(Icons.business_center_outlined, color: Color(0xFF2DD4BF), size: 18),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                const Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        'Cambia Codice ATECO',
-                                                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                      ),
-                                                      SizedBox(height: 2),
-                                                      Text(
-                                                        'Seleziona la tua attività per la % esatta',
-                                                        style: TextStyle(color: Colors.white38, fontSize: 10),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Icon(
-                                                  _isModificaEspansa
-                                                      ? Icons.keyboard_arrow_up_rounded
-                                                      : Icons.keyboard_arrow_down_rounded,
-                                                  color: Colors.white38,
-                                                  size: 18,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-
-                                        if (_isModificaEspansa) ...[
-                                          Divider(color: Colors.white.withOpacity(0.12), height: 1),
-                                          Padding(
-                                            padding: const EdgeInsets.all(12),
-                                            child: Column(
-                                              children: _listaAteco.map((item) {
-                                                final bool isSelected = item['codice'] == _atecoSelezionato;
-                                                final double coeff = item['coeff'] as double;
-
-                                                return InkWell(
-                                                  onTap: () {
-                                                    setState(() {
-                                                      _atecoSelezionato = item['codice'] as String;
-                                                      _coeffSelezionato = coeff;
-                                                      _isModificaEspansa = false;
-                                                    });
-                                                    widget.onAtecoCambiato(_atecoSelezionato, _coeffSelezionato);
-                                                  },
-                                                  child: Container(
-                                                    width: double.infinity,
-                                                    margin: const EdgeInsets.only(bottom: 6),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                    decoration: BoxDecoration(
-                                                      color: isSelected
-                                                          ? const Color(0xFF2DD4BF).withOpacity(0.15)
-                                                          : Colors.black.withOpacity(0.2),
-                                                      borderRadius: BorderRadius.circular(10),
-                                                      border: Border.all(
-                                                        color: isSelected ? const Color(0xFF2DD4BF) : Colors.transparent,
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                      children: [
-                                                        Expanded(
-                                                          child: Text(
-                                                            item['codice'] as String,
-                                                            style: TextStyle(
-                                                              color: isSelected ? Colors.white : Colors.white70,
-                                                              fontSize: 11,
-                                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFF2DD4BF).withOpacity(0.2),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            '${(coeff * 100).toInt()}%',
-                                                            style: const TextStyle(
-                                                              color: Color(0xFF2DD4BF),
-                                                              fontSize: 10,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
                                 ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // ==========================================
-                    // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
-                    // ==========================================
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF18181B).withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.white.withOpacity(0.15)),
-                          ),
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Text(
-                              'Chiudi',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -622,43 +555,38 @@ _buildRow(
 
   Widget _buildRow(String label, String value, {bool isBold = false, Color? color, VoidCallback? onInfoTap}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: isBold ? Colors.white70 : Colors.white54,
-                      fontSize: 10,
-                      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isBold ? Colors.white : Colors.white54,
+                    fontSize: 11,
+                    fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
                   ),
                 ),
                 if (onInfoTap != null) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   GestureDetector(
                     onTap: onInfoTap,
-                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 13),
+                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 14),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
           Text(
             value,
             textAlign: TextAlign.right,
             style: TextStyle(
-              color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.85)),
-              fontSize: 10,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.9)),
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             ),
           ),
         ],
