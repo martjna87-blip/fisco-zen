@@ -392,14 +392,14 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🚀 INCASSA FATTURA (CON GESTIONE DATA CUSTOM)
+  // 🚀 INCASSA FATTURA (CON GESTIONE DATA E TITOLO DETTAGLIATO)
   void incassaFatturaPiva({
     String? idFattura,
     required String cliente,
     required double importoLordo,
     required double importoTasse,
     required String contoDestinazione,
-    String? dataIncasso, // 👈 PARAMETRO RICEVUTO DALLA SCHERMATA
+    String? dataIncasso,
   }) {
     final targetAccount = _accounts.firstWhere(
       (acc) => acc.title.contains(contoDestinazione) || contoDestinazione.contains(acc.title),
@@ -426,13 +426,16 @@ class WalletProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
+    String numeroFattura = '';
+
     if (idFattura != null) {
       final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
       if (idx != -1) {
         final f = _fattureDaIncassare.removeAt(idx);
+        numeroFattura = f['numero']?.toString() ?? ''; // 👈 RECUPERIAMO IL NUMERO FATTURA!
         _fattureIncassate.add({
           ...f,
-          'dataIncasso': dataFinale, // 👈 SALVA LA DATA SCELTA (ES. GIUGNO)
+          'dataIncasso': dataFinale,
           'importoTasse': importoTasse,
           'contoAccredito': contoDestinazione,
         });
@@ -441,9 +444,14 @@ class WalletProvider extends ChangeNotifier {
 
     _fatturatoTotale += importoLordo;
 
-    // Registra solo l'entrata reale: il calcolo della tassa virtuale avviene in automatico!
+    // 👈 CREIAMO UN TITOLO COMPLETO CON NOME E NUMERO FATTURA
+    final String titoloTransazione = numeroFattura.isNotEmpty 
+        ? 'Fattura n.$numeroFattura - $cliente' 
+        : 'Incasso: $cliente';
+
+    // Registra l'entrata nel Wallet con il nuovo titolo dettagliato
     addTransaction(
-      title: 'Incasso: $cliente',
+      title: titoloTransazione,
       amount: importoLordo,
       isIncome: true,
       category: 'P.IVA',
