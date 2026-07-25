@@ -856,19 +856,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // INDICATORE VISIVO SWIPE (PALLINI E LINEE)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildPageDot(_tipoMovimento == 'riepilogo', const Color(0xFF2DD4BF)),
-                                    const SizedBox(width: 6),
-                                    _buildPageDot(_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa', const Color(0xFFEF4444)),
-                                    const SizedBox(width: 6),
-                                    _buildPageDot(_tipoMovimento == 'entrata', const Color(0xFF10B981)),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-
                                 // SELETTORE TAB: RIEPILOGO | USCITA | ENTRATA
                                 Container(
                                   padding: const EdgeInsets.all(4),
@@ -909,47 +896,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                                 const SizedBox(height: 12),
 
-                                // CONTENUTO FORM O RIEPILOGO CON SWIPE
+                                // CONTENUTO: RIEPILOGO O FORM (SWIPE ELIMINATO PER EVITARE CONFLITTI)
                                 Expanded(
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onHorizontalDragEnd: (details) {
-                                      if (details.primaryVelocity == null) return;
-
-                                      // 👈 SWIPE A SINISTRA (Riepilogo -> Uscita -> Entrata)
-                                      if (details.primaryVelocity! < -250) {
-                                        if (_tipoMovimento == 'riepilogo') {
-                                          setState(() => _tipoMovimento = 'uscita');
-                                        } else if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') {
-                                          setState(() => _tipoMovimento = 'entrata');
-                                        }
-                                      } 
-                                      // 👉 SWIPE A DESTRA (Entrata -> Uscita -> Riepilogo)
-                                      else if (details.primaryVelocity! > 250) {
-                                        if (_tipoMovimento == 'entrata') {
-                                          setState(() => _tipoMovimento = 'uscita');
-                                        } else if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') {
-                                          setState(() => _tipoMovimento = 'riepilogo');
-                                        }
-                                      }
-                                    },
-                                    child: _tipoMovimento == 'riepilogo'
-                                        ? _buildSchermataRiepilogo()
-                                        : SingleChildScrollView(
-                                            controller: _scrollController,
-                                            physics: const BouncingScrollPhysics(),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withOpacity(0.35),
-                                                borderRadius: BorderRadius.circular(18),
-                                                border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  
-                                                // BOTTONE RAPIDO SCANSIONE (SPAZIO RISERVATO PER SIMMETRIA)
+                                  child: _tipoMovimento == 'riepilogo'
+                                      ? _buildSchermataRiepilogo()
+                                      : SingleChildScrollView(
+                                          controller: _scrollController,
+                                          physics: const BouncingScrollPhysics(),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(0.35),
+                                              borderRadius: BorderRadius.circular(18),
+                                              border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                // BOTTONE RAPIDO SCANSIONE
                                                 Visibility(
                                                   visible: isSpesa,
                                                   maintainSize: true,
@@ -1234,18 +1198,22 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   ),
                                                   child: Column(
                                                     children: [
-                                                      SwitchListTile(
-                                                        contentPadding: EdgeInsets.zero,
-                                                        title: const Text('Movimento Ricorrente', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                                                        subtitle: const Text('Es. Abbonamento mensile, affitto o stipendio', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                                                        activeColor: const Color(0xFF2DD4BF),
-                                                        value: _isRicorrente,
-                                                        onChanged: (val) {
-                                                          setState(() {
-                                                            _isRicorrente = val;
-                                                          });
-                                                          if (val) _scrollToOffset(200);
-                                                        },
+                                                      // FIX ERRORE CONSOLE: Avvolto in Material trasparente
+                                                      Material(
+                                                        color: Colors.transparent,
+                                                        child: SwitchListTile(
+                                                          contentPadding: EdgeInsets.zero,
+                                                          title: const Text('Movimento Ricorrente', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                                                          subtitle: const Text('Es. Abbonamento mensile, affitto o stipendio', style: TextStyle(color: Colors.white38, fontSize: 9)),
+                                                          activeColor: const Color(0xFF2DD4BF),
+                                                          value: _isRicorrente,
+                                                          onChanged: (val) {
+                                                            setState(() {
+                                                              _isRicorrente = val;
+                                                            });
+                                                            if (val) _scrollToOffset(200);
+                                                          },
+                                                        ),
                                                       ),
 
                                                       if (_isRicorrente) ...[
@@ -1354,23 +1322,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   ),
                                                 ),
 
-                                                const SizedBox(height: 14),
+                                                const SizedBox(height: 16),
 
-                                                // PULSANTE SALVA VERDE ACQUA
+                                                // PULSANTE SALVA DINAMICO
                                                 SizedBox(
                                                   width: double.infinity,
-                                                  height: 44,
+                                                  height: 46,
                                                   child: ElevatedButton(
                                                     onPressed: _salvaMovimento,
                                                     style: ElevatedButton.styleFrom(
-                                                      backgroundColor: const Color(0xFF2DD4BF),
+                                                      backgroundColor: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
                                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                                       elevation: 0,
                                                     ),
-                                                    child: const Text(
-                                                      'Salva Movimento',
-                                                      style: TextStyle(
-                                                        color: Colors.black,
+                                                    child: Text(
+                                                      isSpesa ? 'Salva Uscita' : 'Salva Entrata',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 13,
                                                       ),
@@ -1381,7 +1349,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                             ),
                                           ),
                                         ),
-                                  ), // 👈 AGGIUNTA CHIUSURA DI GESTUREDETECTOR
                                 ),
                               ],
                             ),
@@ -1389,42 +1356,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         ),
                       ),
                     ),
-
-                    if (!isKeyboardOpen) ...[
-                      const SizedBox(height: 12),
-
-                      // ==========================================
-                      // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
-                      // ==========================================
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF18181B).withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.white.withOpacity(0.15)),
-                            ),
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text(
-                                'Annulla e Chiudi',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1435,7 +1366,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CESTINO DI ELIMINAZIONE
+  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CRUSCOTTO
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
@@ -1450,7 +1381,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'cat': tx.category,
         'data': tx.date,
         'isSpesa': !tx.isIncome,
-        'isFattura': isFatturaPiva, // Identifica se è una fattura
+        'isFattura': isFatturaPiva, 
       };
     }).toList();
 
@@ -1485,15 +1416,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     return Column(
       children: [
+        // CRUSCOTTO FISSO IN ALTO
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
           child: Column(
             children: [
+              // MESE E FRECCE
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios_rounded, color: Color(0xFF2DD4BF), size: 16),
+                    visualDensity: VisualDensity.compact,
                     onPressed: () {
                       setState(() {
                         _meseSelezionatoRiepilogo = DateTime(_meseSelezionatoRiepilogo.year, _meseSelezionatoRiepilogo.month - 1);
@@ -1502,11 +1441,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     },
                   ),
                   Text(
-                    _formattaMeseAnno(_meseSelezionatoRiepilogo),
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    _formattaMeseAnno(_meseSelezionatoRiepilogo).toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2DD4BF), size: 16),
+                    visualDensity: VisualDensity.compact,
                     onPressed: () {
                       setState(() {
                         _meseSelezionatoRiepilogo = DateTime(_meseSelezionatoRiepilogo.year, _meseSelezionatoRiepilogo.month + 1);
@@ -1516,49 +1456,112 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
+              // TOTALI
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 12),
-                      const SizedBox(width: 3),
+                      const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 14),
+                      const SizedBox(width: 4),
                       Text(
-                        'Entrate: +${_formatValuta(totaleEntrate)}',
-                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600),
+                        '+${_formatValuta(totaleEntrate)}',
+                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('•', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('|', style: TextStyle(color: Colors.white24, fontSize: 16)),
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 12),
-                      const SizedBox(width: 3),
+                      const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 14),
+                      const SizedBox(width: 4),
                       Text(
-                        'Spese: -${_formatValuta(totaleSpese)}',
-                        style: const TextStyle(
-                          color: Color(0xFFEF4444),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        '-${_formatValuta(totaleSpese)}',
+                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              // SELETTORE FILTRO
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _vistaRiepilogo = 'categoria';
+                          _categoriaEspansaIndex = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _vistaRiepilogo == 'categoria' ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Per Categoria',
+                              style: TextStyle(
+                                color: _vistaRiepilogo == 'categoria' ? Colors.black : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _vistaRiepilogo = 'data';
+                          _categoriaEspansaIndex = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _vistaRiepilogo == 'data' ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Per Data',
+                              style: TextStyle(
+                                color: _vistaRiepilogo == 'data' ? Colors.black : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-        const Divider(color: Colors.white12, height: 1),
+        
+        const SizedBox(height: 12),
 
+        // LISTA MOVIMENTI LIBERA
         Expanded(
           child: movimentiMeseSelezionato.isEmpty
               ? const Center(
-                  child: Text('Nessun movimento registrato in questo mese.', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                  child: Text('Nessun movimento in questo mese.', style: TextStyle(color: Colors.white38, fontSize: 12)),
                 )
               : _vistaRiepilogo == 'categoria'
                   ? ListView.builder(
@@ -1648,7 +1651,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            // 🗑️ CESTINO PER I MOVIMENTI MANUALI
                                             if (!isFattura) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
@@ -1762,7 +1764,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            // 🗑️ CESTINO PER I MOVIMENTI MANUALI
                                             if (!isFattura) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
@@ -1788,63 +1789,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         );
                       },
                     ),
-        ),
-
-        const SizedBox(height: 8),
-
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: () => setState(() {
-                  _vistaRiepilogo = 'categoria';
-                  _categoriaEspansaIndex = null;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _vistaRiepilogo == 'categoria' ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    'Per Categoria',
-                    style: TextStyle(
-                      color: _vistaRiepilogo == 'categoria' ? Colors.black : Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () => setState(() {
-                  _vistaRiepilogo = 'data';
-                  _categoriaEspansaIndex = null;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _vistaRiepilogo == 'data' ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    'Per Data',
-                    style: TextStyle(
-                      color: _vistaRiepilogo == 'data' ? Colors.black : Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
