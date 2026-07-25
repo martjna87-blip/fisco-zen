@@ -884,51 +884,38 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                         ],
                                       ),
 
-                                      // 👈 WIDGET P.IVA: NETTO SPENDIBILE (VERDE + MONEY) E FONDO TASSE (BLU + SALVADANAIO)
+                                      // 👈 WIDGET P.IVA: NETTO E TASSE INCOLONNATI
                                       if (mostraPiva) ...[
                                         const SizedBox(height: 12),
                                         const Divider(color: Colors.white12, height: 1),
-                                        const SizedBox(height: 10),
-                                        Row(
+                                        const SizedBox(height: 12),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  const Row(
-                                                    children: [
-                                                      Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                                      SizedBox(width: 4),
-                                                      Text('NETTO SPENDIBILE', style: TextStyle(color: Color(0xFF10B981), fontSize: 8, fontWeight: FontWeight.bold)),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    '${nettoReale.toStringAsFixed(2)} €',
-                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ],
-                                              ),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
+                                                const SizedBox(width: 6),
+                                                const Text('NETTO SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  '${nettoReale.toStringAsFixed(2)} €',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
                                             ),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.end,
-                                                children: [
-                                                  const Row(
-                                                    mainAxisAlignment: MainAxisAlignment.end,
-                                                    children: [
-                                                      Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                                      SizedBox(width: 4),
-                                                      Text('FONDO TASSE DA VERSARE', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 8, fontWeight: FontWeight.bold)),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    '${totaleTasseLorde.toStringAsFixed(2)} €',
-                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ],
-                                              ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
+                                                const SizedBox(width: 6),
+                                                const Text('FONDO TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  '${totaleTasseLorde.toStringAsFixed(2)} €',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -1030,30 +1017,41 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                             children: [
                                                               Text(
                                                                 '${account.amount.toStringAsFixed(2)} €',
-                                                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                                                               ),
-                                                              // 👈 WIDGET P.IVA: Visibile SOLO sul Conto Principale
+                                                              // 👈 WIDGET P.IVA: Visibile SOLO sul Conto Principale (Solo Icone + Numeri)
                                                               if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
-                                                                const SizedBox(height: 3),
-                                                                Row(
-                                                                  mainAxisSize: MainAxisSize.min,
+                                                                const SizedBox(height: 4),
+                                                                Column(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start, // 👈 ALLINEA LE ICONE A PIOMBO TRA LORO
                                                                   children: [
-                                                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
-                                                                    const SizedBox(width: 2),
-                                                                    Text(
-                                                                      '${(account.amount - account.virtualTaxAmount).toStringAsFixed(0)} €',
-                                                                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                                                    Row(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      children: [
+                                                                        const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                                                        const SizedBox(width: 4),
+                                                                        Text(
+                                                                          '${(account.amount - account.virtualTaxAmount).toStringAsFixed(2)} €',
+                                                                          style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
+                                                                        ),
+                                                                      ],
                                                                     ),
-                                                                    const SizedBox(width: 8),
-                                                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
-                                                                    const SizedBox(width: 2),
-                                                                    Text(
-                                                                      '${account.virtualTaxAmount.toStringAsFixed(0)} € tasse',
-                                                                      style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                                                    const SizedBox(height: 2),
+                                                                    Row(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      children: [
+                                                                        const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                                                        const SizedBox(width: 4),
+                                                                        Text(
+                                                                          '${account.virtualTaxAmount.toStringAsFixed(2)} €',
+                                                                          style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
+                                                                        ),
+                                                                      ],
                                                                     ),
                                                                   ],
                                                                 ),
                                                               ],
+                                                              const SizedBox(height: 4),
                                                               Icon(
                                                                 isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                                                                 color: Colors.white38,
