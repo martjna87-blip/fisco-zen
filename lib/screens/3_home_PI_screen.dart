@@ -118,6 +118,188 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 🛡️ DIALOG RAPIDO CON GOAL TRACKER & FEEDBACK PERCENTUALE (STESSO DEL WALLET)
+  void _mostraDialogAccantonamentoTasse(BuildContext context) {
+    final walletProvider = context.read<WalletProvider>();
+    final accounts = walletProvider.accounts;
+
+    if (accounts.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Devi avere almeno due conti per accantonare le tasse.')),
+      );
+      return;
+    }
+
+    final double tasseTotaliCalcolate = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double riservaGiaAccantonata = accounts
+        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+
+    final double tasseScoperte = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
+    final double importoMancanteReale = tasseScoperte > 0.01 ? tasseScoperte : 0.0;
+
+    final TextEditingController importoController = TextEditingController(
+      text: importoMancanteReale > 0 ? importoMancanteReale.toStringAsFixed(2) : '',
+    );
+
+    final contoConTasse = accounts.firstWhere(
+      (a) => a.virtualTaxAmount > 0 && !a.title.toLowerCase().contains('salvadanaio'),
+      orElse: () => accounts[0],
+    );
+
+    final salvadanaioTasse = accounts.firstWhere(
+      (a) => a.title.toLowerCase().contains('salvadanaio tasse'),
+      orElse: () => accounts.length > 1 ? accounts[1] : accounts[0],
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+          
+          final double nuovaRiservaTotale = riservaGiaAccantonata + importoInserito;
+          
+          final double percentualeText = tasseTotaliCalcolate > 0.01 
+              ? (nuovaRiservaTotale / tasseTotaliCalcolate * 100) 
+              : (nuovaRiservaTotale > 0 ? 100.0 : 0.0);
+              
+          final double percentualeBarra = tasseTotaliCalcolate > 0.01 
+              ? (nuovaRiservaTotale / tasseTotaliCalcolate).clamp(0.0, 1.0) 
+              : (nuovaRiservaTotale > 0 ? 1.0 : 0.0);
+              
+          final double extraCuscinetto = nuovaRiservaTotale > tasseTotaliCalcolate 
+              ? nuovaRiservaTotale - tasseTotaliCalcolate 
+              : 0.0;
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C1C21),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 22),
+                SizedBox(width: 8),
+                Text('Accantona Tasse', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      Text('${tasseTotaliCalcolate.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      Text('${riservaGiaAccantonata.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Copertura Totale: ${percentualeText.toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (extraCuscinetto > 0)
+                            Text(
+                              '+${extraCuscinetto.toStringAsFixed(0)} € Cuscinetto',
+                              style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: percentualeBarra,
+                          minHeight: 8,
+                          backgroundColor: Colors.white10,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: importoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Importo da aggiungere (€)',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      prefixIcon: const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (importoInserito > 0) {
+                    walletProvider.eseguiGiroconto(
+                      daAccountId: contoConTasse.id,
+                      aAccountId: salvadanaioTasse.id,
+                      importo: importoInserito,
+                      isAccantonamentoTasse: true,
+                    );
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          extraCuscinetto > 0
+                              ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
+                              : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
+                        ),
+                        backgroundColor: const Color(0xFF3B82F6),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Metti al Sicuro', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _mostraFeedback(String messaggio) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -194,6 +376,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
     final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
+    
+    // 👈 CONDIZIONE ULTRA-SICURA
+    final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
@@ -201,11 +386,10 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO (280PX)
+            // 🎯 HEADER PORTAFOGLIO
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. IMMAGINE DI SFONDO
                 Container(
                   height: 280,
                   decoration: const BoxDecoration(
@@ -218,7 +402,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                // 2. SFUMATURA
                 Container(
                   height: 280,
                   decoration: BoxDecoration(
@@ -234,7 +417,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 🔄 3. TASTO RESET IN ALTO A SINISTRA (DISCRETO PER TEST)
                 Positioned(
                   top: 10,
                   left: 16,
@@ -250,7 +432,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 🏷️ 4. PILLOLA ATECO IN ALTO A DESTRA
                 Positioned(
                   top: 10,
                   right: 16,
@@ -276,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 🎯 5. CONTENUTO CENTRATO CLEAN (SENZA BOTTONI INGLESI / WALLET SOTTO)
+                // 🎯 CONTENUTO CENTRATO
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -318,9 +499,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(width: 8),
-                                if (residuoTasseDaCoprire > 0) 
+                                
+                                // 👈 LOGICA BOTTONE AGGIORNATA
+                                if (!isTasseCoperte) 
                                   InkWell(
-                                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                                    onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 APRE IL POPUP GIUSTO
                                     borderRadius: BorderRadius.circular(6),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -336,22 +519,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   )
                                 else
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                    ),
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                        SizedBox(width: 3),
-                                        Text(
-                                          'Protette',
-                                          style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
+                                  InkWell(
+                                    onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 CLICCABILE ANCHE QUI
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                          SizedBox(width: 3),
+                                          Text(
+                                            'Protette',
+                                            style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                               ],
@@ -365,14 +552,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            // CONTENUTO SCROLLABILE SPECULARE
+            // CONTENUTO SCROLLABILE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ 1. SERBATOIO RISERVA TASSE (In cima al contenuto, esattamente come nel Wallet)
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE
                   Builder(
                     builder: (context) {
                       final double riservaAccantonata = walletProvider.accounts
@@ -474,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  // 2. I 3 QUADRANTI D'AZIONE (POSIZIONATI SUBITO SOTTO IL SERBATOIO PER PERFETTA SIMMETRIA COL WALLET)
+                  // 2. I 3 QUADRANTI D'AZIONE
                   Row(
                     children: [
                       Expanded(
@@ -492,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: Icons.shield_outlined,
                           title: 'Stima Tasse\nP.IVA',
                           value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
-                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato), // 👈 QUESTO APRE L'ATECO!
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -622,7 +809,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                  // 👈 4. SPAZIO INVISIBILE ABBONDANTE PER NON COPRIRE CON LA BOTTOM NAV BAR!
                   const SizedBox(height: 120),
                 ],
               ),

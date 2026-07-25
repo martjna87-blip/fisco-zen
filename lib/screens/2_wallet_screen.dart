@@ -17,8 +17,9 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
+  
   // 🛡️ DIALOG RAPIDO CON GOAL TRACKER & FEEDBACK PERCENTUALE
-  void _mostraDialogAccantonamentoTasse(BuildContext context, double tasseScoperte) {
+  void _mostraDialogAccantonamentoTasse(BuildContext context) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
 
@@ -29,8 +30,19 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
+    // 1. Calcoliamo i veri totali dal provider in modo preciso!
+    final double tasseTotaliCalcolate = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double riservaGiaAccantonata = accounts
+        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+
+    final double tasseScoperte = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
+    
+    // Evitiamo bug di numeri infinitesimali forzando a zero i micro-resti
+    final double importoMancanteReale = tasseScoperte > 0.01 ? tasseScoperte : 0.0;
+
     final TextEditingController importoController = TextEditingController(
-      text: tasseScoperte.toStringAsFixed(2),
+      text: importoMancanteReale > 0 ? importoMancanteReale.toStringAsFixed(2) : '',
     );
 
     final contoConTasse = accounts.firstWhere(
@@ -47,11 +59,22 @@ class _WalletScreenState extends State<WalletScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+          final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
           
-          final double percentuale = tasseScoperte > 0 ? (importoInserito / tasseScoperte).clamp(0.0, 2.0) : 1.0;
-          final double percentualeText = tasseScoperte > 0 ? (importoInserito / tasseScoperte * 100) : 100;
-          final double extraCuscinetto = importoInserito > tasseScoperte ? importoInserito - tasseScoperte : 0.0;
+          // 2. NUOVA MATEMATICA: Calcolo della % sulla TOTALITÀ delle tasse!
+          final double nuovaRiservaTotale = riservaGiaAccantonata + importoInserito;
+          
+          final double percentualeText = tasseTotaliCalcolate > 0.01 
+              ? (nuovaRiservaTotale / tasseTotaliCalcolate * 100) 
+              : (nuovaRiservaTotale > 0 ? 100.0 : 0.0);
+              
+          final double percentualeBarra = tasseTotaliCalcolate > 0.01 
+              ? (nuovaRiservaTotale / tasseTotaliCalcolate).clamp(0.0, 1.0) 
+              : (nuovaRiservaTotale > 0 ? 1.0 : 0.0);
+              
+          final double extraCuscinetto = nuovaRiservaTotale > tasseTotaliCalcolate 
+              ? nuovaRiservaTotale - tasseTotaliCalcolate 
+              : 0.0;
 
           return AlertDialog(
             backgroundColor: const Color(0xFF1C1C21),
@@ -68,9 +91,21 @@ class _WalletScreenState extends State<WalletScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Tasse calcolate (Codice Ateco): ${tasseScoperte.toStringAsFixed(2)} €',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                  // RIEPILOGO CHIARO PER L'UTENTE
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      Text('${tasseTotaliCalcolate.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      Text('${riservaGiaAccantonata.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
                   ),
                   const SizedBox(height: 14),
 
@@ -81,9 +116,9 @@ class _WalletScreenState extends State<WalletScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Copertura: ${percentualeText.toStringAsFixed(0)}%',
+                            'Copertura Totale: ${percentualeText.toStringAsFixed(0)}%',
                             style: TextStyle(
-                              color: importoInserito >= tasseScoperte ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                              color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -99,11 +134,11 @@ class _WalletScreenState extends State<WalletScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
-                          value: (percentuale / 1.0).clamp(0.0, 1.0),
+                          value: percentualeBarra,
                           minHeight: 8,
                           backgroundColor: Colors.white10,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            importoInserito >= tasseScoperte ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                            percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                           ),
                         ),
                       ),
@@ -118,7 +153,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
-                      labelText: 'Importo da accantonare (€)',
+                      labelText: 'Importo da aggiungere (€)',
                       labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
@@ -186,6 +221,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
     final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
     final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
+    
+    // 👈 CONDIZIONE ULTRA-SICURA: Trasforma il bottone in "Protette" se mancano meno di 1 centesimo
+    final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0C),
@@ -193,11 +231,10 @@ class _WalletScreenState extends State<WalletScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO (STESSA STRUTTURA SPECULARE 280PX)
+            // 🎯 HEADER PORTAFOGLIO
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. SFONDO IMMERSIVO
                 Container(
                   height: 280,
                   decoration: const BoxDecoration(
@@ -210,7 +247,6 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ),
                 ),
-                // 2. GRADIENTE SCURO
                 Container(
                   height: 280,
                   decoration: BoxDecoration(
@@ -226,7 +262,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 🏷️ 3. PILLOLA RIEPILOGO IN ALTO A DESTRA
                 Positioned(
                   top: 10,
                   right: 16,
@@ -259,7 +294,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 🎯 4. CONTENUTO CENTRATO CLEAN
+                // 🎯 CONTENUTO CENTRATO
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -308,9 +343,11 @@ class _WalletScreenState extends State<WalletScreen> {
                                     style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(width: 8),
-                                  if (residuoTasseDaCoprire > 0) 
+                                  
+                                  // 👈 LOGICA BOTTONE AGGIORNATA
+                                  if (!isTasseCoperte) 
                                     InkWell(
-                                      onTap: () => _mostraDialogAccantonamentoTasse(context, residuoTasseDaCoprire),
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
                                       borderRadius: BorderRadius.circular(6),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -326,22 +363,26 @@ class _WalletScreenState extends State<WalletScreen> {
                                       ),
                                     )
                                   else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                      ),
-                                      child: const Row(
-                                        children: [
-                                          Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                          SizedBox(width: 3),
-                                          Text(
-                                            'Protette',
-                                            style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
+                                    InkWell(
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Protette',
+                                              style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -356,7 +397,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
 
-            // CONTENUTO SCROLLABILE SPECULARE
+            // CONTENUTO SCROLLABILE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -364,7 +405,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ 1. SERBATOIO RISERVA TASSE (In cima al contenuto)
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE
                   if (widget.isPiva) ...[
                     Builder(
                       builder: (context) {
@@ -455,7 +496,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    '🛡️ Cuscinetto di sicurezza extra: +${cuscinettoExtra.toStringAsFixed(2)} €',
+                                    '🛡️ Cuscinetto extra: +${cuscinettoExtra.toStringAsFixed(2)} €',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
                                   ),
@@ -468,7 +509,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ],
 
-                  // 2. 3 QUADRANTI AZIONE (SUBITO SOTTO IL SERBATOIO ALLA STESSA ALTEZZA SPECULARE)
+                  // 2. 3 QUADRANTI AZIONE
                   Row(
                     children: [
                       Expanded(
@@ -649,7 +690,6 @@ class _WalletScreenState extends State<WalletScreen> {
                           isIncome: tx.isIncome,
                         )),
 
-                  // 👈 5. SPAZIO INVISIBILE ABBONDANTE PER NON COPRIRE CON LA BOTTOM NAV BAR
                   const SizedBox(height: 120),
                 ],
               ),
