@@ -373,6 +373,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     final String accountId = matchingAccount.id;
 
+    // 👈 GESTIONE DATI RICORRENTI
+    String? giornoRicorrenzaFinale;
+    if (_isRicorrente) {
+      giornoRicorrenzaFinale = _frequenzaSelezionata == 'Ogni settimana' 
+          ? _giornoSettimanaSelezionato 
+          : _giornoRicorrenzaController.text;
+    }
+
     context.read<WalletProvider>().addTransaction(
       title: descrizione,
       amount: importo,
@@ -380,6 +388,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       category: categoriaFinale,
       accountId: accountId,
       date: _dataSelezionata,
+      isRecurrent: _isRicorrente, // 👈 INVIO FLAG
+      frequenza: _isRicorrente ? _frequenzaSelezionata : null, // 👈 INVIO FREQUENZA
+      giornoRicorrenza: giornoRicorrenzaFinale, // 👈 INVIO GIORNO
     );
 
     setState(() {
@@ -399,7 +410,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  void _confermaEliminazioneMovimento(BuildContext context, String id, String desc) {
+  void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -413,8 +424,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ],
         ),
         content: Text(
-          'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          isRecurrent 
+            ? 'Vuoi davvero eliminare "$desc"?\n\nQuesta è una spesa ricorrente. Eliminerai solo questo singolo movimento e il saldo verrà stornato.'
+            : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
           TextButton(
@@ -957,11 +970,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CRUSCOTTO
+  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CRUSCOTTO E PREVISIONI
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    final List<Map<String, dynamic>> tuttiMovimenti = walletProvider.transactions
+    // 1. Prendi i Movimenti Reali
+    final List<Map<String, dynamic>> movimentiReali = walletProvider.transactions
         .where((tx) => !tx.title.startsWith('Accantonamento Tasse'))
         .map((tx) {
       final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
@@ -973,20 +987,40 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'data': tx.date,
         'isSpesa': !tx.isIncome,
         'isFattura': isFatturaPiva, 
+        'isRecurrent': tx.isRecurrent,
+        'isPrevisto': false,
       };
     }).toList();
 
+    // 2. Prendi i Movimenti Previsti dal Motore (passando il mese sfogliato!)
+    final List<Map<String, dynamic>> previsti = walletProvider.getMovimentiPrevisti(_meseSelezionatoRiepilogo)
+        .map((tx) => {
+      'id': tx.id,
+      'desc': tx.title,
+      'imp': tx.amount,
+      'cat': tx.category,
+      'data': tx.date,
+      'isSpesa': !tx.isIncome,
+      'isFattura': false,
+      'isRecurrent': true,
+      'isPrevisto': true, // 👈 FLAG PREVISTO
+    }).toList();
+
+    // 3. Uniamo tutto insieme
+    final List<Map<String, dynamic>> tuttiMovimenti = [...movimentiReali, ...previsti];
+
+    // Filtriamo per mese selezionato (reali + previsti)
     final movimentiMeseSelezionato = tuttiMovimenti.where((m) {
       final dt = m['data'] as DateTime;
       return dt.year == _meseSelezionatoRiepilogo.year && dt.month == _meseSelezionatoRiepilogo.month;
     }).toList();
 
     final double totaleSpese = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == true)
+        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false) // I previsti non toccano i totali reali!
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
     final double totaleEntrate = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == false)
+        .where((m) => m['isSpesa'] == false && m['isPrevisto'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
@@ -1164,6 +1198,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         final double totCat = listaMovs.fold(0.0, (sum, m) {
                           final imp = m['imp'] as double;
                           final isSpesa = m['isSpesa'] as bool;
+                          final isPrevisto = m['isPrevisto'] as bool;
+                          // Esclude i previsti dal calcolo della categoria visibile!
+                          if (isPrevisto) return sum;
                           return sum + (isSpesa ? -imp : imp);
                         });
                         final bool isEspansa = _categoriaEspansaIndex == index;
@@ -1220,6 +1257,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       final bool isFattura = m['isFattura'] as bool;
                                       final String id = m['id'] as String;
                                       final String desc = m['desc'] as String;
+                                      final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
+                                      final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1227,25 +1266,41 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Expanded(
-                                              child: Text(
-                                                '$desc (${dt.day}/${dt.month})',
-                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
-                                                overflow: TextOverflow.ellipsis,
+                                              child: Row(
+                                                children: [
+                                                  if (isRecurrent) ...[
+                                                    Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
+                                                    const SizedBox(width: 4),
+                                                  ],
+                                                  Expanded(
+                                                    child: Text(
+                                                      isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})',
+                                                      style: TextStyle(
+                                                        color: isPrevisto ? Colors.white38 : Colors.white60, 
+                                                        fontSize: 11, 
+                                                        fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
                                               style: TextStyle(
-                                                color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                                color: isPrevisto 
+                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
+                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            if (!isFattura) ...[
+                                            if (!isFattura && !isPrevisto) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
-                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc),
+                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc, isRecurrent), // 👈 FIX ELIMINA RICORRENTE
                                                 child: Container(
                                                   padding: const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(
@@ -1277,6 +1332,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         final double totGiorno = listaMovs.fold(0.0, (sum, m) {
                           final double imp = m['imp'] as double;
                           final bool isSpesa = m['isSpesa'] as bool;
+                          final bool isPrevisto = m['isPrevisto'] as bool;
+                          if (isPrevisto) return sum;
                           return sum + (isSpesa ? -imp : imp);
                         });
                         
@@ -1333,6 +1390,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       final bool isFattura = m['isFattura'] as bool;
                                       final String id = m['id'] as String;
                                       final String desc = m['desc'] as String;
+                                      final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
+                                      final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1340,25 +1399,41 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Expanded(
-                                              child: Text(
-                                                '$desc (${m['cat']})',
-                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
-                                                overflow: TextOverflow.ellipsis,
+                                              child: Row(
+                                                children: [
+                                                  if (isRecurrent) ...[
+                                                    Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
+                                                    const SizedBox(width: 4),
+                                                  ],
+                                                  Expanded(
+                                                    child: Text(
+                                                      isPrevisto ? '$desc (${m['cat']} - Previsto)' : '$desc (${m['cat']})',
+                                                      style: TextStyle(
+                                                        color: isPrevisto ? Colors.white38 : Colors.white60, 
+                                                        fontSize: 11, 
+                                                        fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
                                               style: TextStyle(
-                                                color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                                color: isPrevisto 
+                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
+                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            if (!isFattura) ...[
+                                            if (!isFattura && !isPrevisto) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
-                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc),
+                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc, isRecurrent),
                                                 child: Container(
                                                   padding: const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(

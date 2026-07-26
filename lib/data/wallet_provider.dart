@@ -178,45 +178,88 @@ class WalletProvider extends ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
-  // 🔮 MOTORE PREVISIONI: Calcola i movimenti ricorrenti in arrivo nel mese
-  List<TransactionModel> get movimentiPrevistiDelMese {
+  // Helper per convertire il giorno testuale in numero
+  int _stringToWeekday(String day) {
+    switch (day) {
+      case 'Lunedì': return 1;
+      case 'Martedì': return 2;
+      case 'Mercoledì': return 3;
+      case 'Giovedì': return 4;
+      case 'Venerdì': return 5;
+      case 'Sabato': return 6;
+      case 'Domenica': return 7;
+      default: return 1;
+    }
+  }
+
+  // 🔮 MOTORE PREVISIONI INTELLIGENTE (Mensile + Settimanale Aggregata)
+  List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
     final oggi = DateTime.now();
 
-    // Filtra solo le "Regole Madre" (I movimenti contrassegnati come ricorrenti)
     final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
     for (var tx in ricorrenti) {
+      // 📅 CASO A: OGNI MESE
       if (tx.frequenza == 'Ogni mese' && tx.giornoRicorrenza != null) {
         int giornoPrevisto = int.tryParse(tx.giornoRicorrenza!) ?? 1;
-        
-        // Crea una data virtuale per il mese corrente
         DateTime dataVirtuale;
         try {
-          dataVirtuale = DateTime(oggi.year, oggi.month, giornoPrevisto);
+          dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoPrevisto);
         } catch (e) {
-          dataVirtuale = DateTime(oggi.year, oggi.month + 1, 0); // Per i mesi corti (es. 31 Febbraio -> 28)
+          dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0); 
         }
 
-        // Se la spesa deve ancora avvenire questo mese, la metto tra le previste!
-        if (dataVirtuale.isAfter(oggi)) {
+        bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
+
+        if (dataVirtuale.isAfter(oggi) && !isStessoMeseCreazione) {
           previsti.add(TransactionModel(
-            id: 'prev_${tx.id}', // ID virtuale
+            id: 'prev_${tx.id}_${dataVirtuale.month}', 
             title: tx.title,
-            subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', // Sottotitolo speciale
+            subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', 
             amount: tx.amount,
             isIncome: tx.isIncome,
             category: tx.category,
             date: dataVirtuale,
             accountId: tx.accountId,
-            isRecurrent: true, // Flag utile alla grafica
+            isRecurrent: true, 
           ));
         }
       }
-      // NB: Regole più complesse (settimanali, annuali) si aggiungeranno qui!
+      // 📆 CASO B: OGNI SETTIMANA (AGGREGATA)
+      else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
+        int targetWeekday = _stringToWeekday(tx.giornoRicorrenza!);
+        int numOccorrenze = 0;
+        DateTime? primaDataValida;
+        
+        int daysInMonth = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0).day;
+        for (int i = 1; i <= daysInMonth; i++) {
+          DateTime checkDate = DateTime(meseRiferimento.year, meseRiferimento.month, i);
+          if (checkDate.weekday == targetWeekday) {
+            // Conta solo le ricorrenze nel futuro rispetto a oggi e alla prima spesa registrata
+            if (checkDate.isAfter(oggi) && checkDate.isAfter(tx.date)) {
+              numOccorrenze++;
+              primaDataValida ??= checkDate; 
+            }
+          }
+        }
+        
+        if (numOccorrenze > 0) {
+          previsti.add(TransactionModel(
+            id: 'prev_${tx.id}_${meseRiferimento.month}', 
+            title: '${tx.title} ($numOccorrenze uscite)', // Es: Allenamento (4 uscite)
+            subtitle: 'Previsto', 
+            amount: tx.amount * numOccorrenze, // Importo moltiplicato per il numero di uscite del mese
+            isIncome: tx.isIncome,
+            category: tx.category,
+            date: primaDataValida ?? meseRiferimento, 
+            accountId: tx.accountId,
+            isRecurrent: true, 
+          ));
+        }
+      }
     }
     
-    // Ordiniamo le previsioni per data di arrivo (le prime a scadere in alto)
     previsti.sort((a, b) => a.date.compareTo(b.date));
     return previsti;
   }
