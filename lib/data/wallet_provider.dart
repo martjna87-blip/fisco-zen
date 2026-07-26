@@ -47,7 +47,12 @@ class TransactionModel {
   final bool isIncome;
   final String category;
   final DateTime date;
-  final String? accountId; // 👈 NUOVO CAMPO
+  final String? accountId; 
+  
+  // 👈 NUOVI CAMPI PER LE SPESE RICORRENTI
+  final bool isRecurrent; 
+  final String? frequenza; 
+  final String? giornoRicorrenza; 
 
   TransactionModel({
     required this.id,
@@ -58,6 +63,9 @@ class TransactionModel {
     required this.category,
     required this.date,
     this.accountId,
+    this.isRecurrent = false, // Di default un movimento è "normale"
+    this.frequenza,
+    this.giornoRicorrenza,
   });
 
   Map<String, dynamic> toJson() => {
@@ -69,6 +77,9 @@ class TransactionModel {
         'category': category,
         'date': date.toIso8601String(),
         'accountId': accountId,
+        'isRecurrent': isRecurrent,
+        'frequenza': frequenza,
+        'giornoRicorrenza': giornoRicorrenza,
       };
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => TransactionModel(
@@ -80,6 +91,9 @@ class TransactionModel {
         category: json['category'] as String,
         date: DateTime.parse(json['date'] as String),
         accountId: json['accountId'] as String?,
+        isRecurrent: json['isRecurrent'] as bool? ?? false,
+        frequenza: json['frequenza'] as String?,
+        giornoRicorrenza: json['giornoRicorrenza'] as String?,
       );
 }
 
@@ -163,6 +177,49 @@ class WalletProvider extends ChangeNotifier {
 
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
+
+  // 🔮 MOTORE PREVISIONI: Calcola i movimenti ricorrenti in arrivo nel mese
+  List<TransactionModel> get movimentiPrevistiDelMese {
+    final previsti = <TransactionModel>[];
+    final oggi = DateTime.now();
+
+    // Filtra solo le "Regole Madre" (I movimenti contrassegnati come ricorrenti)
+    final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
+
+    for (var tx in ricorrenti) {
+      if (tx.frequenza == 'Ogni mese' && tx.giornoRicorrenza != null) {
+        int giornoPrevisto = int.tryParse(tx.giornoRicorrenza!) ?? 1;
+        
+        // Crea una data virtuale per il mese corrente
+        DateTime dataVirtuale;
+        try {
+          dataVirtuale = DateTime(oggi.year, oggi.month, giornoPrevisto);
+        } catch (e) {
+          dataVirtuale = DateTime(oggi.year, oggi.month + 1, 0); // Per i mesi corti (es. 31 Febbraio -> 28)
+        }
+
+        // Se la spesa deve ancora avvenire questo mese, la metto tra le previste!
+        if (dataVirtuale.isAfter(oggi)) {
+          previsti.add(TransactionModel(
+            id: 'prev_${tx.id}', // ID virtuale
+            title: tx.title,
+            subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', // Sottotitolo speciale
+            amount: tx.amount,
+            isIncome: tx.isIncome,
+            category: tx.category,
+            date: dataVirtuale,
+            accountId: tx.accountId,
+            isRecurrent: true, // Flag utile alla grafica
+          ));
+        }
+      }
+      // NB: Regole più complesse (settimanali, annuali) si aggiungeranno qui!
+    }
+    
+    // Ordiniamo le previsioni per data di arrivo (le prime a scadere in alto)
+    previsti.sort((a, b) => a.date.compareTo(b.date));
+    return previsti;
+  }
 
   List<Map<String, dynamic>> _fattureDaIncassare = [];
   List<Map<String, dynamic>> get fattureDaIncassare => List.unmodifiable(_fattureDaIncassare);
@@ -269,6 +326,9 @@ class WalletProvider extends ChangeNotifier {
     required String category,
     String? accountId,
     DateTime? date,
+    bool isRecurrent = false, // 👈 NUOVO PARAMENTRO
+    String? frequenza,        // 👈 NUOVO PARAMENTRO
+    String? giornoRicorrenza, // 👈 NUOVO PARAMENTRO
   }) {
     final DateTime dataUso = date ?? DateTime.now();
 
@@ -278,7 +338,7 @@ class WalletProvider extends ChangeNotifier {
       orElse: () => _accounts.first,
     );
 
-    // 2. Crea la transazione salvando l'ID del conto
+    // 2. Crea la transazione salvando l'ID del conto e i dati ricorrenti
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -287,7 +347,10 @@ class WalletProvider extends ChangeNotifier {
       isIncome: isIncome,
       category: category,
       date: dataUso,
-      accountId: targetAccount.id, // 👈 Collega il movimento al conto
+      accountId: targetAccount.id,
+      isRecurrent: isRecurrent,
+      frequenza: frequenza,
+      giornoRicorrenza: giornoRicorrenza,
     );
 
     _transactions.insert(0, newTx);
@@ -301,68 +364,7 @@ class WalletProvider extends ChangeNotifier {
         targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
       }
       
-    } else {// 🚀 INCASSA FATTURA (CON GESTIONE DATA CUSTOM)
-  void incassaFatturaPiva({
-    String? idFattura,
-    required String cliente,
-    required double importoLordo,
-    required double importoTasse,
-    required String contoDestinazione,
-    String? dataIncasso, // 👈 PARAMETRO RICEVUTO DALLA SCHERMATA
-  }) {
-    final targetAccount = _accounts.firstWhere(
-      (acc) => acc.title.contains(contoDestinazione) || contoDestinazione.contains(acc.title),
-      orElse: () => _accounts.first,
-    );
-
-    final String dataFinale = dataIncasso ?? 'Oggi';
-
-    // Conversione della stringa data in oggetto DateTime per la transazione
-    DateTime dataObj = DateTime.now();
-    if (dataIncasso != null) {
-      try {
-        final parti = dataIncasso.split(' ');
-        if (parti.length >= 3) {
-          final g = int.parse(parti[0]);
-          final a = int.parse(parti[2]);
-          final mesi = [
-            'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-            'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-          ];
-          final m = mesi.indexOf(parti[1]) + 1;
-          if (m > 0) dataObj = DateTime(a, m, g);
-        }
-      } catch (_) {}
-    }
-
-    if (idFattura != null) {
-      final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
-      if (idx != -1) {
-        final f = _fattureDaIncassare.removeAt(idx);
-        _fattureIncassate.add({
-          ...f,
-          'dataIncasso': dataFinale, // 👈 SALVA LA DATA SCELTA (ES. GIUGNO)
-          'importoTasse': importoTasse,
-          'contoAccredito': contoDestinazione,
-        });
-      }
-    }
-
-    _fatturatoTotale += importoLordo;
-
-    // Registra solo l'entrata reale: il calcolo della tassa virtuale avviene in automatico!
-    addTransaction(
-      title: 'Incasso: $cliente',
-      amount: importoLordo,
-      isIncome: true,
-      category: 'P.IVA',
-      accountId: targetAccount.id,
-      date: dataObj,
-    );
-
-    _salvaDatiInLocalStorage();
-    notifyListeners();
-  }
+    } else {
       targetAccount.amount -= amount;
       if (category == 'Bisogni') _spesoBisogni += amount;
       if (category == 'Svago') _spesoSvago += amount;

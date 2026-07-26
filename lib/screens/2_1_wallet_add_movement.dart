@@ -29,7 +29,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _giornoRicorrenzaController = TextEditingController(text: '1');
   
-  final ScrollController _scrollController = ScrollController();
+  // 👈 FIX: Un controller per le uscite e uno per le entrate
+  final ScrollController _scrollControllerSpesa = ScrollController();
+  final ScrollController _scrollControllerEntrata = ScrollController();
 
   String _categoriaSelezionata = '50% Spese Fisse';
   String _contoSelezionato = 'Conto Principale (IBAN)';
@@ -158,7 +160,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     _amountController.dispose();
     _noteController.dispose();
     _giornoRicorrenzaController.dispose();
-    _scrollController.dispose();
+    _scrollControllerSpesa.dispose();
+    _scrollControllerEntrata.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -761,10 +764,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   void _scrollToOffset(double deltaPixels) {
+    // 👈 FIX: Capisce da solo quale controller usare in base alla schermata attiva
+    final activeController = (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') 
+        ? _scrollControllerSpesa 
+        : _scrollControllerEntrata;
+
     Future.delayed(const Duration(milliseconds: 180), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          (_scrollController.offset + deltaPixels).clamp(0.0, _scrollController.position.maxScrollExtent),
+      if (activeController.hasClients) {
+        activeController.animateTo(
+          (activeController.offset + deltaPixels).clamp(0.0, activeController.position.maxScrollExtent),
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeInOutCubic,
         );
@@ -1387,7 +1395,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     ].contains(_frequenzaSelezionata);
 
     return SingleChildScrollView(
-      controller: _scrollController,
+      // 👈 FIX: Assegna dinamicamente il controller corretto
+      controller: isSpesa ? _scrollControllerSpesa : _scrollControllerEntrata,
       physics: const BouncingScrollPhysics(),
       child: Container(
         padding: const EdgeInsets.all(12),
