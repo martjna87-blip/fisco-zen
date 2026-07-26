@@ -69,7 +69,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   bool _isRicorrente = false;
   String _frequenzaSelezionata = 'Ogni mese';
   String _meseRicorrenzaSelezionato = 'Gennaio';
-  
+
   String _giornoSettimanaSelezionato = 'Lunedì';
   bool _isGiornoSettimanaEspanso = false;
 
@@ -1784,7 +1784,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           const SizedBox(width: 8),
                         ],
                         Expanded(
-                          flex: _frequenzaSelezionata == 'Ogni settimana' ? 2 : 1,
+                          flex: _frequenzaSelezionata == 'Ogni settimana' ? 2 : 1, // Più largo se serve il giorno della settimana
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1825,7 +1825,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                     decoration: const InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                      contentPadding: EdgeInsets.symmetric(vertical: 10), // Padding verticale allineato a 10
                                       hintText: '1',
                                       hintStyle: TextStyle(color: Colors.white24),
                                       border: InputBorder.none,
@@ -1896,7 +1896,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             onTap: onToggle,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              // PADDING VERTICALE BLOCCATO A 12 PER TUTTE LE CELLE
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               child: Row(
                 children: [
                   Icon(icon, color: iconColor, size: 16),
@@ -1905,6 +1906,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     child: Text(
                       selectedValue,
                       style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 1, // 👈 FORZA IL TESTO SU UNA RIGA
+                      overflow: TextOverflow.ellipsis, // 👈 AGGIUNGE I PUNTINI SE TROPPO LUNGO
                     ),
                   ),
                   Icon(
@@ -1947,6 +1950,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                 fontSize: 11,
                                 fontWeight: isSelected || isNewOption ? FontWeight.bold : FontWeight.normal,
                               ),
+                              maxLines: 1, // 👈 PUNTINI ANCHE NELLE OPZIONI DELLA TENDINA
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
