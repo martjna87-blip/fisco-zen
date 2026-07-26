@@ -245,11 +245,12 @@ class WalletProvider extends ChangeNotifier {
         }
         
         if (numOccorrenze > 0) {
+          final String etichettaOccorrenze = tx.isIncome ? 'entrate' : 'uscite';
           previsti.add(TransactionModel(
             id: 'prev_${tx.id}_${meseRiferimento.month}', 
-            title: '${tx.title} ($numOccorrenze uscite)', // Es: Allenamento (4 uscite)
+            title: '${tx.title} ($numOccorrenze $etichettaOccorrenze)', 
             subtitle: 'Previsto', 
-            amount: tx.amount * numOccorrenze, // Importo moltiplicato per il numero di uscite del mese
+            amount: tx.amount * numOccorrenze, 
             isIncome: tx.isIncome,
             category: tx.category,
             date: primaDataValida ?? meseRiferimento, 

@@ -425,13 +425,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ),
         content: Text(
           isRecurrent 
-            ? 'Questa è una spesa ricorrente.\nScegli esattamente come vuoi procedere:'
+            ? 'Questa è una spesa/entrata ricorrente.\nScegli esattamente come vuoi procedere:'
             : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actionsAlignment: isRecurrent ? MainAxisAlignment.center : MainAxisAlignment.end,
         actions: isRecurrent
-            // 🛑 BIVIO A 3 SCELTE PER SPESE RICORRENTI
             ? [
                 Column(
                   children: [
@@ -466,7 +465,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           context.read<WalletProvider>().deleteButKeepRecurrence(id);
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Spesa stornata, ma le future sono state mantenute.'), backgroundColor: Color(0xFFF59E0B)),
+                            const SnackBar(content: Text('Movimento stornato, ma le future sono state mantenute.'), backgroundColor: Color(0xFFF59E0B)),
                           );
                         },
                         child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -498,7 +497,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ],
                 )
               ]
-            // 🗑️ ELIMINAZIONE STANDARD PER SPESE NORMALI
             : [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -519,6 +517,74 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
+      ),
+    );
+  }
+
+  void _confermaEliminazioneMovimentoFuturo(BuildContext context, String parentId, String desc) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.event_repeat_rounded, color: Color(0xFF2DD4BF), size: 22),
+            SizedBox(width: 8),
+            Text('Gestisci Ricorrenza Futura', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Stai modificando una previsione futura per "$desc".\nScegli come procedere:',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF2DD4BF)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().stopRecurrence(parentId);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ricorrenza disdetta per i mesi futuri!'), backgroundColor: Color(0xFFF59E0B)),
+                    );
+                  },
+                  child: const Text('Disdici la ricorrenza da ora in poi', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().deleteTransaction(parentId);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ricorrenza "$desc" ed intero storico eliminati.'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  },
+                  child: const Text('Elimina sia lo storico che i futuri', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -844,7 +910,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   void _scrollToOffset(double deltaPixels) {
-    // 👈 FIX: Capisce da solo quale controller usare in base alla schermata attiva
     final activeController = (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') 
         ? _scrollControllerSpesa 
         : _scrollControllerEntrata;
@@ -879,7 +944,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           height: screenSize.height * 0.88,
           child: Stack(
             children: [
-              // 1. IMMAGINE SFONDO ATMOSFERICA
               Positioned.fill(
                 child: Image.network(
                   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
@@ -889,20 +953,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
                 ),
               ),
-
-              // 2. OVERLAY SCURO SFUMATO
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.75),
                 ),
               ),
-
-              // 3. CONTENUTO GLASS
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER CON BOTTONE (X) CIRCOLARE ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -935,12 +994,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
-                    // ==========================================
-                    // 🔲 CORPO PRINCIPALE GLASSMORPHIC
-                    // ==========================================
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
@@ -956,7 +1010,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // SELETTORE TAB: RIEPILOGO | USCITA | ENTRATA
                                 Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
@@ -999,10 +1052,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 12),
-
-                                // PAGEVIEW NATIVO A RISPOSTA HARDWARE FLUIDA
                                 Expanded(
                                   child: PageView(
                                     controller: _pageController,
@@ -1037,17 +1087,16 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🧮 SCHERMATA RIEPILOGO UNIFICATA CON CRUSCOTTO E PREVISIONI
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    // 1. Prendi i Movimenti Reali (nascondendo le "Regole Fantasma")
     final List<Map<String, dynamic>> movimentiReali = walletProvider.transactions
-        .where((tx) => !tx.title.startsWith('Accantonamento Tasse') && !tx.id.startsWith('rule_')) // 👈 FIX: Nasconde le regole invisibili
+        .where((tx) => !tx.title.startsWith('Accantonamento Tasse') && !tx.id.startsWith('rule_'))
         .map((tx) {
       final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
       return {
         'id': tx.id,
+        'parentId': tx.id,
         'desc': tx.title,
         'imp': tx.amount,
         'cat': tx.category,
@@ -1059,10 +1108,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       };
     }).toList();
 
-    // 2. Prendi i Movimenti Previsti dal Motore (passando il mese sfogliato!)
     final List<Map<String, dynamic>> previsti = walletProvider.getMovimentiPrevisti(_meseSelezionatoRiepilogo)
         .map((tx) => {
       'id': tx.id,
+      'parentId': tx.id.replaceFirst('prev_', '').split('_')[0],
       'desc': tx.title,
       'imp': tx.amount,
       'cat': tx.category,
@@ -1070,20 +1119,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       'isSpesa': !tx.isIncome,
       'isFattura': false,
       'isRecurrent': true,
-      'isPrevisto': true, // 👈 FLAG PREVISTO
+      'isPrevisto': true,
     }).toList();
 
-    // 3. Uniamo tutto insieme
     final List<Map<String, dynamic>> tuttiMovimenti = [...movimentiReali, ...previsti];
 
-    // Filtriamo per mese selezionato (reali + previsti)
     final movimentiMeseSelezionato = tuttiMovimenti.where((m) {
       final dt = m['data'] as DateTime;
       return dt.year == _meseSelezionatoRiepilogo.year && dt.month == _meseSelezionatoRiepilogo.month;
     }).toList();
 
     final double totaleSpese = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false) // I previsti non toccano i totali reali!
+        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
     final double totaleEntrate = movimentiMeseSelezionato
@@ -1108,7 +1155,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     return Column(
       children: [
-        // CRUSCOTTO FISSO IN ALTO
         Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           decoration: BoxDecoration(
@@ -1118,7 +1164,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ),
           child: Column(
             children: [
-              // MESE E FRECCE
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1149,7 +1194,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
               const SizedBox(height: 4),
-              // TOTALI
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -1180,7 +1224,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              // SELETTORE FILTRO
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -1246,10 +1289,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ],
           ),
         ),
-        
         const SizedBox(height: 12),
-
-        // LISTA MOVIMENTI LIBERA
         Expanded(
           child: movimentiMeseSelezionato.isEmpty
               ? const Center(
@@ -1266,7 +1306,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           final imp = m['imp'] as double;
                           final isSpesa = m['isSpesa'] as bool;
                           final isPrevisto = m['isPrevisto'] as bool;
-                          // Esclude i previsti dal calcolo della categoria visibile!
                           if (isPrevisto) return sum;
                           return sum + (isSpesa ? -imp : imp);
                         });
@@ -1323,6 +1362,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       final imp = m['imp'] as double;
                                       final bool isFattura = m['isFattura'] as bool;
                                       final String id = m['id'] as String;
+                                      final String parentId = m['parentId'] as String;
                                       final String desc = m['desc'] as String;
                                       final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
                                       final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
@@ -1341,7 +1381,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   ],
                                                   Expanded(
                                                     child: Text(
-                                                      isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})',
+                                                      isPrevisto 
+                                                        ? (desc.contains('entrate') || desc.contains('uscite') ? '$desc - Previsto' : '$desc (Previsto il ${dt.day}/${dt.month})') 
+                                                        : '$desc (${dt.day}/${dt.month})',
                                                       style: TextStyle(
                                                         color: isPrevisto ? Colors.white38 : Colors.white60, 
                                                         fontSize: 11, 
@@ -1364,10 +1406,16 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            if (!isFattura && !isPrevisto) ...[
+                                            if (!isFattura) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
-                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc, isRecurrent), // 👈 FIX ELIMINA RICORRENTE
+                                                onTap: () {
+                                                  if (isPrevisto) {
+                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc);
+                                                  } else {
+                                                    _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
+                                                  }
+                                                },
                                                 child: Container(
                                                   padding: const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(
@@ -1456,6 +1504,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       final imp = m['imp'] as double;
                                       final bool isFattura = m['isFattura'] as bool;
                                       final String id = m['id'] as String;
+                                      final String parentId = m['parentId'] as String;
                                       final String desc = m['desc'] as String;
                                       final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
                                       final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
@@ -1474,7 +1523,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                   ],
                                                   Expanded(
                                                     child: Text(
-                                                      isPrevisto ? '$desc (${m['cat']} - Previsto)' : '$desc (${m['cat']})',
+                                                      isPrevisto 
+                                                        ? '$desc (${m['cat']} - Previsto)' 
+                                                        : '$desc (${m['cat']})',
                                                       style: TextStyle(
                                                         color: isPrevisto ? Colors.white38 : Colors.white60, 
                                                         fontSize: 11, 
@@ -1497,10 +1548,16 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            if (!isFattura && !isPrevisto) ...[
+                                            if (!isFattura) ...[
                                               const SizedBox(width: 6),
                                               InkWell(
-                                                onTap: () => _confermaEliminazioneMovimento(context, id, desc, isRecurrent),
+                                                onTap: () {
+                                                  if (isPrevisto) {
+                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc);
+                                                  } else {
+                                                    _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
+                                                  }
+                                                },
                                                 child: Container(
                                                   padding: const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(
@@ -1527,7 +1584,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 👈 FORM MOVIMENTO MIGLIORATO (1 COLONNA, PREFERITI SU, SCAN NELL'IMPORTO)
   Widget _buildFormMovimento({required bool isSpesa}) {
     final bool mostraMeseInizio = [
       'Ogni 2 mesi',
@@ -1537,7 +1593,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     ].contains(_frequenzaSelezionata);
 
     return SingleChildScrollView(
-      // 👈 FIX: Assegna dinamicamente il controller corretto
       controller: isSpesa ? _scrollControllerSpesa : _scrollControllerEntrata,
       physics: const BouncingScrollPhysics(),
       child: Container(
@@ -1550,10 +1605,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // SPAZIO SUPERIORE AL POSTO DEL DOPPIO TASTO FOTOCAMERA
             if (isSpesa) const SizedBox(height: 10),
-
-            // IMPORTO CON TASTO SCANSIONE INTEGRATO SULLA DESTRA
             Stack(
               alignment: Alignment.center,
               children: [
@@ -1601,10 +1653,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // DESCRIZIONE
             TextField(
               controller: _noteController,
               style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -1622,10 +1671,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ),
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // PREFERITI RAPIDI (SPOSTATI SOTTO LA DESCRIZIONE)
             const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1689,14 +1735,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 },
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // RIGA 1: DATA E CONTO AFFIANCATI
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // DATA
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1732,7 +1774,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // CONTO
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1765,55 +1806,39 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // RIGA 2: CATEGORIA E BUDGET (Se Entrata, Categoria prende tutto lo spazio!)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // CATEGORIA
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(isSpesa ? 'CATEGORIA SPECIFICA' : 'CATEGORIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      const SizedBox(height: 4),
-                      _buildInlineSelector(
-                        icon: isSpesa ? Icons.category_outlined : Icons.account_balance_wallet_outlined,
-                        iconColor: isSpesa ? const Color(0xFF2DD4BF) : const Color(0xFF10B981),
-                        selectedValue: isSpesa ? _sottocategoriaSelezionata : _sottocategoriaEntrataSelezionata,
-                        isExpanded: isSpesa ? _isSottocategoriaEspansa : _isSottocategoriaEntrataEspansa,
-                        onToggle: () {
-                          setState(() {
-                            if (isSpesa) {
+            if (isSpesa) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        const SizedBox(height: 4),
+                        _buildInlineSelector(
+                          icon: Icons.category_outlined,
+                          iconColor: const Color(0xFF2DD4BF),
+                          selectedValue: _sottocategoriaSelezionata,
+                          isExpanded: _isSottocategoriaEspansa,
+                          onToggle: () {
+                            setState(() {
                               _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
                               if (_isSottocategoriaEspansa) _scrollToOffset(120);
-                            } else {
-                              _isSottocategoriaEntrataEspansa = !_isSottocategoriaEntrataEspansa;
-                              if (_isSottocategoriaEntrataEspansa) _scrollToOffset(120);
-                            }
-                          });
-                        },
-                        items: isSpesa ? _sottocategorieSpesa : _sottocategorieEntrata,
-                        onSelect: (val) {
-                          setState(() {
-                            if (isSpesa) {
+                            });
+                          },
+                          items: _sottocategorieSpesa,
+                          onSelect: (val) {
+                            setState(() {
                               _sottocategoriaSelezionata = val;
                               _isSottocategoriaEspansa = false;
-                            } else {
-                              _sottocategoriaEntrataSelezionata = val;
-                              _isSottocategoriaEntrataEspansa = false;
-                            }
-                          });
-                        },
-                      ),
-                    ],
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                
-                // BUDGET (SOLO SPESA)
-                if (isSpesa) ...[
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -1844,12 +1869,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     ),
                   ),
                 ],
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // SEZIONE MOVIMENTO RICORRENTE
+              ),
+              const SizedBox(height: 12),
+            ],
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -1901,7 +1923,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                   Row(
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (mostraMeseInizio) ...[
@@ -1935,7 +1957,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           const SizedBox(width: 8),
                         ],
                         Expanded(
-                          flex: _frequenzaSelezionata == 'Ogni settimana' ? 2 : 1, // Più largo se serve il giorno della settimana
+                          flex: _frequenzaSelezionata == 'Ogni settimana' ? 2 : 1,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1976,7 +1998,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                     decoration: const InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(vertical: 10), // Padding verticale allineato a 10
+                                      contentPadding: EdgeInsets.symmetric(vertical: 10),
                                       hintText: '1',
                                       hintStyle: TextStyle(color: Colors.white24),
                                       border: InputBorder.none,
@@ -1993,10 +2015,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // PULSANTE SALVA DINAMICO
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -2047,7 +2066,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             onTap: onToggle,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
-              // PADDING VERTICALE BLOCCATO A 12 PER TUTTE LE CELLE
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               child: Row(
                 children: [
@@ -2057,8 +2075,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     child: Text(
                       selectedValue,
                       style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                      maxLines: 1, // 👈 FORZA IL TESTO SU UNA RIGA
-                      overflow: TextOverflow.ellipsis, // 👈 AGGIUNGE I PUNTINI SE TROPPO LUNGO
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Icon(
@@ -2070,7 +2088,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
             ),
           ),
-
           if (isExpanded) ...[
             const Divider(color: Colors.white12, height: 1),
             Padding(
@@ -2101,7 +2118,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                 fontSize: 11,
                                 fontWeight: isSelected || isNewOption ? FontWeight.bold : FontWeight.normal,
                               ),
-                              maxLines: 1, // 👈 PUNTINI ANCHE NELLE OPZIONI DELLA TENDINA
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
