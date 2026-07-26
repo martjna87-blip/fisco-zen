@@ -414,44 +414,111 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141417),
+        backgroundColor: const Color(0xFF18181B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
             SizedBox(width: 8),
-            Text('Elimina Movimento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Gestisci Movimento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Text(
           isRecurrent 
-            ? 'Vuoi davvero eliminare "$desc"?\n\nQuesta è una spesa ricorrente. Eliminerai solo questo singolo movimento e il saldo verrà stornato.'
+            ? 'Questa è una spesa ricorrente.\nScegli esattamente come vuoi procedere:'
             : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              context.read<WalletProvider>().deleteTransaction(id);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Movimento "$desc" eliminato.'),
-                  backgroundColor: const Color(0xFFEF4444),
+        actionsAlignment: isRecurrent ? MainAxisAlignment.center : MainAxisAlignment.end,
+        actions: isRecurrent
+            // 🛑 BIVIO A 3 SCELTE PER SPESE RICORRENTI
+            ? [
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFEF4444)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          context.read<WalletProvider>().stopRecurrence(id);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Ricorrenza interrotta! Le spese future sono state cancellate.'), backgroundColor: Color(0xFFF59E0B)),
+                          );
+                        },
+                        child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFEF4444)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          context.read<WalletProvider>().deleteButKeepRecurrence(id);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Spesa stornata, ma le future sono state mantenute.'), backgroundColor: Color(0xFFF59E0B)),
+                          );
+                        },
+                        child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          context.read<WalletProvider>().deleteTransaction(id);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Movimento "$desc" e futuri eliminati.'), backgroundColor: const Color(0xFFEF4444)),
+                          );
+                        },
+                        child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                    ),
+                  ],
+                )
+              ]
+            // 🗑️ ELIMINAZIONE STANDARD PER SPESE NORMALI
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
                 ),
-              );
-            },
-            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().deleteTransaction(id);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Movimento "$desc" eliminato.'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  },
+                  child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
       ),
     );
   }
@@ -974,9 +1041,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    // 1. Prendi i Movimenti Reali
+    // 1. Prendi i Movimenti Reali (nascondendo le "Regole Fantasma")
     final List<Map<String, dynamic>> movimentiReali = walletProvider.transactions
-        .where((tx) => !tx.title.startsWith('Accantonamento Tasse'))
+        .where((tx) => !tx.title.startsWith('Accantonamento Tasse') && !tx.id.startsWith('rule_')) // 👈 FIX: Nasconde le regole invisibili
         .map((tx) {
       final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
       return {

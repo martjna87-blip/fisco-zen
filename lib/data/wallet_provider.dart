@@ -591,16 +591,13 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🗑️ ELIMINA TRANSAZIONE MANUALE (Storna il saldo del conto)
+  // 🗑️ ELIMINA TRANSAZIONE MANUALE (Elimina sia la spesa che i futuri)
   void deleteTransaction(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
       final tx = _transactions.removeAt(idx);
+      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? '1'), orElse: () => _accounts.first);
 
-      // Trova il conto principale
-      final targetAccount = _accounts.first;
-
-      // Storna il saldo
       if (tx.isIncome) {
         targetAccount.amount -= tx.amount;
       } else {
@@ -609,6 +606,66 @@ class WalletProvider extends ChangeNotifier {
         if (tx.category == 'Svago') _spesoSvago = (_spesoSvago - tx.amount).clamp(0.0, double.infinity);
         if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
       }
+
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+
+  // 🛑 OPZIONE A: MANTIENI LA SPESA ATTUALE, MA FERMA I FUTURI
+  void stopRecurrence(String id) {
+    final idx = _transactions.indexWhere((t) => t.id == id);
+    if (idx != -1) {
+      final tx = _transactions[idx];
+      _transactions[idx] = TransactionModel(
+        id: tx.id,
+        title: tx.title,
+        subtitle: tx.subtitle,
+        amount: tx.amount,
+        isIncome: tx.isIncome,
+        category: tx.category,
+        date: tx.date,
+        accountId: tx.accountId,
+        isRecurrent: false, // Disattiva la ricorrenza
+        frequenza: null,
+        giornoRicorrenza: null,
+      );
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+
+  // 👻 OPZIONE B: ELIMINA LA SPESA ATTUALE, MA MANTIENI I FUTURI (Regola Fantasma)
+  void deleteButKeepRecurrence(String id) {
+    final idx = _transactions.indexWhere((t) => t.id == id);
+    if (idx != -1) {
+      final tx = _transactions[idx];
+      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? '1'), orElse: () => _accounts.first);
+
+      // 1. Storna il saldo dal conto
+      if (tx.isIncome) {
+        targetAccount.amount -= tx.amount;
+      } else {
+        targetAccount.amount += tx.amount;
+        if (tx.category == 'Bisogni') _spesoBisogni = (_spesoBisogni - tx.amount).clamp(0.0, double.infinity);
+        if (tx.category == 'Svago') _spesoSvago = (_spesoSvago - tx.amount).clamp(0.0, double.infinity);
+        if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
+      }
+
+      // 2. Converti in "Regola Fantasma"
+      _transactions[idx] = TransactionModel(
+        id: 'rule_${tx.id}',
+        title: tx.title,
+        subtitle: tx.subtitle,
+        amount: tx.amount,
+        isIncome: tx.isIncome,
+        category: tx.category,
+        date: tx.date,
+        accountId: tx.accountId,
+        isRecurrent: true,
+        frequenza: tx.frequenza,
+        giornoRicorrenza: tx.giornoRicorrenza,
+      );
 
       _salvaDatiInLocalStorage();
       notifyListeners();
