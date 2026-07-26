@@ -5,11 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
 
 class AddMovementSheet extends StatefulWidget {
-  final String initialTab; // 👈 Aggiungiamo la scelta dinamica
+  final String initialTab;
 
   const AddMovementSheet({
     super.key,
-    this.initialTab = 'riepilogo', // Di default apre il riepilogo
+    this.initialTab = 'riepilogo',
   });
 
   @override
@@ -17,11 +17,12 @@ class AddMovementSheet extends StatefulWidget {
 }
 
 class _AddMovementSheetState extends State<AddMovementSheet> {
-  late String _tipoMovimento; // 👈 Diciamo a Flutter che lo imposteremo dopo
+  late String _tipoMovimento;
+  late PageController _pageController;
 
   final ImagePicker _picker = ImagePicker();
   bool _isAnalyzing = false;
-  String _vistaRiepilogo = 'categoria'; // 'categoria' o 'data'
+  String _vistaRiepilogo = 'categoria'; 
   int? _categoriaEspansaIndex; 
 
   final TextEditingController _amountController = TextEditingController();
@@ -68,6 +69,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   bool _isRicorrente = false;
   String _frequenzaSelezionata = 'Ogni mese';
   String _meseRicorrenzaSelezionato = 'Gennaio';
+  
+  String _giornoSettimanaSelezionato = 'Lunedì';
+  bool _isGiornoSettimanaEspanso = false;
+
+  final List<String> _giorniSettimana = [
+    'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'
+  ];
 
   final List<String> _categorieSpesa = ['50% Spese Fisse', '30% Spese Variabili', '20% Risparmio'];
 
@@ -131,10 +139,16 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   IconData _iconaCorrente = Icons.shopping_cart_outlined;
 
- @override
+  @override
   void initState() {
     super.initState();
-    _tipoMovimento = widget.initialTab; // 👈 Imposta la scheda passata dal bottone!
+    _tipoMovimento = widget.initialTab;
+    
+    int initialPage = 0;
+    if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') initialPage = 1;
+    if (_tipoMovimento == 'entrata') initialPage = 2;
+    _pageController = PageController(initialPage: initialPage);
+
     _noteController.addListener(_suggerisciCategoriaAuto);
   }
 
@@ -145,6 +159,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     _noteController.dispose();
     _giornoRicorrenzaController.dispose();
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -192,60 +207,91 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
-  // 📸 SCANSIONE E LETTURA AUTOMATICA SCONTRINO / TICKET VIA FOTOCAMERA
   void _scansionaScontrinoModal() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF141417),
+      backgroundColor: const Color(0xFF18181B),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const Text(
               'Scansiona Scontrino / Ticket',
               style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF)),
-              title: const Text('Scatta Foto da Fotocamera', style: TextStyle(color: Colors.white, fontSize: 13)),
+            InkWell(
               onTap: () {
-                // 1. Chiude il menu all'istante
                 Navigator.pop(ctx);
-                // 2. Lancia subito la fotocamera senza aspettare
                 _processaImmagineScontrino(ImageSource.camera);
               },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
+                    SizedBox(width: 12),
+                    Text('Scatta Foto da Fotocamera', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF2DD4BF)),
-              title: const Text('Scegli da Galleria', style: TextStyle(color: Colors.white, fontSize: 13)),
+            const SizedBox(height: 8),
+            InkWell(
               onTap: () {
                 Navigator.pop(ctx);
                 _processaImmagineScontrino(ImageSource.gallery);
               },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.photo_library_rounded, color: Color(0xFF2DD4BF), size: 20),
+                    SizedBox(width: 12),
+                    Text('Scegli da Galleria', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
             ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
 
-  // 👇 FUNZIONE OTTIMIZZATA PER IL WEB
   Future<void> _processaImmagineScontrino(ImageSource source) async {
     try {
-      // APERTURA IMMEDIATA: Se Safari blocca qualcosa, lo fa qui
       final XFile? image = await _picker.pickImage(source: source);
-      
-      // Se premi "Annulla" sulla fotocamera
       if (image == null) return;
 
       setState(() => _isAnalyzing = true);
 
-      // Feedback Visivo
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -260,20 +306,17 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ),
       );
 
-      // Simuliamo il tempo di elaborazione dell'Intelligenza Artificiale (2 secondi)
       await Future.delayed(const Duration(seconds: 2));
 
-      // Dati estratti in automatico (Simulazione)
       double importoTrovato = 42.80;
       String esercenteTrovato = 'Supermercato Conad';
       DateTime dataTrovata = DateTime.now();
 
-      // AUTOCOMPILAZIONE CAMPI SULLA SCHERMATA
       setState(() {
         _amountController.text = importoTrovato.toStringAsFixed(2).replaceAll('.', ',');
         _noteController.text = esercenteTrovato;
         _dataSelezionata = dataTrovata;
-        _tipoMovimento = 'uscita'; // Assicurati di essere in Uscita
+        _tipoMovimento = 'uscita'; 
         _suggerisciCategoriaAuto();
         _isAnalyzing = false;
       });
@@ -289,7 +332,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       }
     } catch (e) {
       setState(() => _isAnalyzing = false);
-      // 🔥 ORA SE SAFARI BLOCCA VEDREMO IL PERCHÉ IN UN BANNER ROSSO
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -320,7 +362,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ? _sottocategoriaSelezionata 
         : _sottocategoriaEntrataSelezionata;
 
-    // 👈 Cerca l'account reale che corrisponde al nome selezionato
     final accounts = context.read<WalletProvider>().accounts;
     final matchingAccount = accounts.firstWhere(
       (acc) => acc.title == _contoSelezionato || _contoSelezionato.contains(acc.title),
@@ -343,6 +384,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _noteController.clear();
       _meseSelezionatoRiepilogo = DateTime(_dataSelezionata.year, _dataSelezionata.month);
       _tipoMovimento = 'riepilogo'; 
+      _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -354,7 +396,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🗑️ DIALOG CONFERMA ELIMINAZIONE
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc) {
     showDialog(
       context: context,
@@ -736,15 +777,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
-    
-    final bool isSpesa = _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa';
-
-    final bool mostraMeseInizio = [
-      'Ogni 2 mesi',
-      'Ogni 3 mesi (Trimestrale)',
-      'Ogni 6 mesi (Semestrale)',
-      'Ogni anno (Annuale)',
-    ].contains(_frequenzaSelezionata);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -777,7 +809,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ),
               ),
 
-              // 3. CONTENUTO CON HEADER CIRCOLARE E SCHEDE GLASS
+              // 3. CONTENUTO GLASS
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
@@ -813,33 +845,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             ),
                           ],
                         ),
-                        if (isSpesa)
-                          InkWell(
-                            onTap: _scansionaScontrinoModal,
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2DD4BF).withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFF2DD4BF)),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF), size: 14),
-                                  SizedBox(width: 4),
-                                  Text('Scansiona', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                          ),
                       ],
                     ),
 
                     const SizedBox(height: 12),
 
                     // ==========================================
-                    // 🔲 RIQUADRO 1: CORPO PRINCIPALE GLASSMORPHIC
+                    // 🔲 CORPO PRINCIPALE GLASSMORPHIC
                     // ==========================================
                     Expanded(
                       child: ClipRRect(
@@ -871,7 +883,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           label: 'Riepilogo',
                                           isSelected: _tipoMovimento == 'riepilogo',
                                           color: const Color(0xFF2DD4BF),
-                                          onTap: () => setState(() => _tipoMovimento = 'riepilogo'),
+                                          onTap: () {
+                                            _pageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                          },
                                         ),
                                       ),
                                       Expanded(
@@ -879,7 +893,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           label: 'Uscita',
                                           isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
                                           color: const Color(0xFFEF4444),
-                                          onTap: () => setState(() => _tipoMovimento = 'uscita'),
+                                          onTap: () {
+                                            _pageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                          },
                                         ),
                                       ),
                                       Expanded(
@@ -887,7 +903,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           label: 'Entrata',
                                           isSelected: _tipoMovimento == 'entrata',
                                           color: const Color(0xFF10B981),
-                                          onTap: () => setState(() => _tipoMovimento = 'entrata'),
+                                          onTap: () {
+                                            _pageController.animateToPage(2, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                          },
                                         ),
                                       ),
                                     ],
@@ -896,459 +914,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                                 const SizedBox(height: 12),
 
-                                // CONTENUTO: RIEPILOGO O FORM (SWIPE ELIMINATO PER EVITARE CONFLITTI)
+                                // PAGEVIEW NATIVO A RISPOSTA HARDWARE FLUIDA
                                 Expanded(
-                                  child: _tipoMovimento == 'riepilogo'
-                                      ? _buildSchermataRiepilogo()
-                                      : SingleChildScrollView(
-                                          controller: _scrollController,
-                                          physics: const BouncingScrollPhysics(),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.35),
-                                              borderRadius: BorderRadius.circular(18),
-                                              border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // BOTTONE RAPIDO SCANSIONE
-                                                Visibility(
-                                                  visible: isSpesa,
-                                                  maintainSize: true,
-                                                  maintainAnimation: true,
-                                                  maintainState: true,
-                                                  child: Align(
-                                                    alignment: Alignment.centerRight,
-                                                    child: TextButton.icon(
-                                                      onPressed: _scansionaScontrinoModal,
-                                                      icon: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                                      label: const Text('Scansiona Ticket / Foto', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                                                    ),
-                                                  ),
-                                                ),
-
-                                                // IMPORTO
-                                                Center(
-                                                  child: IntrinsicWidth(
-                                                    child: TextField(
-                                                      controller: _amountController,
-                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                      autofocus: false,
-                                                      textAlign: TextAlign.center,
-                                                      style: TextStyle(
-                                                        color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                                                        fontSize: 34,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                      decoration: InputDecoration(
-                                                        hintText: '0,00 €',
-                                                        hintStyle: const TextStyle(color: Colors.white24, fontSize: 34),
-                                                        border: InputBorder.none,
-                                                        prefixText: isSpesa ? '- ' : '+ ',
-                                                        prefixStyle: TextStyle(
-                                                          color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                                                          fontSize: 34,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-
-                                                const SizedBox(height: 10),
-
-                                                // DESCRIZIONE
-                                                TextField(
-                                                  controller: _noteController,
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                                  decoration: InputDecoration(
-                                                    labelText: isSpesa ? 'Descrizione' : 'Descrizione',
-                                                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                                                    filled: true,
-                                                    fillColor: Colors.black.withOpacity(0.35),
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
-                                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
-                                                    prefixIcon: IconButton(
-                                                      icon: Icon(_iconaCorrente, color: const Color(0xFF2DD4BF), size: 20),
-                                                      onPressed: _mostraSelettoreIcone,
-                                                      tooltip: 'Cambia pittogramma',
-                                                    ),
-                                                  ),
-                                                ),
-
-                                                // PREFERITI
-                                                const SizedBox(height: 10),
-                                                const Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text('PREFERITI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                                    Text('Tieni premuto per eliminare', style: TextStyle(color: Colors.white38, fontSize: 8, fontStyle: FontStyle.italic)),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                SizedBox(
-                                                  height: 36,
-                                                  child: ListView.builder(
-                                                    scrollDirection: Axis.horizontal,
-                                                    physics: const BouncingScrollPhysics(),
-                                                    itemCount: (isSpesa ? _speseFrequenti.length : _entrateFrequenti.length) + 1,
-                                                    itemBuilder: (context, index) {
-                                                      final list = isSpesa ? _speseFrequenti : _entrateFrequenti;
-                                                      if (index == list.length) {
-                                                        return ActionChip(
-                                                          avatar: const Icon(Icons.add, size: 14, color: Color(0xFF2DD4BF)),
-                                                          label: const Text('Nuova', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                                                          backgroundColor: const Color(0xFF2DD4BF).withOpacity(0.12),
-                                                          side: const BorderSide(color: Color(0xFF2DD4BF)),
-                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                                          onPressed: () => _mostraDialogNuovoPreferito(isSpesa),
-                                                        );
-                                                      }
-
-                                                      final item = list[index];
-                                                      final isSelected = _noteController.text == item['label'];
-
-                                                      return Padding(
-                                                        padding: const EdgeInsets.only(right: 6.0),
-                                                        child: GestureDetector(
-                                                          onLongPress: () => _confermaEliminazionePreferito(index, isSpesa),
-                                                          child: FilterChip(
-                                                            showCheckmark: false,
-                                                            selected: isSelected,
-                                                            avatar: Icon(item['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF2DD4BF)),
-                                                            label: Text(
-                                                              item['label'],
-                                                              style: TextStyle(
-                                                                color: isSelected ? Colors.white : Colors.white70,
-                                                                fontSize: 11,
-                                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                              ),
-                                                            ),
-                                                            backgroundColor: Colors.black.withOpacity(0.35),
-                                                            selectedColor: const Color(0xFF2DD4BF).withOpacity(0.4),
-                                                            side: BorderSide(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.1)),
-                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                                            onSelected: (_) {
-                                                              if (isSpesa) {
-                                                                _selezionaSpesaFrequente(item['label'], item['icon'], item['cat'], item['sottoCat'] ?? 'Acquisti');
-                                                              } else {
-                                                                _selezionaEntrataFrequente(item['label'], item['icon']);
-                                                              }
-                                                            },
-                                                          ),
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-
-                                                const SizedBox(height: 12),
-
-                                                // DATA MOVIMENTO
-                                                const Text('DATA MOVIMENTO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                                const SizedBox(height: 4),
-                                                InkWell(
-                                                  onTap: () => _selezionaData(context),
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black.withOpacity(0.35),
-                                                      borderRadius: BorderRadius.circular(14),
-                                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 15),
-                                                            const SizedBox(width: 8),
-                                                            Text(
-                                                              _formattaDataInItaliano(_dataSelezionata),
-                                                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        const Text('Modifica', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-
-                                                const SizedBox(height: 12),
-
-                                                // SOTTOCATEGORIA SPECIFICA SPESA
-                                                if (isSpesa) ...[
-                                                  const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                  const SizedBox(height: 4),
-                                                  _buildInlineSelector(
-                                                    icon: Icons.category_outlined,
-                                                    iconColor: const Color(0xFF2DD4BF),
-                                                    selectedValue: _sottocategoriaSelezionata,
-                                                    isExpanded: _isSottocategoriaEspansa,
-                                                    onToggle: () {
-                                                      setState(() {
-                                                        _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
-                                                      });
-                                                      if (_isSottocategoriaEspansa) _scrollToOffset(120);
-                                                    },
-                                                    items: _sottocategorieSpesa,
-                                                    onSelect: (val) {
-                                                      setState(() {
-                                                        _sottocategoriaSelezionata = val;
-                                                        _isSottocategoriaEspansa = false;
-                                                      });
-                                                    },
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                ],
-
-                                                // SOTTOCATEGORIA SPECIFICA ENTRATA
-                                                if (!isSpesa) ...[
-                                                  const Text('CATEGORIA ENTRATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                  const SizedBox(height: 4),
-                                                  _buildInlineSelector(
-                                                    icon: Icons.account_balance_wallet_outlined,
-                                                    iconColor: const Color(0xFF10B981),
-                                                    selectedValue: _sottocategoriaEntrataSelezionata,
-                                                    isExpanded: _isSottocategoriaEntrataEspansa,
-                                                    onToggle: () {
-                                                      setState(() {
-                                                        _isSottocategoriaEntrataEspansa = !_isSottocategoriaEntrataEspansa;
-                                                      });
-                                                      if (_isSottocategoriaEntrataEspansa) _scrollToOffset(120);
-                                                    },
-                                                    items: _sottocategorieEntrata,
-                                                    onSelect: (val) {
-                                                      setState(() {
-                                                        _sottocategoriaEntrataSelezionata = val;
-                                                        _isSottocategoriaEntrataEspansa = false;
-                                                      });
-                                                    },
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                ],
-
-                                                // CATEGORIA BUDGET (SOLO SPESA)
-                                                if (isSpesa) ...[
-                                                  const Text('REGOLE BUDGET', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                  const SizedBox(height: 4),
-                                                  _buildInlineSelector(
-                                                    icon: Icons.pie_chart_outline_rounded,
-                                                    iconColor: const Color(0xFF2DD4BF),
-                                                    selectedValue: _categoriaSelezionata,
-                                                    isExpanded: _isCategoriaEspansa,
-                                                    onToggle: () {
-                                                      setState(() {
-                                                        _isCategoriaEspansa = !_isCategoriaEspansa;
-                                                      });
-                                                      if (_isCategoriaEspansa) _scrollToOffset(120);
-                                                    },
-                                                    items: _categorieSpesa,
-                                                    onSelect: (val) {
-                                                      setState(() {
-                                                        _categoriaSelezionata = val;
-                                                        _isCategoriaEspansa = false;
-                                                      });
-                                                    },
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                ],
-
-                                                // SELEZIONE CONTO
-                                                const Text('SELEZIONA CONTO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                const SizedBox(height: 4),
-                                                _buildInlineSelector(
-                                                  icon: Icons.account_balance_wallet_outlined,
-                                                  iconColor: Colors.white54,
-                                                  selectedValue: _contoSelezionato,
-                                                  isExpanded: _isContoEspanso,
-                                                  onToggle: () {
-                                                    setState(() {
-                                                      _isContoEspanso = !_isContoEspanso;
-                                                    });
-                                                    if (_isContoEspanso) _scrollToOffset(140);
-                                                  },
-                                                  items: [..._contiDisponibili, '+ Aggiungi nuovo conto...'],
-                                                  onSelect: (val) {
-                                                    if (val == '+ Aggiungi nuovo conto...') {
-                                                      _mostraDialogNuovoConto();
-                                                    } else {
-                                                      setState(() {
-                                                        _contoSelezionato = val;
-                                                        _isContoEspanso = false;
-                                                      });
-                                                    }
-                                                  },
-                                                ),
-
-                                                const SizedBox(height: 12),
-
-                                                // SEZIONE MOVIMENTO RICORRENTE
-                                                AnimatedContainer(
-                                                  duration: const Duration(milliseconds: 250),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: _isRicorrente ? const Color(0xFF2DD4BF).withOpacity(0.08) : Colors.black.withOpacity(0.35),
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    border: Border.all(color: _isRicorrente ? const Color(0xFF2DD4BF).withOpacity(0.3) : Colors.white.withOpacity(0.08)),
-                                                  ),
-                                                  child: Column(
-                                                    children: [
-                                                      // FIX ERRORE CONSOLE: Avvolto in Material trasparente
-                                                      Material(
-                                                        color: Colors.transparent,
-                                                        child: SwitchListTile(
-                                                          contentPadding: EdgeInsets.zero,
-                                                          title: const Text('Movimento Ricorrente', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                                                          subtitle: const Text('Es. Abbonamento mensile, affitto o stipendio', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                                                          activeColor: const Color(0xFF2DD4BF),
-                                                          value: _isRicorrente,
-                                                          onChanged: (val) {
-                                                            setState(() {
-                                                              _isRicorrente = val;
-                                                            });
-                                                            if (val) _scrollToOffset(200);
-                                                          },
-                                                        ),
-                                                      ),
-
-                                                      if (_isRicorrente) ...[
-                                                        const Divider(color: Colors.white12, height: 12),
-
-                                                        Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            const Text('FREQUENZA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                            const SizedBox(height: 4),
-                                                            _buildInlineSelector(
-                                                              icon: Icons.repeat_rounded,
-                                                              iconColor: const Color(0xFF2DD4BF),
-                                                              selectedValue: _frequenzaSelezionata,
-                                                              isExpanded: _isFrequenzaEspansa,
-                                                              onToggle: () {
-                                                                setState(() {
-                                                                  _isFrequenzaEspansa = !_isFrequenzaEspansa;
-                                                                });
-                                                                if (_isFrequenzaEspansa) _scrollToOffset(180);
-                                                              },
-                                                              items: _opzioniFrequenza,
-                                                              onSelect: (val) {
-                                                                setState(() {
-                                                                  _frequenzaSelezionata = val;
-                                                                  _isFrequenzaEspansa = false;
-                                                                });
-                                                              },
-                                                            ),
-                                                          ],
-                                                        ),
-
-                                                        const SizedBox(height: 10),
-
-                                                        Row(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            if (mostraMeseInizio) ...[
-                                                              Expanded(
-                                                                flex: 2,
-                                                                child: Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                                  children: [
-                                                                    const Text('MESE INIZIO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                                    const SizedBox(height: 4),
-                                                                    _buildInlineSelector(
-                                                                      icon: Icons.calendar_month_rounded,
-                                                                      iconColor: const Color(0xFF2DD4BF),
-                                                                      selectedValue: _meseRicorrenzaSelezionato,
-                                                                      isExpanded: _isMeseEspanso,
-                                                                      onToggle: () {
-                                                                        setState(() {
-                                                                          _isMeseEspanso = !_isMeseEspanso;
-                                                                        });
-                                                                        if (_isMeseEspanso) _scrollToOffset(220);
-                                                                      },
-                                                                      items: _mesiAnno,
-                                                                      onSelect: (val) {
-                                                                        setState(() {
-                                                                          _meseRicorrenzaSelezionato = val;
-                                                                          _isMeseEspanso = false;
-                                                                        });
-                                                                      },
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: 8),
-                                                            ],
-
-                                                            Expanded(
-                                                              flex: 1,
-                                                              child: Column(
-                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                children: [
-                                                                  const Text('GIORNO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                                  const SizedBox(height: 4),
-                                                                  Container(
-                                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                                    decoration: BoxDecoration(
-                                                                      color: Colors.black.withOpacity(0.35),
-                                                                      borderRadius: BorderRadius.circular(14),
-                                                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                                                    ),
-                                                                    child: TextField(
-                                                                      controller: _giornoRicorrenzaController,
-                                                                      keyboardType: TextInputType.number,
-                                                                      textAlign: TextAlign.center,
-                                                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                                      decoration: const InputDecoration(
-                                                                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                                                                        hintText: '1',
-                                                                        hintStyle: TextStyle(color: Colors.white24),
-                                                                        border: InputBorder.none,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        const SizedBox(height: 6),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                ),
-
-                                                const SizedBox(height: 16),
-
-                                                // PULSANTE SALVA DINAMICO
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  height: 46,
-                                                  child: ElevatedButton(
-                                                    onPressed: _salvaMovimento,
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                      elevation: 0,
-                                                    ),
-                                                    child: Text(
-                                                      isSpesa ? 'Salva Uscita' : 'Salva Entrata',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
+                                  child: PageView(
+                                    controller: _pageController,
+                                    physics: const BouncingScrollPhysics(),
+                                    onPageChanged: (index) {
+                                      setState(() {
+                                        if (index == 0) _tipoMovimento = 'riepilogo';
+                                        else if (index == 1) _tipoMovimento = 'uscita';
+                                        else if (index == 2) _tipoMovimento = 'entrata';
+                                      });
+                                    },
+                                    children: [
+                                      _buildSchermataRiepilogo(),
+                                      _buildFormMovimento(isSpesa: true),
+                                      _buildFormMovimento(isSpesa: false),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -1794,6 +1377,501 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
+  // 👈 FORM MOVIMENTO MIGLIORATO (1 COLONNA, PREFERITI SU, SCAN NELL'IMPORTO)
+  Widget _buildFormMovimento({required bool isSpesa}) {
+    final bool mostraMeseInizio = [
+      'Ogni 2 mesi',
+      'Ogni 3 mesi (Trimestrale)',
+      'Ogni 6 mesi (Semestrale)',
+      'Ogni anno (Annuale)',
+    ].contains(_frequenzaSelezionata);
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // SPAZIO SUPERIORE AL POSTO DEL DOPPIO TASTO FOTOCAMERA
+            if (isSpesa) const SizedBox(height: 10),
+
+            // IMPORTO CON TASTO SCANSIONE INTEGRATO SULLA DESTRA
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: IntrinsicWidth(
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      autofocus: false,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '0,00 €',
+                        hintStyle: const TextStyle(color: Colors.white24, fontSize: 36),
+                        border: InputBorder.none,
+                        prefixText: isSpesa ? '- ' : '+ ',
+                        prefixStyle: TextStyle(
+                          color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (isSpesa)
+                  Positioned(
+                    right: 0,
+                    child: Material(
+                      color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _scansionaScontrinoModal,
+                        borderRadius: BorderRadius.circular(30),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10.0),
+                          child: Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF2DD4BF), size: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // DESCRIZIONE
+            TextField(
+              controller: _noteController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Descrizione',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.black.withOpacity(0.35),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
+                prefixIcon: IconButton(
+                  icon: Icon(_iconaCorrente, color: const Color(0xFF2DD4BF), size: 20),
+                  onPressed: _mostraSelettoreIcone,
+                  tooltip: 'Cambia pittogramma',
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // PREFERITI RAPIDI (SPOSTATI SOTTO LA DESCRIZIONE)
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('PREFERITI RAPIDI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                Text('Tieni premuto per eliminare', style: TextStyle(color: Colors.white38, fontSize: 8, fontStyle: FontStyle.italic)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 34,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: (isSpesa ? _speseFrequenti.length : _entrateFrequenti.length) + 1,
+                itemBuilder: (context, index) {
+                  final list = isSpesa ? _speseFrequenti : _entrateFrequenti;
+                  if (index == list.length) {
+                    return ActionChip(
+                      avatar: const Icon(Icons.add, size: 14, color: Color(0xFF2DD4BF)),
+                      label: const Text('Nuova', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                      backgroundColor: const Color(0xFF2DD4BF).withOpacity(0.12),
+                      side: const BorderSide(color: Color(0xFF2DD4BF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onPressed: () => _mostraDialogNuovoPreferito(isSpesa),
+                    );
+                  }
+
+                  final item = list[index];
+                  final isSelected = _noteController.text == item['label'];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: GestureDetector(
+                      onLongPress: () => _confermaEliminazionePreferito(index, isSpesa),
+                      child: FilterChip(
+                        showCheckmark: false,
+                        selected: isSelected,
+                        avatar: Icon(item['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF2DD4BF)),
+                        label: Text(
+                          item['label'],
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: Colors.black.withOpacity(0.35),
+                        selectedColor: const Color(0xFF2DD4BF).withOpacity(0.4),
+                        side: BorderSide(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onSelected: (_) {
+                          if (isSpesa) {
+                            _selezionaSpesaFrequente(item['label'], item['icon'], item['cat'], item['sottoCat'] ?? 'Acquisti');
+                          } else {
+                            _selezionaEntrataFrequente(item['label'], item['icon']);
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // RIGA 1: DATA E CONTO AFFIANCATI
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // DATA
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('DATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () => _selezionaData(context),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _formattaDataInItaliano(_dataSelezionata),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // CONTO
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('CONTO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      _buildInlineSelector(
+                        icon: Icons.account_balance_wallet_outlined,
+                        iconColor: Colors.white54,
+                        selectedValue: _contoSelezionato,
+                        isExpanded: _isContoEspanso,
+                        onToggle: () {
+                          setState(() => _isContoEspanso = !_isContoEspanso);
+                          if (_isContoEspanso) _scrollToOffset(100);
+                        },
+                        items: [..._contiDisponibili, '+ Aggiungi conto...'],
+                        onSelect: (val) {
+                          if (val == '+ Aggiungi conto...') {
+                            _mostraDialogNuovoConto();
+                          } else {
+                            setState(() {
+                              _contoSelezionato = val;
+                              _isContoEspanso = false;
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // RIGA 2: CATEGORIA E BUDGET (Se Entrata, Categoria prende tutto lo spazio!)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // CATEGORIA
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isSpesa ? 'CATEGORIA SPECIFICA' : 'CATEGORIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      _buildInlineSelector(
+                        icon: isSpesa ? Icons.category_outlined : Icons.account_balance_wallet_outlined,
+                        iconColor: isSpesa ? const Color(0xFF2DD4BF) : const Color(0xFF10B981),
+                        selectedValue: isSpesa ? _sottocategoriaSelezionata : _sottocategoriaEntrataSelezionata,
+                        isExpanded: isSpesa ? _isSottocategoriaEspansa : _isSottocategoriaEntrataEspansa,
+                        onToggle: () {
+                          setState(() {
+                            if (isSpesa) {
+                              _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
+                              if (_isSottocategoriaEspansa) _scrollToOffset(120);
+                            } else {
+                              _isSottocategoriaEntrataEspansa = !_isSottocategoriaEntrataEspansa;
+                              if (_isSottocategoriaEntrataEspansa) _scrollToOffset(120);
+                            }
+                          });
+                        },
+                        items: isSpesa ? _sottocategorieSpesa : _sottocategorieEntrata,
+                        onSelect: (val) {
+                          setState(() {
+                            if (isSpesa) {
+                              _sottocategoriaSelezionata = val;
+                              _isSottocategoriaEspansa = false;
+                            } else {
+                              _sottocategoriaEntrataSelezionata = val;
+                              _isSottocategoriaEntrataEspansa = false;
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // BUDGET (SOLO SPESA)
+                if (isSpesa) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('REGOLE BUDGET', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        const SizedBox(height: 4),
+                        _buildInlineSelector(
+                          icon: Icons.pie_chart_outline_rounded,
+                          iconColor: const Color(0xFF2DD4BF),
+                          selectedValue: _categoriaSelezionata,
+                          isExpanded: _isCategoriaEspansa,
+                          onToggle: () {
+                            setState(() {
+                              _isCategoriaEspansa = !_isCategoriaEspansa;
+                              if (_isCategoriaEspansa) _scrollToOffset(120);
+                            });
+                          },
+                          items: _categorieSpesa,
+                          onSelect: (val) {
+                            setState(() {
+                              _categoriaSelezionata = val;
+                              _isCategoriaEspansa = false;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // SEZIONE MOVIMENTO RICORRENTE
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: _isRicorrente ? const Color(0xFF2DD4BF).withOpacity(0.08) : Colors.black.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _isRicorrente ? const Color(0xFF2DD4BF).withOpacity(0.3) : Colors.white.withOpacity(0.08)),
+              ),
+              child: Column(
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Movimento Ricorrente', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                      subtitle: const Text('Es. Abbonamento mensile, affitto o stipendio', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                      activeColor: const Color(0xFF2DD4BF),
+                      value: _isRicorrente,
+                      onChanged: (val) {
+                        setState(() => _isRicorrente = val);
+                        if (val) _scrollToOffset(200);
+                      },
+                    ),
+                  ),
+                  if (_isRicorrente) ...[
+                    const Divider(color: Colors.white12, height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('FREQUENZA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        _buildInlineSelector(
+                          icon: Icons.repeat_rounded,
+                          iconColor: const Color(0xFF2DD4BF),
+                          selectedValue: _frequenzaSelezionata,
+                          isExpanded: _isFrequenzaEspansa,
+                          onToggle: () {
+                            setState(() => _isFrequenzaEspansa = !_isFrequenzaEspansa);
+                            if (_isFrequenzaEspansa) _scrollToOffset(180);
+                          },
+                          items: _opzioniFrequenza,
+                          onSelect: (val) {
+                            setState(() {
+                              _frequenzaSelezionata = val;
+                              _isFrequenzaEspansa = false;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                   Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (mostraMeseInizio) ...[
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('MESE INIZIO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                _buildInlineSelector(
+                                  icon: Icons.calendar_month_rounded,
+                                  iconColor: const Color(0xFF2DD4BF),
+                                  selectedValue: _meseRicorrenzaSelezionato,
+                                  isExpanded: _isMeseEspanso,
+                                  onToggle: () {
+                                    setState(() => _isMeseEspanso = !_isMeseEspanso);
+                                    if (_isMeseEspanso) _scrollToOffset(220);
+                                  },
+                                  items: _mesiAnno,
+                                  onSelect: (val) {
+                                    setState(() {
+                                      _meseRicorrenzaSelezionato = val;
+                                      _isMeseEspanso = false;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          flex: _frequenzaSelezionata == 'Ogni settimana' ? 2 : 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _frequenzaSelezionata == 'Ogni settimana' ? 'GIORNO DELLA SETTIMANA' : 'GIORNO DEL MESE', 
+                                style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)
+                              ),
+                              const SizedBox(height: 4),
+                              if (_frequenzaSelezionata == 'Ogni settimana')
+                                _buildInlineSelector(
+                                  icon: Icons.calendar_view_week_rounded,
+                                  iconColor: const Color(0xFF2DD4BF),
+                                  selectedValue: _giornoSettimanaSelezionato,
+                                  isExpanded: _isGiornoSettimanaEspanso,
+                                  onToggle: () {
+                                    setState(() => _isGiornoSettimanaEspanso = !_isGiornoSettimanaEspanso);
+                                    if (_isGiornoSettimanaEspanso) _scrollToOffset(220);
+                                  },
+                                  items: _giorniSettimana,
+                                  onSelect: (val) {
+                                    setState(() {
+                                      _giornoSettimanaSelezionato = val;
+                                      _isGiornoSettimanaEspanso = false;
+                                    });
+                                  },
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.35),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                  ),
+                                  child: TextField(
+                                    controller: _giornoRicorrenzaController,
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                    decoration: const InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                      hintText: '1',
+                                      hintStyle: TextStyle(color: Colors.white24),
+                                      border: InputBorder.none,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // PULSANTE SALVA DINAMICO
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _salvaMovimento,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: Text(
+                  isSpesa ? 'Salva Uscita' : 'Salva Entrata',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInlineSelector({
     required IconData icon,
     required Color iconColor,
@@ -1900,24 +1978,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.black : Colors.white54,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.black : Colors.white54,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ),
+      ),
     );
   }
 
-  // 👈 NUOVO HELPER PER PALLINI / LINEE DELLO SWIPE
   Widget _buildPageDot(bool isActive, Color color) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: isActive ? 20 : 6, // Se attivo diventa una linea, altrimenti resta un pallino
+      width: isActive ? 20 : 6, 
       height: 6,
       decoration: BoxDecoration(
         color: isActive ? color : Colors.white24,
