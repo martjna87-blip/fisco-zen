@@ -110,6 +110,137 @@ class WalletProvider extends ChangeNotifier {
   bool _isProUser = false;
   bool get isProUser => _isProUser;
 
+// ===========================================================================
+  // 🪪 PROFILO ONBOARDING & MOTORE FISCALE
+  // ===========================================================================
+  String _codiceAteco = '62.02.00';
+  double _coefficienteRedditivita = 0.78;
+  String _tipoCassa = 'gestioneSeparata'; // gestioneSeparata, commercianti, artigiani, cassaProfessionale
+  bool _isStartup = true; // true = 5%, false = 15%
+  
+  // Dipendente & Part-Time
+  String _tipoLavoroDipendente = 'nessuno'; // nessuno, fullTime, partTimeSuperiore50, partTimeInferiore50
+  bool _ralSupera30k = false;
+  bool _scontoInps35 = false; // Solo Commercianti/Artigiani
+
+  // Storico & Deducibilità
+  bool _isPrimoAnnoAssoluto = false;
+  double _accontoImpostaVersato = 0.0;
+  double _accontoInpsVersato = 0.0;
+  double _contributiInpsPagatiAnnoCorrente = 0.0; // Deducibile dal fatturato lordo x coef
+
+  // Target & Stagionalità
+  double _nettoTargetMensile = 2000.0;
+  double _speseFisseMensili = 800.0;
+  double _fatturatoStimatoAnnuo = 35000.0;
+  int _mesiAttiviIncasso = 10; // es. 10 mesi su 12
+
+// ===========================================================================
+  // 🎯 MOTORE DI CALCOLO: VERDETTO FISCALE & STRATEGICO
+  // ===========================================================================
+  Map<String, dynamic> calcolaVerdettoFiscale({
+    double? fatturatoCustom,
+    double? nettoTargetCustom,
+    int? mesiAttiviCustom,
+  }) {
+    final fatturato = fatturatoCustom ?? _fatturatoStimatoAnnuo;
+    final nettoTargetMese = nettoTargetCustom ?? _nettoTargetMensile;
+    final mesiAttivi = mesiAttiviCustom ?? _mesiAttiviIncasso;
+
+    // 1. Calcolo Imponibile Lordo ATECO
+    final imponibileLordo = fatturato * _coefficienteRedditivita;
+
+    // 2. Deduzione Contributi INPS versati nell'anno solare
+    final imponibileNettoTasse = (imponibileLordo - _contributiInpsPagatiAnnoCorrente).clamp(0.0, double.infinity);
+
+    // 3. Calcolo INPS Annuo in base alla Cassa e al Lavoro Dipendente
+    double stimaInpsAnnuo = 0.0;
+    
+    if (_tipoCassa == 'gestioneSeparata') {
+      // Se ha lavoro dipendente (Full o Part-time qualsiasi %) -> Aliquota ridotta 24%
+      final aliquotaInps = (_tipoLavoroDipendente != 'nessuno') ? 0.24 : 0.2607;
+      stimaInpsAnnuo = imponibileLordo * aliquotaInps;
+    } else if (_tipoCassa == 'commercianti' || _tipoCassa == 'artigiani') {
+      // Se Dipendente Full-Time o Part-Time > 50% -> ESENZIONE TOTALE CONTRIBUTI FISSI!
+      final isEsenzioneFissi = (_tipoLavoroDipendente == 'fullTime' || _tipoLavoroDipendente == 'partTimeSuperiore50');
+      
+      if (isEsenzioneFissi) {
+        stimaInpsAnnuo = 0.0; // Nessun fisso dovuto!
+      } else {
+        // Contributi Fissi INPS (~4.200 € / anno base)
+        double fissoBase = 4200.0;
+        if (_scontoInps35) fissoBase *= 0.65; // Sconto 35% per commercianti/artigiani
+        stimaInpsAnnuo = fissoBase;
+      }
+    } else {
+      // Casse Professionali (Inarcassa, ENPAP, Forense...) ~ media 15% o minimo cassa
+      stimaInpsAnnuo = imponibileLordo * 0.15;
+    }
+
+    // 4. Calcolo Imposta Sostitutiva (5% o 15%)
+    final aliquotaImposta = _isStartup ? 0.05 : 0.15;
+    final stimaImpostaAnnuo = imponibileNettoTasse * aliquotaImposta;
+
+    // 5. Totale Uscite Fiscali Annue
+    final totaleTasseAnnuo = stimaInpsAnnuo + stimaImpostaAnnuo;
+
+    // 6. Netto Reale Annuo e Mensile "Lissato" su 12 Mesi
+    final nettoRealeAnnuo = fatturato - totaleTasseAnnuo;
+    final stipendioMensile12Mesi = nettoRealeAnnuo / 12;
+
+    // 7. Stagionalità & Accantonamento Mesi Zero
+    final mesiPausa = 12 - mesiAttivi;
+    final quotaMesiZeroMensile = (mesiPausa > 0) 
+        ? (stipendioMensile12Mesi * mesiPausa) / mesiAttivi 
+        : 0.0;
+
+    // 8. Trattenuta % Consigliata per ogni singola fattura incassata
+    final percentualeTrattenutaTasseFattura = fatturato > 0 
+        ? (totaleTasseAnnuo / fatturato) * 100 
+        : 0.0;
+    
+    final percentualeTrattenutaMesiZeroFattura = (fatturato > 0 && mesiPausa > 0)
+        ? ((stipendioMensile12Mesi * mesiPausa) / fatturato) * 100
+        : 0.0;
+
+    // 9. Verdetto Semaforo Sostenibilità
+    String semaforo = 'VERDE'; 
+    String motivazione = '';
+
+    if (stipendioMensile12Mesi >= nettoTargetMese) {
+      semaforo = 'VERDE';
+      motivazione = 'Il tuo fatturato stimato copre il tuo obiettivo di netto e ti permette un margine extra!';
+    } else if (stipendioMensile12Mesi >= (nettoTargetMese * 0.85)) {
+      semaforo = 'GIALLO';
+      motivazione = 'Sei vicino al tuo obiettivo, ma il margine per imprevisti è ridotto.';
+    } else {
+      semaforo = 'ROSSO';
+      motivazione = 'Il fatturato stimato non è sufficiente per garantire il tuo netto desiderato.';
+    }
+
+    // 10. Ingegneria Inversa: Quanto dovresti fatturare per il target?
+    final pressioneFiscalePercentuale = fatturato > 0 ? (totaleTasseAnnuo / fatturato) : 0.25;
+    final fatturatoLordoNecessarioForTarget = (nettoTargetMese * 12) / (1 - pressioneFiscalePercentuale);
+
+    return {
+      'fatturatoLordo': fatturato,
+      'imponibileLordo': imponibileLordo,
+      'stimaInpsAnnuo': stimaInpsAnnuo,
+      'stimaImpostaAnnuo': stimaImpostaAnnuo,
+      'totaleTasseAnnuo': totaleTasseAnnuo,
+      'pressioneFiscaleReale': pressioneFiscalePercentuale * 100,
+      'nettoRealeAnnuo': nettoRealeAnnuo,
+      'stipendioMensile12Mesi': stipendioMensile12Mesi,
+      'quotaMesiZeroMensile': quotaMesiZeroMensile,
+      'percentualeTrattenutaTasseFattura': percentualeTrattenutaTasseFattura,
+      'percentualeTrattenutaMesiZeroFattura': percentualeTrattenutaMesiZeroFattura,
+      'percentualeNettoDisponibile': 100 - percentualeTrattenutaTasseFattura - percentualeTrattenutaMesiZeroFattura,
+      'semaforo': semaforo,
+      'motivazione': motivazione,
+      'fatturatoLordoNecessarioForTarget': fatturatoLordoNecessarioForTarget,
+    };
+  }
+  
 // ==========================================
   // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
   // ==========================================
