@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'screens/1_setup_screen.dart';
+//import 'screens/1_setup_screen.dart';
+import 'screens/1_onboarding_wizard.dart'; // 👈 1. HO AGGIUNTO L'IMPORT QUI
 import 'data/wallet_provider.dart';
 
 void main() {
@@ -36,7 +37,10 @@ class FiscoZenApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF101012),
       ),
-      home: const SetupScreen(),
+      
+      // 👈 2. HO NASCOSTO LA VECCHIA HOME E INSERITO QUELLA NUOVA DA TESTARE
+      // home: const SetupScreen(), 
+      home: const SetupScreen(), // 👈 Usa SetupScreen invece di OnboardingWizard
     );
   }
 }
