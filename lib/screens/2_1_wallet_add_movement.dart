@@ -521,7 +521,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  void _confermaEliminazioneMovimentoFuturo(BuildContext context, String parentId, String desc) {
+  void _confermaEliminazioneMovimentoFuturo(BuildContext context, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -535,7 +535,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ],
         ),
         content: Text(
-          'Stai modificando una previsione futura per "$desc".\nScegli come procedere:',
+          'Stai modificando la previsione per "$desc".\nLo storico dei mesi passati non verrà toccato. Scegli cosa fare:',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
@@ -550,13 +550,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
-                    context.read<WalletProvider>().stopRecurrence(parentId);
+                    context.read<WalletProvider>().skipPrediction(parentId, meseRiferimento);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ricorrenza disdetta per i mesi futuri!'), backgroundColor: Color(0xFFF59E0B)),
+                      const SnackBar(content: Text('Eliminata la previsione per questo mese.'), backgroundColor: Color(0xFFF59E0B)),
                     );
                   },
-                  child: const Text('Disdici la ricorrenza da ora in poi', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: const Text('Elimina solo quella di questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -569,13 +569,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
-                    context.read<WalletProvider>().deleteTransaction(parentId);
+                    context.read<WalletProvider>().stopRecurrence(parentId);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Ricorrenza "$desc" ed intero storico eliminati.'), backgroundColor: const Color(0xFFEF4444)),
+                      const SnackBar(content: Text('Ricorrenza disdetta da questo mese in poi! Lo storico passato è salvo.'), backgroundColor: Color(0xFFEF4444)),
                     );
                   },
-                  child: const Text('Elimina sia lo storico che i futuri', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ),
               TextButton(
@@ -963,34 +963,33 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 child: Column(
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                  ),
-                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                                ),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withOpacity(0.2)),
                               ),
+                              child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              _tipoMovimento == 'riepilogo'
-                                  ? 'Riepilogo Movimenti'
-                                  : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata'),
-                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _tipoMovimento == 'riepilogo'
+                                ? 'Riepilogo Movimenti'
+                                : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata'),
+                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -1194,34 +1193,37 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
               const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '+${_formatValuta(totaleEntrate)}',
-                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('|', style: TextStyle(color: Colors.white24, fontSize: 16)),
-                  ),
-                  Row(
-                    children: [
-                      const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '-${_formatValuta(totaleSpese)}',
-                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '+${_formatValuta(totaleEntrate)}',
+                          style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('|', style: TextStyle(color: Colors.white24, fontSize: 16)),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.arrow_upward_rounded, color: Color(0xFFEF4444), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '-${_formatValuta(totaleSpese)}',
+                          style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               Container(
@@ -1411,7 +1413,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                               InkWell(
                                                 onTap: () {
                                                   if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc);
+                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc, dt);
                                                   } else {
                                                     _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
                                                   }
@@ -1500,6 +1502,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   padding: const EdgeInsets.only(left: 36, right: 10, bottom: 8, top: 4),
                                   child: Column(
                                     children: listaMovs.map((m) {
+                                      final dt = m['data'] as DateTime;
                                       final isSpesa = m['isSpesa'] as bool;
                                       final imp = m['imp'] as double;
                                       final bool isFattura = m['isFattura'] as bool;
@@ -1553,7 +1556,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                               InkWell(
                                                 onTap: () {
                                                   if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc);
+                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc, dt);
                                                   } else {
                                                     _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
                                                   }

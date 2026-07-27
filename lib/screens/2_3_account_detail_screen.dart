@@ -74,14 +74,20 @@ class AccountDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${(conto['saldo'] as double).toStringAsFixed(2)} €',
-                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${(conto['saldo'] as double).toStringAsFixed(2)} €',
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${conto['tipo']} • Aperto il ${conto['dataCreazione']}',
                         style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -106,21 +112,26 @@ class AccountDetailScreen extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // INTESTAZIONE MESE + BILANCIO MENSILE
+                    // INTESTAZIONE MESE + BILANCIO MENSILE (BLINDATO)
                     Padding(
                       padding: const EdgeInsets.only(top: 16, bottom: 10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            sezione['mese'].toString().toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.0,
+                          Expanded(
+                            child: Text(
+                              sezione['mese'].toString().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
@@ -166,12 +177,23 @@ class AccountDetailScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(m['titolo'], style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    m['titolo'], 
+                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text(m['data'], style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  Text(
+                                    m['data'], 
+                                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               '${isSpesa ? '' : '+'}${(m['importo'] as double).toStringAsFixed(2)} €',
                               style: TextStyle(

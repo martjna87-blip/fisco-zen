@@ -780,40 +780,47 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                   ),
-                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Gestione Conti',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Gestione Conti',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 6),
                         InkWell(
                           onTap: _mostraDialogNuovoConto,
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(20),
@@ -822,10 +829,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             child: const Row(
                               children: [
                                 Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                SizedBox(width: 4),
+                                SizedBox(width: 3),
                                 Text(
                                   'Nuovo Conto',
-                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -865,17 +872,29 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text('PATRIMONIO LIQUIDO TOTALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text(
+                                                  'PATRIMONIO LIQUIDO TOTALE',
+                                                  style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                FittedBox(
+                                                  fit: BoxFit.scaleDown,
+                                                  alignment: Alignment.centerLeft,
+                                                  child: Text(
+                                                    '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
+                                          const SizedBox(width: 8),
                                           IconButton(
                                             icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
                                             onPressed: () => _mostraDialogGiroconto(accounts),
@@ -1013,24 +1032,34 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                         child: Column(
                                                           crossAxisAlignment: CrossAxisAlignment.start,
                                                           children: [
-                                                            Text(account.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                            Text(
+                                                              account.title,
+                                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
                                                             const SizedBox(height: 2),
-                                                            Text(account.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                                                            Text(
+                                                              account.subtitle,
+                                                              style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
                                                           ],
                                                         ),
                                                       ),
-                                                      
+                                                      const SizedBox(width: 8),
                                                       Column(
                                                         crossAxisAlignment: CrossAxisAlignment.end,
                                                         children: [
                                                           Text(
                                                             '${account.amount.toStringAsFixed(2)} €',
-                                                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                                           ),
                                                           if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
                                                             const SizedBox(height: 4),
                                                             Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              crossAxisAlignment: CrossAxisAlignment.end,
                                                               children: [
                                                                 Row(
                                                                   mainAxisSize: MainAxisSize.min,
@@ -1038,7 +1067,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                                     const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
                                                                     const SizedBox(width: 4),
                                                                     Text(
-                                                                      (account.amount - account.virtualTaxAmount).toStringAsFixed(2), // 👈 TOLTO IL SIMBOLO €
+                                                                      (account.amount - account.virtualTaxAmount).toStringAsFixed(2),
                                                                       style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
                                                                     ),
                                                                   ],
@@ -1050,7 +1079,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                                     const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
                                                                     const SizedBox(width: 4),
                                                                     Text(
-                                                                      account.virtualTaxAmount.toStringAsFixed(2), // 👈 TOLTO IL SIMBOLO €
+                                                                      account.virtualTaxAmount.toStringAsFixed(2),
                                                                       style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
                                                                     ),
                                                                   ],
