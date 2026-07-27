@@ -644,39 +644,46 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER CON BOTTONE (X) CIRCOLARE IDENTICO A REGISTRA FATTURA ---
+                    // --- HEADER CON BOTTONE (X) CIRCOLARE (BLINDATO OVERFLOW) ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                   ),
-                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Pilotaggio Budget',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Pilotaggio Budget',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 6),
                         Row(
                           children: [
                             InkWell(
@@ -697,7 +704,7 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
                               onTap: _mostraDialogAggiungiVoceBudget,
                               borderRadius: BorderRadius.circular(20),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(20),
@@ -706,10 +713,10 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
                                 child: const Row(
                                   children: [
                                     Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                    SizedBox(width: 4),
+                                    SizedBox(width: 3),
                                     Text(
                                       'Voce',
-                                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                                     ),
                                   ],
                                 ),
@@ -928,8 +935,15 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
         const Spacer(),
-        Text('${pctReale.toInt()}% ', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10)),
-        Text('(Target ${pctTarget.toInt()}%)', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            children: [
+              Text('${pctReale.toInt()}% ', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10)),
+              Text('(Target ${pctTarget.toInt()}%)', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -976,12 +990,23 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(titolo, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                      Text(
+                        titolo, 
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 2),
-                      const Text('Tocca per dettaglio voci', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.w500)),
+                      const Text(
+                        'Tocca per dettaglio voci', 
+                        style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 6),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -989,7 +1014,7 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
                       'Speso: ${speso.toStringAsFixed(2)} €',
                       style: TextStyle(
                         color: isSforatoPct ? const Color(0xFFEF4444) : Colors.white,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1018,18 +1043,28 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${(pctProgresso * 100).toInt()}% del Tetto Max',
-                  style: const TextStyle(color: Colors.white38, fontSize: 9),
+                Expanded(
+                  child: Text(
+                    '${(pctProgresso * 100).toInt()}% del Tetto Max',
+                    style: const TextStyle(color: Colors.white38, fontSize: 9),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                Text(
-                  isSforatoPct
-                      ? 'Sforato di +${(speso - targetMaxPct).toStringAsFixed(2)} €'
-                      : 'Capienza: ${(targetMaxPct - speso).toStringAsFixed(2)} €',
-                  style: TextStyle(
-                    color: isSforatoPct ? const Color(0xFFEF4444) : colore,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    isSforatoPct
+                        ? 'Sforato di +${(speso - targetMaxPct).toStringAsFixed(2)} €'
+                        : 'Capienza: ${(targetMaxPct - speso).toStringAsFixed(2)} €',
+                    style: TextStyle(
+                      color: isSforatoPct ? const Color(0xFFEF4444) : colore,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
                   ),
                 ),
               ],

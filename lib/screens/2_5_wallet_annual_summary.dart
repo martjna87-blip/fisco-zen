@@ -213,13 +213,16 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
 
                           Column(
                             children: [
-                              Text(
-                                '${item['risparmioNetto'].toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: -1,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${item['risparmioNetto'].toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: -1,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -254,29 +257,44 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.1),
-                                              shape: BoxShape.circle,
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.1),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 20),
                                             ),
-                                            child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 20),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text('Incassato', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                              Text('+${(item['incassato'] as double).toStringAsFixed(0)} €', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                                            ],
-                                          ),
-                                        ],
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Incassato', 
+                                                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  Text(
+                                                    '+${(item['incassato'] as double).toStringAsFixed(0)} €', 
+                                                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
+                                      const SizedBox(width: 6),
                                       Text(
                                         '-${(item['speso'] as double).toStringAsFixed(0)} €',
-                                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 15, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
@@ -322,11 +340,19 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Questo anno hai speso...', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500)),
+                        const Expanded(
+                          child: Text(
+                            'Questo anno hai speso...', 
+                            style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
                         Row(
                           children: [
                             _buildLegendaItem('Reale', const Color(0xFF2DD4BF)),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             _buildLegendaItem('Pilotaggio', Colors.white38),
                           ],
                         ),
@@ -419,7 +445,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                               children: [
                                 Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                                 if (!isPassato) ...[
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -436,11 +462,14 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                               isPassato
                                   ? 'In: +${m['incassato'].toStringAsFixed(0)} € • Out: -${m['speso'].toStringAsFixed(0)} €'
                                   : 'Target Pilotaggio: ${m['pilotaggio'].toStringAsFixed(0)} €',
-                              style: const TextStyle(color: Colors.white38, fontSize: 11),
+                              style: const TextStyle(color: Colors.white38, fontSize: 10),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         isPassato
                             ? '${isVirtuoso ? '+' : ''}${delta.toStringAsFixed(0)} €'
@@ -450,7 +479,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                               ? (isVirtuoso ? const Color(0xFF2DD4BF) : const Color(0xFFEF4444))
                               : Colors.white54,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13,
                         ),
                       ),
                     ],
