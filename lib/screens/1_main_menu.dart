@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-
+// Test sincronizzazione Mac ok
 // Importiamo le TUE VERE schermate
 import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
