@@ -103,19 +103,24 @@ class ProUpgradeSheet extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                    // LISTA VANTAGGI PRO
+                    // LISTA VANTAGGI PRO (Ora scorrevole se lo schermo è corto!)
                     Expanded(
-                      child: Column(
-                        children: [
-                          _buildProFeatureRow('Scansione OCR automatica da fotocamera'),
-                          _buildProFeatureRow('Importazione diretta file PDF e XML Fatture'),
-                          _buildProFeatureRow('Calcolo Tasse e INPS avanzato in tempo reale'),
-                          _buildProFeatureRow('Export CSV/PDF per il tuo Commercialista'),
-                        ],
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            _buildProFeatureRow('Scansione OCR automatica da fotocamera'),
+                            _buildProFeatureRow('Importazione diretta file PDF e XML Fatture'),
+                            _buildProFeatureRow('Calcolo Tasse e INPS avanzato in tempo reale'),
+                            _buildProFeatureRow('Export CSV/PDF per il tuo Commercialista'),
+                          ],
+                        ),
                       ),
                     ),
 
-                    // SCHEDA PREZZO
+                    const SizedBox(height: 8),
+
+                    // SCHEDA PREZZO (Blindata orizzontalmente)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -128,8 +133,19 @@ class ProUpgradeSheet extends StatelessWidget {
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Piano P.IVA Pro', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('4,99 € / mese', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 14, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              'Piano P.IVA Pro',
+                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '4,99 € / mese',
+                            style: TextStyle(color: Color(0xFFF59E0B), fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),

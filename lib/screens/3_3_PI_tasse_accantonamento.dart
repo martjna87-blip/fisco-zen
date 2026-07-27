@@ -180,41 +180,48 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER FLUTTUANTE ---
+                    // --- HEADER FLUTTUANTE BLINDATO ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                   ),
-                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Stima Tasse P.IVA',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Stima Tasse P.IVA',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF2563EB).withOpacity(0.25),
                             borderRadius: BorderRadius.circular(12),
@@ -562,16 +569,20 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
           Expanded(
             child: Row(
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isBold ? Colors.white : Colors.white54,
-                    fontSize: 11,
-                    fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isBold ? Colors.white : Colors.white54,
+                      fontSize: 11,
+                      fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (onInfoTap != null) ...[
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: onInfoTap,
                     child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 14),
@@ -580,6 +591,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             value,
             textAlign: TextAlign.right,

@@ -445,7 +445,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.35),
           borderRadius: BorderRadius.circular(14),
@@ -456,36 +456,49 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 color: isPro ? const Color(0xFFA855F7).withOpacity(0.15) : Colors.white10,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: isPro ? const Color(0xFFA855F7) : const Color(0xFFF59E0B), size: 18),
+              child: Icon(icon, color: isPro ? const Color(0xFFA855F7) : const Color(0xFFF59E0B), size: 16),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       if (!isPro) ...[
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF59E0B).withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('PRO', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 8, fontWeight: FontWeight.bold)),
+                          child: const Text('PRO', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 7, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white54, fontSize: 9),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),

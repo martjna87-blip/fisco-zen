@@ -225,41 +225,48 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER & TITOLO ---
+                    // --- HEADER & TITOLO BLINDATO ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                   ),
-                                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Dettaglio Fiscale',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Dettaglio Fiscale',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF2DD4BF).withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
@@ -269,7 +276,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                             'Coeff. ${(widget.coefficienteRedditivita * 100).toInt()}%',
                             style: const TextStyle(
                               color: Color(0xFF2DD4BF),
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -433,17 +440,26 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                                                       const SizedBox(height: 8),
 
-                                                      // RIGA SINTETICA NETTO / TASSE (INVERTITI + BLU TASSE UNIFICATO)
+                                                      // RIGA SINTETICA NETTO / TASSE (PROTEGGI-OVERFLOW)
                                                       Row(
                                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                         children: [
-                                                          Text(
-                                                            'Netto: +${nettoRimanenteCard.toStringAsFixed(2)} €',
-                                                            style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
+                                                          Flexible(
+                                                            child: Text(
+                                                              'Netto: +${nettoRimanenteCard.toStringAsFixed(2)} €',
+                                                              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
                                                           ),
-                                                          Text(
-                                                            'Tasse: -${totaleAccantonareCard.toStringAsFixed(2)} €',
-                                                            style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.w600),
+                                                          const SizedBox(width: 8),
+                                                          Flexible(
+                                                            child: Text(
+                                                              'Tasse: -${totaleAccantonareCard.toStringAsFixed(2)} €',
+                                                              style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.w600),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
@@ -574,14 +590,19 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: isBold ? Colors.white : Colors.white60,
-            fontSize: 10,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isBold ? Colors.white : Colors.white60,
+              fontSize: 10,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(

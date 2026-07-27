@@ -371,7 +371,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
                                               const SizedBox(height: 14),
 
-                                              // SELEZIONE CONTO A TENDINA IN-LINE
+                                              // SELEZIONE CONTO A TENDINA IN-LINE (BLINDATO)
                                               const Text('SELEZIONA CONTO DI ACCREDITO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
                                               const SizedBox(height: 6),
                                               
@@ -399,16 +399,23 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                         child: Row(
                                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                           children: [
-                                                            Row(
-                                                              children: [
-                                                                const Icon(Icons.account_balance_outlined, color: Color(0xFF2DD4BF), size: 16),
-                                                                const SizedBox(width: 8),
-                                                                Text(
-                                                                  _contoSelezionato ?? 'Seleziona un conto',
-                                                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                                ),
-                                                              ],
+                                                            Expanded(
+                                                              child: Row(
+                                                                children: [
+                                                                  const Icon(Icons.account_balance_outlined, color: Color(0xFF2DD4BF), size: 16),
+                                                                  const SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      _contoSelezionato ?? 'Seleziona un conto',
+                                                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
                                                             ),
+                                                            const SizedBox(width: 6),
                                                             Icon(
                                                               _isTendinaContiAperta ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                                                               color: const Color(0xFF2DD4BF),
@@ -444,12 +451,16 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                                     size: 16,
                                                                   ),
                                                                   const SizedBox(width: 10),
-                                                                  Text(
-                                                                    conto,
-                                                                    style: TextStyle(
-                                                                      color: isSelected ? Colors.white : Colors.white70,
-                                                                      fontSize: 12,
-                                                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      conto,
+                                                                      style: TextStyle(
+                                                                        color: isSelected ? Colors.white : Colors.white70,
+                                                                        fontSize: 12,
+                                                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                                      ),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
                                                                     ),
                                                                   ),
                                                                 ],
@@ -465,7 +476,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
                                               const SizedBox(height: 12),
 
-                                              // DATA INCASSO
+                                              // DATA INCASSO (BLINDATO)
                                               const Text('DATA INCASSO FATTURA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
                                               const SizedBox(height: 6),
                                               InkWell(
@@ -481,16 +492,23 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                                   child: Row(
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
-                                                      Row(
-                                                        children: [
-                                                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 15),
-                                                          const SizedBox(width: 8),
-                                                          Text(
-                                                            _formattaDataInItaliano(_dataSelezionata),
-                                                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                          ),
-                                                        ],
+                                                      Expanded(
+                                                        child: Row(
+                                                          children: [
+                                                            const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 15),
+                                                            const SizedBox(width: 8),
+                                                            Expanded(
+                                                              child: Text(
+                                                                _formattaDataInItaliano(_dataSelezionata),
+                                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ),
+                                                      const SizedBox(width: 6),
                                                       const Text('Modifica', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                                                     ],
                                                   ),
