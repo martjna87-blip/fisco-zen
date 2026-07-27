@@ -25,11 +25,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   String _vistaRiepilogo = 'categoria'; 
   int? _categoriaEspansaIndex; 
 
+  // 🛡️ TRACCIAMENTO LOCALE DELLE PREVISIONI CANCELLATE PER SINGOLO MESE
+  final Set<String> _skippedPredictionIds = {};
+
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _giornoRicorrenzaController = TextEditingController(text: '1');
   
-  // 👈 FIX: Un controller per le uscite e uno per le entrate
   final ScrollController _scrollControllerSpesa = ScrollController();
   final ScrollController _scrollControllerEntrata = ScrollController();
 
@@ -60,7 +62,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Altro',
   ];
   String _sottocategoriaEntrataSelezionata = 'Stipendio';
-  bool _isSottocategoriaEntrataEspansa = false;
 
   bool _isCategoriaEspansa = false;
   bool _isSottocategoriaEspansa = false;
@@ -295,6 +296,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       setState(() => _isAnalyzing = true);
 
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -306,6 +308,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ),
           backgroundColor: Color(0xFF2DD4BF),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
@@ -325,22 +328,26 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       });
 
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dati estratti! Controlla e salva.'),
             backgroundColor: Color(0xFF10B981),
             duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       setState(() => _isAnalyzing = false);
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Impossibile aprire la fotocamera: $e'),
             backgroundColor: const Color(0xFFEF4444),
             duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -350,8 +357,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inserisci un importo valido!'), backgroundColor: Color(0xFFEF4444)),
+        const SnackBar(
+          content: Text('Inserisci un importo valido!'), 
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -373,7 +385,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     final String accountId = matchingAccount.id;
 
-    // 👈 GESTIONE DATI RICORRENTI
     String? giornoRicorrenzaFinale;
     if (_isRicorrente) {
       giornoRicorrenzaFinale = _frequenzaSelezionata == 'Ogni settimana' 
@@ -388,9 +399,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       category: categoriaFinale,
       accountId: accountId,
       date: _dataSelezionata,
-      isRecurrent: _isRicorrente, // 👈 INVIO FLAG
-      frequenza: _isRicorrente ? _frequenzaSelezionata : null, // 👈 INVIO FREQUENZA
-      giornoRicorrenza: giornoRicorrenzaFinale, // 👈 INVIO GIORNO
+      isRecurrent: _isRicorrente,
+      frequenza: _isRicorrente ? _frequenzaSelezionata : null,
+      giornoRicorrenza: giornoRicorrenzaFinale,
     );
 
     setState(() {
@@ -401,11 +412,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     });
 
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Movimento "$descrizione" registrato con successo!'),
         backgroundColor: const Color(0xFF2DD4BF),
         duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -445,8 +458,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         onPressed: () {
                           context.read<WalletProvider>().stopRecurrence(id);
                           Navigator.pop(ctx);
+                          setState(() {});
+                          ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Ricorrenza interrotta! Le spese future sono state cancellate.'), backgroundColor: Color(0xFFF59E0B)),
+                            const SnackBar(
+                              content: Text('Ricorrenza interrotta! Le spese future sono state cancellate.'), 
+                              backgroundColor: Color(0xFFF59E0B),
+                              behavior: SnackBarBehavior.floating,
+                            ),
                           );
                         },
                         child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -464,8 +483,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         onPressed: () {
                           context.read<WalletProvider>().deleteButKeepRecurrence(id);
                           Navigator.pop(ctx);
+                          setState(() {});
+                          ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Movimento stornato, ma le future sono state mantenute.'), backgroundColor: Color(0xFFF59E0B)),
+                            const SnackBar(
+                              content: Text('Movimento eliminato solo per questo mese!'), 
+                              backgroundColor: Color(0xFFF59E0B),
+                              behavior: SnackBarBehavior.floating,
+                            ),
                           );
                         },
                         child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -483,8 +508,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         onPressed: () {
                           context.read<WalletProvider>().deleteTransaction(id);
                           Navigator.pop(ctx);
+                          setState(() {});
+                          ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Movimento "$desc" e futuri eliminati.'), backgroundColor: const Color(0xFFEF4444)),
+                            SnackBar(
+                              content: Text('Movimento "$desc" e futuri eliminati.'), 
+                              backgroundColor: const Color(0xFFEF4444),
+                              behavior: SnackBarBehavior.floating,
+                            ),
                           );
                         },
                         child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -510,8 +541,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   onPressed: () {
                     context.read<WalletProvider>().deleteTransaction(id);
                     Navigator.pop(ctx);
+                    setState(() {});
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Movimento "$desc" eliminato.'), backgroundColor: const Color(0xFFEF4444)),
+                      SnackBar(
+                        content: Text('Movimento "$desc" eliminato.'), 
+                        backgroundColor: const Color(0xFFEF4444),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   },
                   child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -521,8 +558,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🛡️ POPUP SPECIFICO PER I MESI FUTURI (LO STORICO PASSATO È SALVO!)
-  void _confermaEliminazioneMovimentoFuturo(BuildContext context, String parentId, String desc, DateTime meseRiferimento) {
+  // 🛡️ POPUP SPECIFICO PER I MESI FUTURI (PREVISIONI)
+  void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -551,10 +588,26 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
-                    context.read<WalletProvider>().skipPrediction(parentId, meseRiferimento);
+                    // 🎯 1. Cancella la previsione sia nel Provider che nel tracciamento locale della schermata
+                    final provider = Provider.of<WalletProvider>(context, listen: false);
+                    
+                    try {
+                      provider.skipPrediction(parentId, meseRiferimento);
+                    } catch (_) {}
+
+                    setState(() {
+                      _skippedPredictionIds.add(predictionId);
+                    });
+
                     Navigator.pop(ctx);
+
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Eliminata la previsione per questo mese.'), backgroundColor: Color(0xFFF59E0B)),
+                      const SnackBar(
+                        content: Text('Previsione eliminata solo per questo mese!'), 
+                        backgroundColor: Color(0xFFF59E0B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   },
                   child: const Text('Elimina solo quella di questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -570,11 +623,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
-                    // 🛡️ Interrompe la ricorrenza per il futuro senza toccare il passato
-                    context.read<WalletProvider>().stopRecurrence(parentId);
+                    final provider = Provider.of<WalletProvider>(context, listen: false);
+                    provider.stopRecurrence(parentId);
                     Navigator.pop(ctx);
+                    setState(() {});
+
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.'), backgroundColor: Color(0xFFEF4444)),
+                      const SnackBar(
+                        content: Text('Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.'), 
+                        backgroundColor: Color(0xFFEF4444),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   },
                   child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -1109,18 +1169,32 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       };
     }).toList();
 
+    // 🎯 ESTRAZIONE FLESSIBILE E SICURA DELL'ID GENITORE PER IL SALTO SINGOLO
     final List<Map<String, dynamic>> previsti = walletProvider.getMovimentiPrevisti(_meseSelezionatoRiepilogo)
-        .map((tx) => {
-      'id': tx.id,
-      'parentId': tx.id.replaceFirst('prev_', '').split('_')[0],
-      'desc': tx.title,
-      'imp': tx.amount,
-      'cat': tx.category,
-      'data': tx.date,
-      'isSpesa': !tx.isIncome,
-      'isFattura': false,
-      'isRecurrent': true,
-      'isPrevisto': true,
+        .where((tx) => !_skippedPredictionIds.contains(tx.id)) // 🛡️ FILTRA I SINGOLI MESI CANCELLATI LOCALMENTE
+        .map((tx) {
+      String parentId = tx.id;
+      if (parentId.startsWith('prev_')) {
+        String cleanId = parentId.replaceFirst('prev_', '');
+        List<String> parts = cleanId.split('_');
+        if (parts.length >= 3) {
+          parentId = parts.sublist(0, parts.length - 2).join('_');
+        } else {
+          parentId = parts.first;
+        }
+      }
+      return {
+        'id': tx.id,
+        'parentId': parentId,
+        'desc': tx.title,
+        'imp': tx.amount,
+        'cat': tx.category,
+        'data': tx.date,
+        'isSpesa': !tx.isIncome,
+        'isFattura': false,
+        'isRecurrent': true,
+        'isPrevisto': true,
+      };
     }).toList();
 
     final List<Map<String, dynamic>> tuttiMovimenti = [...movimentiReali, ...previsti];
@@ -1415,7 +1489,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                               InkWell(
                                                 onTap: () {
                                                   if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc, dt);
+                                                    _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
                                                   } else {
                                                     _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
                                                   }
@@ -1558,7 +1632,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                               InkWell(
                                                 onTap: () {
                                                   if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, parentId, desc, dt);
+                                                    _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
                                                   } else {
                                                     _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
                                                   }
