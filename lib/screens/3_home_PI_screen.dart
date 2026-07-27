@@ -710,48 +710,51 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                  // 2. I 3 QUADRANTI D'AZIONE
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.add_circle_outline_rounded,
-                          title: 'Nuova\nfattura',
-                          value: '+ Registra',
-                          onTap: _mostraDialogRegistraFattura,
+                  // 2. I 3 QUADRANTI D'AZIONE (Ora indistruttibili con IntrinsicHeight)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildMiniCard(
+                            icon: Icons.add_circle_outline_rounded,
+                            title: 'Nuova\nfattura',
+                            value: '+ Registra',
+                            onTap: _mostraDialogRegistraFattura,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
 
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.shield_outlined,
-                          title: 'Stima Tasse\nP.IVA',
-                          value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
-                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato), // 👈 QUESTO APRE L'ATECO!
+                        Expanded(
+                          child: _buildMiniCard(
+                            icon: Icons.shield_outlined,
+                            title: 'Stima Tasse\nP.IVA',
+                            value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
+                            onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
 
-                      Expanded(
-                        child: _buildMiniCard(
-                          icon: Icons.analytics_outlined,
-                          title: 'Dettaglio\nfatture',
-                          value: '${fattureIncassate.length} incassate',
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => DettaglioFattureSheet(
-                                fattureIncassate: fattureIncassate,
-                                coefficienteRedditivita: _coefficienteRedditivita,
-                                aliquotaImposta: _aliquotaImposta,
-                                aliquotaInps: _aliquotaInps,
-                              ),
-                            );
-                          },
+                        Expanded(
+                          child: _buildMiniCard(
+                            icon: Icons.analytics_outlined,
+                            title: 'Dettaglio\nfatture',
+                            value: '${fattureIncassate.length} incassate',
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => DettaglioFattureSheet(
+                                  fattureIncassate: fattureIncassate,
+                                  coefficienteRedditivita: _coefficienteRedditivita,
+                                  aliquotaImposta: _aliquotaImposta,
+                                  aliquotaInps: _aliquotaInps,
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 12),
@@ -877,8 +880,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: const Color(0xFF141417).withOpacity(0.92),
           borderRadius: BorderRadius.circular(20),
@@ -889,6 +891,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(icon, color: Colors.white70, size: 22),
+            const SizedBox(height: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -897,17 +900,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
-                    height: 1.2,
+                    height: 1.15,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

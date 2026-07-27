@@ -709,8 +709,8 @@ class _WalletScreenState extends State<WalletScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110,
-        padding: const EdgeInsets.all(12),
+        // NESSUNA ALTEZZA FISSA! Il box si modella al testo.
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: const Color(0xFF141417).withOpacity(0.92),
           borderRadius: BorderRadius.circular(20),
@@ -721,17 +721,22 @@ class _WalletScreenState extends State<WalletScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(icon, color: Colors.white70, size: 22),
+            const SizedBox(height: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.2),
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.15),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -745,13 +750,23 @@ class _WalletScreenState extends State<WalletScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          ],
+        Expanded( // 👈 Protegge il layout se lo schermo è stretto!
+          child: Row(
+            children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title, 
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 1, 
+                  overflow: TextOverflow.ellipsis, // 👈 Aggiunge "..." se serve
+                ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 8),
         Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
       ],
     );

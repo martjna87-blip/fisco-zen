@@ -228,6 +228,10 @@ class WalletProvider extends ChangeNotifier {
       }
       // 📆 CASO B: OGNI SETTIMANA (AGGREGATA)
       else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
+        // 👈 CONTROLLO SKIP SULL'INTERO MESE SETTIMANALE
+        final keySettimanale = '${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}';
+        if (_skippedPredictions.contains(keySettimanale)) continue;
+
         int targetWeekday = _stringToWeekday(tx.giornoRicorrenza!);
         int numOccorrenze = 0;
         DateTime? primaDataValida;
@@ -236,7 +240,6 @@ class WalletProvider extends ChangeNotifier {
         for (int i = 1; i <= daysInMonth; i++) {
           DateTime checkDate = DateTime(meseRiferimento.year, meseRiferimento.month, i);
           if (checkDate.weekday == targetWeekday) {
-            // Conta solo le ricorrenze nel futuro rispetto a oggi e alla prima spesa registrata
             if (checkDate.isAfter(oggi) && checkDate.isAfter(tx.date)) {
               numOccorrenze++;
               primaDataValida ??= checkDate; 
@@ -270,6 +273,7 @@ class WalletProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> _fattureIncassate = [];
   List<Map<String, dynamic>> get fattureIncassate => List.unmodifiable(_fattureIncassate);
+  List<String> _skippedPredictions = [];
 
   WalletProvider() {
     _caricaDatiDaLocalStorage();
@@ -332,6 +336,11 @@ class WalletProvider extends ChangeNotifier {
         final List decoded = jsonDecode(storage['fattureIncassate']!);
         _fattureIncassate = decoded.map((f) => Map<String, dynamic>.from(f)).toList();
       }
+
+      if (storage.containsKey('skippedPredictions')) {
+        final List decoded = jsonDecode(storage['skippedPredictions']!);
+        _skippedPredictions = decoded.map((s) => s.toString()).toList();
+      }
     } catch (e) {
       debugPrint('Errore durante la lettura da LocalStorage: $e');
     }
@@ -358,6 +367,7 @@ class WalletProvider extends ChangeNotifier {
       storage['transactions'] = jsonEncode(_transactions.map((t) => t.toJson()).toList());
       storage['fattureDaIncassare'] = jsonEncode(_fattureDaIncassare);
       storage['fattureIncassate'] = jsonEncode(_fattureIncassate);
+      storage['skippedPredictions'] = jsonEncode(_skippedPredictions);
     } catch (e) {
       debugPrint('Errore durante il salvataggio in LocalStorage: $e');
     }
@@ -631,6 +641,16 @@ class WalletProvider extends ChangeNotifier {
         frequenza: null,
         giornoRicorrenza: null,
       );
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
+  }
+
+  // 🙈 CANCELLA SOLO LA RATA DI UN MESE SPECIFICO (Senza toccare passato né futuri)
+  void skipPrediction(String parentId, DateTime meseRiferimento) {
+    final key = '${parentId}_${meseRiferimento.year}_${meseRiferimento.month}';
+    if (!_skippedPredictions.contains(key)) {
+      _skippedPredictions.add(key);
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
