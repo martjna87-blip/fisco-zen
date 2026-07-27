@@ -521,6 +521,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
+  // 🛡️ POPUP SPECIFICO PER I MESI FUTURI (LO STORICO PASSATO È SALVO!)
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
@@ -569,10 +570,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
+                    // 🛡️ Interrompe la ricorrenza per il futuro senza toccare il passato
                     context.read<WalletProvider>().stopRecurrence(parentId);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ricorrenza disdetta da questo mese in poi! Lo storico passato è salvo.'), backgroundColor: Color(0xFFEF4444)),
+                      const SnackBar(content: Text('Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.'), backgroundColor: Color(0xFFEF4444)),
                     );
                   },
                   child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
