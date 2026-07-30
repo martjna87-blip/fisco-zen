@@ -107,8 +107,16 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     } else {
       wallet.setPartitaIVA(true);
       
-      // Qui potrai passare tutte le nuove variabili (acconti, target, mesi) al Provider 
-      // tramite un futuro metodo es: wallet.salvaProfiloFiscale(...)
+      // 💾 SALVIAMO SU DISCO TUTTI I DATI INSERITI NEI 4 STEP:
+      wallet.salvaProfiloFiscale(
+        codiceAteco: codiceAtecoSelezionato ?? '74.10.21',
+        coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
+        aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
+        accontiVersati: double.tryParse(_accontiController.text) ?? 0.0,
+        nettoTarget: double.tryParse(_nettoTargetController.text) ?? 2000.0,
+        fatturatoStimato: double.tryParse(_fatturatoController.text) ?? 35000.0,
+        mesiAttivi: _mesiAttivi,
+      );
       
       Navigator.pushReplacement(
         context,

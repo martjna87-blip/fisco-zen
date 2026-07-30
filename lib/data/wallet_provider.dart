@@ -398,6 +398,12 @@ class WalletProvider extends ChangeNotifier {
       aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 100.0;
 
+      // 📥 Caricamento variabili fiscali dal Questionario
+      _codiceAteco = prefs.getString('codiceAteco') ?? '62.02.00';
+      _nettoTargetMensile = prefs.getDouble('nettoTargetMensile') ?? 2000.0;
+      _fatturatoStimatoAnnuo = prefs.getDouble('fatturatoStimatoAnnuo') ?? 35000.0;
+      _mesiAttiviIncasso = prefs.getInt('mesiAttiviIncasso') ?? 10;
+
       _spesoBisogni = prefs.getDouble('spesoBisogni') ?? 0.0;
       _spesoSvago = prefs.getDouble('spesoSvago') ?? 0.0;
       _spesoRisparmi = prefs.getDouble('spesoRisparmi') ?? 0.0;
@@ -449,6 +455,13 @@ class WalletProvider extends ChangeNotifier {
       await prefs.setDouble('aliquotaImposta', aliquotaImposta);
       await prefs.setDouble('aliquotaInps', aliquotaInps);
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
+
+      // 💾 Salvataggio variabili fiscali dal Questionario
+      await prefs.setBool('onboarding_completed', true);
+      await prefs.setString('codiceAteco', _codiceAteco);
+      await prefs.setDouble('nettoTargetMensile', _nettoTargetMensile);
+      await prefs.setDouble('fatturatoStimatoAnnuo', _fatturatoStimatoAnnuo);
+      await prefs.setInt('mesiAttiviIncasso', _mesiAttiviIncasso);
 
       await prefs.setDouble('spesoBisogni', _spesoBisogni);
       await prefs.setDouble('spesoSvago', _spesoSvago);
@@ -913,6 +926,31 @@ class WalletProvider extends ChangeNotifier {
 
   void toggleProUser() {
     _isProUser = !_isProUser;
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // 💾 SALVATAGGIO PROFILO FISCALE DAL WIZARD
+  // ===========================================================================
+  void salvaProfiloFiscale({
+    required String codiceAteco,
+    required double coeffRedditivitaVal,
+    required double aliquotaImpostaVal,
+    required double accontiVersati,
+    required double nettoTarget,
+    required double fatturatoStimato,
+    required int mesiAttivi,
+  }) {
+    _codiceAteco = codiceAteco;
+    _coefficienteRedditivita = coeffRedditivitaVal;
+    coeffRedditivita = coeffRedditivitaVal;
+    aliquotaImposta = aliquotaImpostaVal;
+    accontiVersatiAnnoPrecedente = accontiVersati;
+    _nettoTargetMensile = nettoTarget;
+    _fatturatoStimatoAnnuo = fatturatoStimato;
+    _mesiAttiviIncasso = mesiAttivi;
+
+    _salvaDatiInLocalStorage();
     notifyListeners();
   }
 }

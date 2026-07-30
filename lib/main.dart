@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'screens/1_setup_screen.dart';       // La vecchia schermata
-import 'screens/1_onboarding_wizard.dart';  // Il nuovo questionario
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/1_onboarding_wizard.dart';
+import 'screens/1_main_menu.dart';
 import 'data/wallet_provider.dart';
 
 void main() {
@@ -37,9 +39,60 @@ class FiscoZenApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF101012),
       ),
-      
-      // 👈 Avviamo la nuova schermata importata da 1_onboarding_wizard.dart
-      home: OnboardingWizard(), 
+      // 👈 Avviamo dallo smistatore intelligente
+      home: const SplashScreen(), 
+    );
+  }
+}
+
+// 🚦 SMISTATORE AUTOMATICO ALL'AVVIO
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboardingStatus();
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool isCompleted = prefs.getBool('onboarding_completed') ?? false;
+    final bool isPiva = prefs.getBool('isPartitaIVA') ?? true;
+
+    if (!mounted) return;
+
+    if (isCompleted) {
+      // ✅ Questionario completato: va direttamente alla Home
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MainMenu(hasPartitaIva: isPiva),
+        ),
+      );
+    } else {
+      // 🆕 Primo avvio: apre il Questionario
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const OnboardingWizard(),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF080B0C),
+      body: Center(
+        child: CircularProgressIndicator(color: Color(0xFF2DD4BF)),
+      ),
     );
   }
 }
