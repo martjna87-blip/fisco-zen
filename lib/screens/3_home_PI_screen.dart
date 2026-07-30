@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '1_onboarding_wizard.dart'; // 👈 Per aprire il questionario sul "Primo Avvio"
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -423,15 +424,71 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: SafeArea(
                     child: Row(
                       children: [
-                        IconButton(
-                          onPressed: () => _mostraConfermaResetGlobale(context, walletProvider),
-                          icon: const Icon(Icons.restart_alt_rounded, color: Color(0xFFEF4444), size: 20),
-                          tooltip: 'Reset Dati',
-                          style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xFFEF4444).withOpacity(0.12),
+                        // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE (CONSERVA IL PROFILO E LA HOME)
+                        InkWell(
+                          onTap: () async {
+                            await walletProvider.resetSoloMovimentieFatture();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Fatture e conti azzerati! Profilo ATECO conservato.'),
+                                duration: Duration(seconds: 2),
+                                backgroundColor: Color(0xFFEF4444),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withOpacity(0.20),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                            ),
+                            child: const Icon(Icons.refresh_rounded, color: Color(0xFFEF4444), size: 16),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO (TORNA AL QUESTIONARIO)
+                        InkWell(
+                          onTap: () async {
+                            await walletProvider.resetTuttiIDati();
+                            if (!context.mounted) return;
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const OnboardingWizard(),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withOpacity(0.20),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.restart_alt_rounded, color: Color(0xFFF59E0B), size: 13),
+                                SizedBox(width: 4),
+                                Text(
+                                  'PRIMO AVVIO',
+                                  style: TextStyle(
+                                    color: Color(0xFFF59E0B),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
+
                         // 👈 TASTINO TEST MODE FREE / PRO
                         InkWell(
                           onTap: () {

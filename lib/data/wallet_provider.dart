@@ -953,4 +953,28 @@ class WalletProvider extends ChangeNotifier {
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
-}
+
+  // ===========================================================================
+  // 🔄 RESET MORBIDO: AZZERA FATTURE E MOVIMENTI MA MANTIENE IL QUESTIONARIO
+  // ===========================================================================
+  Future<void> resetSoloMovimentieFatture() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    _accounts = [
+      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
+      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
+      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+    ];
+
+    _spesoBisogni = 0.00;
+    _spesoSvago = 0.00;
+    _spesoRisparmi = 0.00;
+    _fatturatoTotale = 0.00;
+    _transactions.clear();
+    _fattureDaIncassare.clear();
+    _fattureIncassate.clear();
+
+    await _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+} // 👈 Unica parentesi graffa finale del file
