@@ -4,14 +4,14 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '1_main_menu.dart';
 
-class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key});
+class OnboardingWizard extends StatefulWidget {
+  const OnboardingWizard({super.key});
 
   @override
-  State<SetupScreen> createState() => _SetupScreenState();
+  State<OnboardingWizard> createState() => _OnboardingWizardState();
 }
 
-class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStateMixin {
+class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerProviderStateMixin {
   // 🕹️ CONTROLLER DI NAVIGAZIONE
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -128,6 +128,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF080B0C),
+      resizeToAvoidBottomInset: false, // 👈 Impedisce alla tastiera di schiacciare lo schermo
       body: Stack(
         children: [
           // 🌊 SFONDO 3D FLUIDO (Mantenuto identico!)

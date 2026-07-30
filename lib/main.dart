@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-//import 'screens/1_setup_screen.dart';
-import 'screens/1_onboarding_wizard.dart'; // 👈 1. HO AGGIUNTO L'IMPORT QUI
+import 'screens/1_setup_screen.dart';       // La vecchia schermata
+import 'screens/1_onboarding_wizard.dart';  // Il nuovo questionario
 import 'data/wallet_provider.dart';
 
 void main() {
@@ -39,7 +39,7 @@ class FiscoZenApp extends StatelessWidget {
       ),
       
       // 👈 Avviamo la nuova schermata importata da 1_onboarding_wizard.dart
-      home: const OnboardingWizard(), 
+      home: OnboardingWizard(), 
     );
   }
 }
