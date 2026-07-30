@@ -94,6 +94,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B0C),
+      resizeToAvoidBottomInset: false, // 👈 AGGIUNTA QUESTA RIGA QUI
       body: Stack(
         children: [
           Positioned.fill(

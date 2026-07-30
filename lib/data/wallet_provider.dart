@@ -1,14 +1,13 @@
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html; 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 👈 LA NUOVA CASSAFORTE UNIVERSALE
 
 class AccountModel {
   final String id;
   String title; 
   final String subtitle;
   double amount;
-  double virtualTaxAmount; // 👈 NOVITÀ: Quota tasse accantonata su questo conto
+  double virtualTaxAmount;
   final Color color;
 
   AccountModel({
@@ -16,7 +15,7 @@ class AccountModel {
     required this.title,
     required this.subtitle,
     required this.amount,
-    this.virtualTaxAmount = 0.0, // Di default è 0
+    this.virtualTaxAmount = 0.0,
     required this.color,
   });
 
@@ -25,7 +24,7 @@ class AccountModel {
         'title': title,
         'subtitle': subtitle,
         'amount': amount,
-        'virtualTaxAmount': virtualTaxAmount, // 👈 Salvataggio in memoria
+        'virtualTaxAmount': virtualTaxAmount,
         'color': color.value,
       };
 
@@ -34,7 +33,7 @@ class AccountModel {
         title: json['title'] as String,
         subtitle: json['subtitle'] as String,
         amount: (json['amount'] as num).toDouble(),
-        virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0, // 👈 Se vecchi dati non lo hanno, mette 0
+        virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0,
         color: Color(json['color'] as int),
       );
 }
@@ -49,7 +48,6 @@ class TransactionModel {
   final DateTime date;
   final String? accountId; 
   
-  // 👈 NUOVI CAMPI PER LE SPESE RICORRENTI
   final bool isRecurrent; 
   final String? frequenza; 
   final String? giornoRicorrenza; 
@@ -63,7 +61,7 @@ class TransactionModel {
     required this.category,
     required this.date,
     this.accountId,
-    this.isRecurrent = false, // Di default un movimento è "normale"
+    this.isRecurrent = false,
     this.frequenza,
     this.giornoRicorrenza,
   });
@@ -106,7 +104,6 @@ class WalletProvider extends ChangeNotifier {
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
 
-  // 👈 STATO PER IL TEST PRO / FREE
   bool _isProUser = false;
   bool get isProUser => _isProUser;
 
@@ -115,25 +112,22 @@ class WalletProvider extends ChangeNotifier {
   // ===========================================================================
   String _codiceAteco = '62.02.00';
   double _coefficienteRedditivita = 0.78;
-  String _tipoCassa = 'gestioneSeparata'; // gestioneSeparata, commercianti, artigiani, cassaProfessionale
-  bool _isStartup = true; // true = 5%, false = 15%
+  String _tipoCassa = 'gestioneSeparata';
+  bool _isStartup = true;
   
-  // Dipendente & Part-Time
-  String _tipoLavoroDipendente = 'nessuno'; // nessuno, fullTime, partTimeSuperiore50, partTimeInferiore50
+  String _tipoLavoroDipendente = 'nessuno';
   bool _ralSupera30k = false;
-  bool _scontoInps35 = false; // Solo Commercianti/Artigiani
+  bool _scontoInps35 = false;
 
-  // Storico & Deducibilità
   bool _isPrimoAnnoAssoluto = false;
   double _accontoImpostaVersato = 0.0;
   double _accontoInpsVersato = 0.0;
-  double _contributiInpsPagatiAnnoCorrente = 0.0; // Deducibile dal fatturato lordo x coef
+  double _contributiInpsPagatiAnnoCorrente = 0.0;
 
-  // Target & Stagionalità
   double _nettoTargetMensile = 2000.0;
   double _speseFisseMensili = 800.0;
   double _fatturatoStimatoAnnuo = 35000.0;
-  int _mesiAttiviIncasso = 10; // es. 10 mesi su 12
+  int _mesiAttiviIncasso = 10;
 
 // ===========================================================================
   // 🎯 MOTORE DI CALCOLO: VERDETTO FISCALE & STRATEGICO
@@ -147,54 +141,38 @@ class WalletProvider extends ChangeNotifier {
     final nettoTargetMese = nettoTargetCustom ?? _nettoTargetMensile;
     final mesiAttivi = mesiAttiviCustom ?? _mesiAttiviIncasso;
 
-    // 1. Calcolo Imponibile Lordo ATECO
     final imponibileLordo = fatturato * _coefficienteRedditivita;
-
-    // 2. Deduzione Contributi INPS versati nell'anno solare
     final imponibileNettoTasse = (imponibileLordo - _contributiInpsPagatiAnnoCorrente).clamp(0.0, double.infinity);
 
-    // 3. Calcolo INPS Annuo in base alla Cassa e al Lavoro Dipendente
     double stimaInpsAnnuo = 0.0;
     
     if (_tipoCassa == 'gestioneSeparata') {
-      // Se ha lavoro dipendente (Full o Part-time qualsiasi %) -> Aliquota ridotta 24%
       final aliquotaInps = (_tipoLavoroDipendente != 'nessuno') ? 0.24 : 0.2607;
       stimaInpsAnnuo = imponibileLordo * aliquotaInps;
     } else if (_tipoCassa == 'commercianti' || _tipoCassa == 'artigiani') {
-      // Se Dipendente Full-Time o Part-Time > 50% -> ESENZIONE TOTALE CONTRIBUTI FISSI!
       final isEsenzioneFissi = (_tipoLavoroDipendente == 'fullTime' || _tipoLavoroDipendente == 'partTimeSuperiore50');
       
       if (isEsenzioneFissi) {
-        stimaInpsAnnuo = 0.0; // Nessun fisso dovuto!
+        stimaInpsAnnuo = 0.0; 
       } else {
-        // Contributi Fissi INPS (~4.200 € / anno base)
         double fissoBase = 4200.0;
-        if (_scontoInps35) fissoBase *= 0.65; // Sconto 35% per commercianti/artigiani
+        if (_scontoInps35) fissoBase *= 0.65;
         stimaInpsAnnuo = fissoBase;
       }
     } else {
-      // Casse Professionali (Inarcassa, ENPAP, Forense...) ~ media 15% o minimo cassa
       stimaInpsAnnuo = imponibileLordo * 0.15;
     }
 
-    // 4. Calcolo Imposta Sostitutiva (5% o 15%)
     final aliquotaImposta = _isStartup ? 0.05 : 0.15;
     final stimaImpostaAnnuo = imponibileNettoTasse * aliquotaImposta;
-
-    // 5. Totale Uscite Fiscali Annue
     final totaleTasseAnnuo = stimaInpsAnnuo + stimaImpostaAnnuo;
-
-    // 6. Netto Reale Annuo e Mensile "Lissato" su 12 Mesi
     final nettoRealeAnnuo = fatturato - totaleTasseAnnuo;
     final stipendioMensile12Mesi = nettoRealeAnnuo / 12;
-
-    // 7. Stagionalità & Accantonamento Mesi Zero
     final mesiPausa = 12 - mesiAttivi;
     final quotaMesiZeroMensile = (mesiPausa > 0) 
         ? (stipendioMensile12Mesi * mesiPausa) / mesiAttivi 
         : 0.0;
 
-    // 8. Trattenuta % Consigliata per ogni singola fattura incassata
     final percentualeTrattenutaTasseFattura = fatturato > 0 
         ? (totaleTasseAnnuo / fatturato) * 100 
         : 0.0;
@@ -203,7 +181,6 @@ class WalletProvider extends ChangeNotifier {
         ? ((stipendioMensile12Mesi * mesiPausa) / fatturato) * 100
         : 0.0;
 
-    // 9. Verdetto Semaforo Sostenibilità
     String semaforo = 'VERDE'; 
     String motivazione = '';
 
@@ -218,7 +195,6 @@ class WalletProvider extends ChangeNotifier {
       motivazione = 'Il fatturato stimato non è sufficiente per garantire il tuo netto desiderato.';
     }
 
-    // 10. Ingegneria Inversa: Quanto dovresti fatturare per il target?
     final pressioneFiscalePercentuale = fatturato > 0 ? (totaleTasseAnnuo / fatturato) : 0.25;
     final fatturatoLordoNecessarioForTarget = (nettoTargetMese * 12) / (1 - pressioneFiscalePercentuale);
 
@@ -245,24 +221,21 @@ class WalletProvider extends ChangeNotifier {
   // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
   // ==========================================
   bool isPartitaIVA = true; 
-  double accontiVersatiAnnoPrecedente = 100.0; // 👈 Credito tasse dell'anno scorso
+  double accontiVersatiAnnoPrecedente = 100.0; 
   
-  // Parametri Fiscali (Regime Forfettario Ateco)
-  double coeffRedditivita = 0.78; // Ateco 78%
-  double aliquotaImposta = 0.05;  // Imposta Sostitutiva 5%
-  double aliquotaInps = 0.2607;   // INPS Gestione Separata 26.07%
+  double coeffRedditivita = 0.78; 
+  double aliquotaImposta = 0.05;  
+  double aliquotaInps = 0.2607;   
 
-  // 🎯 CALCOLO PRECISO DELL'ALIQUOTA FISCALE REALE (Totalizza 44.402%)
   double get aliquotaFiscaleReale {
-    final imponibile = coeffRedditivita;                 // 0.78 su 1€
-    final saldoInps = imponibile * aliquotaInps;         // ~20.335%
-    final saldoImposta = imponibile * aliquotaImposta;   // ~3.900%
-    final accontoInps = saldoInps * 0.80;                // ~16.268%
-    final accontoImposta = saldoImposta * 1.00;          // ~3.900%
+    final imponibile = coeffRedditivita;                 
+    final saldoInps = imponibile * aliquotaInps;         
+    final saldoImposta = imponibile * aliquotaImposta;   
+    final accontoInps = saldoInps * 0.80;                
+    final accontoImposta = saldoImposta * 1.00;          
     return saldoInps + saldoImposta + accontoInps + accontoImposta;
   }
 
-  // 🔄 Cambia profilo (P.IVA vs Dipendente) e aggiorna subito l'interfaccia
   void setPartitaIVA(bool value) {
     isPartitaIVA = value;
     _salvaDatiInLocalStorage();
@@ -273,19 +246,14 @@ class WalletProvider extends ChangeNotifier {
   // 📊 MATEMATICA E STATISTICHE GLOBALI
   // ==========================================
 
-  // 1. Saldo Reale in Banca (La somma dei conti reali)
   double get patrimonioNetto => _accounts.fold(0.0, (sum, item) => sum + item.amount);
-
-  // 2. Fondo Tasse Lordo (Tutte le tasse generate dagli incassi)
   double get _tasseLordeAccantonate => _accounts.fold(0.0, (sum, item) => sum + item.virtualTaxAmount);
 
-  // 3. FONDO TASSE DA VERSARE (Tiene conto dell'Acconto!)
   double get fondoTasseDaVersare {
     double fondo = _tasseLordeAccantonate - accontiVersatiAnnoPrecedente;
-    return fondo > 0 ? fondo : 0.0; // Non scende mai sotto zero
+    return fondo > 0 ? fondo : 0.0; 
   }
 
-  // 4. NETTO SPENDIBILE 🟢 (Il vero potere d'acquisto)
   double get nettoSpendibile => patrimonioNetto - fondoTasseDaVersare;
 
   double _spesoBisogni = 0.00;
@@ -300,14 +268,12 @@ class WalletProvider extends ChangeNotifier {
   double _fatturatoTotale = 0.00;
   double get fatturatoTotale => _fatturatoTotale;
 
-  // Stima Globale collegata alla matematica Ateco esatta!
   double get stimaTasseAccantonate => _fatturatoTotale * aliquotaFiscaleReale;
   double get nettoPiva => _fatturatoTotale - stimaTasseAccantonate;
 
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
-  // Helper per convertire il giorno testuale in numero
   int _stringToWeekday(String day) {
     switch (day) {
       case 'Lunedì': return 1;
@@ -321,15 +287,12 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 🔮 MOTORE PREVISIONI INTELLIGENTE (Mensile + Settimanale Aggregata)
   List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
     final oggi = DateTime.now();
-
     final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
     for (var tx in ricorrenti) {
-      // 📅 CASO A: OGNI MESE
       if (tx.frequenza == 'Ogni mese' && tx.giornoRicorrenza != null) {
         int giornoPrevisto = int.tryParse(tx.giornoRicorrenza!) ?? 1;
         DateTime dataVirtuale;
@@ -355,9 +318,7 @@ class WalletProvider extends ChangeNotifier {
           ));
         }
       }
-      // 📆 CASO B: OGNI SETTIMANA (AGGREGATA)
       else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
-        // 👈 CONTROLLO SKIP SULL'INTERO MESE SETTIMANALE
         final keySettimanale = '${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}';
         if (_skippedPredictions.contains(keySettimanale)) continue;
 
@@ -408,9 +369,7 @@ class WalletProvider extends ChangeNotifier {
     _caricaDatiDaLocalStorage();
   }
 
-  // 🗑️ 1. ELIMINA UN CONTO
   void deleteAccount(String accountId) {
-    // Blocco di sicurezza: deve esserci sempre almeno 1 conto attivo
     if (_accounts.length <= 1) {
       throw Exception('Impossibile eliminare: deve esserci almeno un conto attivo.');
     }
@@ -419,7 +378,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✏️ 2. MODIFICA IMPORTO / SALDO DEL CONTO
   void updateAccountAmount(String accountId, double newAmount) {
     final idx = _accounts.indexWhere((a) => a.id == accountId);
     if (idx != -1) {
@@ -429,76 +387,81 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
-  // 📥 LETTURA ISTANTANEA DA LOCALSTORAGE
-  void _caricaDatiDaLocalStorage() {
+  // 📥 LETTURA ISTANTANEA DA SHAREDPREFERENCES (NUOVO METODO)
+  Future<void> _caricaDatiDaLocalStorage() async {
     try {
-      final storage = html.window.localStorage;
+      final prefs = await SharedPreferences.getInstance();
 
-      // 👈 Caricamento Preferenze e Parametri Fiscali (Default 'true')
-      isPartitaIVA = (storage['isPartitaIVA'] ?? 'true') == 'true';
-      coeffRedditivita = double.tryParse(storage['coeffRedditivita'] ?? '') ?? 0.78;
-      aliquotaImposta = double.tryParse(storage['aliquotaImposta'] ?? '') ?? 0.05;
-      aliquotaInps = double.tryParse(storage['aliquotaInps'] ?? '') ?? 0.2607;
-      accontiVersatiAnnoPrecedente = double.tryParse(storage['accontiVersatiAnnoPrecedente'] ?? '') ?? 100.0;
+      isPartitaIVA = prefs.getBool('isPartitaIVA') ?? true;
+      coeffRedditivita = prefs.getDouble('coeffRedditivita') ?? 0.78;
+      aliquotaImposta = prefs.getDouble('aliquotaImposta') ?? 0.05;
+      aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
+      accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 100.0;
 
-      _spesoBisogni = double.tryParse(storage['spesoBisogni'] ?? '') ?? 0.0;
-      _spesoSvago = double.tryParse(storage['spesoSvago'] ?? '') ?? 0.0;
-      _spesoRisparmi = double.tryParse(storage['spesoRisparmi'] ?? '') ?? 0.0;
-      _fatturatoTotale = double.tryParse(storage['fatturatoTotale'] ?? '') ?? 0.0;
+      _spesoBisogni = prefs.getDouble('spesoBisogni') ?? 0.0;
+      _spesoSvago = prefs.getDouble('spesoSvago') ?? 0.0;
+      _spesoRisparmi = prefs.getDouble('spesoRisparmi') ?? 0.0;
+      _fatturatoTotale = prefs.getDouble('fatturatoTotale') ?? 0.0;
 
-      if (storage.containsKey('accounts')) {
-        final List decoded = jsonDecode(storage['accounts']!);
+      final accountsStr = prefs.getString('accounts');
+      if (accountsStr != null) {
+        final List decoded = jsonDecode(accountsStr);
         _accounts = decoded.map((a) => AccountModel.fromJson(Map<String, dynamic>.from(a))).toList();
       }
 
-      if (storage.containsKey('transactions')) {
-        final List decoded = jsonDecode(storage['transactions']!);
+      final transactionsStr = prefs.getString('transactions');
+      if (transactionsStr != null) {
+        final List decoded = jsonDecode(transactionsStr);
         _transactions = decoded.map((t) => TransactionModel.fromJson(Map<String, dynamic>.from(t))).toList();
       }
 
-      if (storage.containsKey('fattureDaIncassare')) {
-        final List decoded = jsonDecode(storage['fattureDaIncassare']!);
+      final fattureDaIncassareStr = prefs.getString('fattureDaIncassare');
+      if (fattureDaIncassareStr != null) {
+        final List decoded = jsonDecode(fattureDaIncassareStr);
         _fattureDaIncassare = decoded.map((f) => Map<String, dynamic>.from(f)).toList();
       }
 
-      if (storage.containsKey('fattureIncassate')) {
-        final List decoded = jsonDecode(storage['fattureIncassate']!);
+      final fattureIncassateStr = prefs.getString('fattureIncassate');
+      if (fattureIncassateStr != null) {
+        final List decoded = jsonDecode(fattureIncassateStr);
         _fattureIncassate = decoded.map((f) => Map<String, dynamic>.from(f)).toList();
       }
 
-      if (storage.containsKey('skippedPredictions')) {
-        final List decoded = jsonDecode(storage['skippedPredictions']!);
+      final skippedPredictionsStr = prefs.getString('skippedPredictions');
+      if (skippedPredictionsStr != null) {
+        final List decoded = jsonDecode(skippedPredictionsStr);
         _skippedPredictions = decoded.map((s) => s.toString()).toList();
       }
+
+      notifyListeners(); // 👈 Aggiorna l'UI appena i dati sono caricati
     } catch (e) {
-      debugPrint('Errore durante la lettura da LocalStorage: $e');
+      debugPrint('Errore durante la lettura: $e');
     }
   }
 
-  // 💾 SALVATAGGIO IN LOCALSTORAGE
-  void _salvaDatiInLocalStorage() {
+  // 💾 SALVATAGGIO IN SHAREDPREFERENCES (NUOVO METODO)
+  Future<void> _salvaDatiInLocalStorage() async {
     try {
-      final storage = html.window.localStorage;
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.setBool('isPartitaIVA', isPartitaIVA);
+      await prefs.setDouble('coeffRedditivita', coeffRedditivita);
+      await prefs.setDouble('aliquotaImposta', aliquotaImposta);
+      await prefs.setDouble('aliquotaInps', aliquotaInps);
+      await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
 
-      // 👈 Salva lo stato P.IVA, parametri fiscali e acconti
-      storage['isPartitaIVA'] = isPartitaIVA.toString();
-      storage['coeffRedditivita'] = coeffRedditivita.toString();
-      storage['aliquotaImposta'] = aliquotaImposta.toString();
-      storage['aliquotaInps'] = aliquotaInps.toString();
-      storage['accontiVersatiAnnoPrecedente'] = accontiVersatiAnnoPrecedente.toString();
+      await prefs.setDouble('spesoBisogni', _spesoBisogni);
+      await prefs.setDouble('spesoSvago', _spesoSvago);
+      await prefs.setDouble('spesoRisparmi', _spesoRisparmi);
+      await prefs.setDouble('fatturatoTotale', _fatturatoTotale);
 
-      storage['spesoBisogni'] = _spesoBisogni.toString();
-      storage['spesoSvago'] = _spesoSvago.toString();
-      storage['spesoRisparmi'] = _spesoRisparmi.toString();
-      storage['fatturatoTotale'] = _fatturatoTotale.toString();
-
-      storage['accounts'] = jsonEncode(_accounts.map((a) => a.toJson()).toList());
-      storage['transactions'] = jsonEncode(_transactions.map((t) => t.toJson()).toList());
-      storage['fattureDaIncassare'] = jsonEncode(_fattureDaIncassare);
-      storage['fattureIncassate'] = jsonEncode(_fattureIncassate);
-      storage['skippedPredictions'] = jsonEncode(_skippedPredictions);
+      await prefs.setString('accounts', jsonEncode(_accounts.map((a) => a.toJson()).toList()));
+      await prefs.setString('transactions', jsonEncode(_transactions.map((t) => t.toJson()).toList()));
+      await prefs.setString('fattureDaIncassare', jsonEncode(_fattureDaIncassare));
+      await prefs.setString('fattureIncassate', jsonEncode(_fattureIncassate));
+      await prefs.setString('skippedPredictions', jsonEncode(_skippedPredictions));
     } catch (e) {
-      debugPrint('Errore durante il salvataggio in LocalStorage: $e');
+      debugPrint('Errore durante il salvataggio: $e');
     }
   }
 
@@ -509,19 +472,17 @@ class WalletProvider extends ChangeNotifier {
     required String category,
     String? accountId,
     DateTime? date,
-    bool isRecurrent = false, // 👈 NUOVO PARAMENTRO
-    String? frequenza,        // 👈 NUOVO PARAMENTRO
-    String? giornoRicorrenza, // 👈 NUOVO PARAMENTRO
+    bool isRecurrent = false, 
+    String? frequenza,        
+    String? giornoRicorrenza, 
   }) {
     final DateTime dataUso = date ?? DateTime.now();
 
-    // 1. Trova il conto di destinazione
     final targetAccount = _accounts.firstWhere(
       (acc) => acc.id == (accountId ?? '1'),
       orElse: () => _accounts.first,
     );
 
-    // 2. Crea la transazione salvando l'ID del conto e i dati ricorrenti
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -538,11 +499,9 @@ class WalletProvider extends ChangeNotifier {
 
     _transactions.insert(0, newTx);
 
-    // 3. Aggiorna i saldi e le statistiche
     if (isIncome) {
       targetAccount.amount += amount;
       
-      // 🎯 CALCOLO TASSE ATECO: Applica l'aliquota reale SOLO se è un incasso P.IVA
       if (category == 'P.IVA') {
         targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
       }
@@ -558,7 +517,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🚀 REGISTRA FATTURA DA INCASSARE
   void addFatturaPiva({
     required String cliente,
     required double importo,
@@ -581,7 +539,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🚀 INCASSA FATTURA (CON GESTIONE DATA E TITOLO DETTAGLIATO)
   void incassaFatturaPiva({
     String? idFattura,
     required String cliente,
@@ -597,7 +554,6 @@ class WalletProvider extends ChangeNotifier {
 
     final String dataFinale = dataIncasso ?? 'Oggi';
 
-    // Conversione della stringa data in oggetto DateTime per la transazione
     DateTime dataObj = DateTime.now();
     if (dataIncasso != null) {
       try {
@@ -624,12 +580,10 @@ class WalletProvider extends ChangeNotifier {
         final f = _fattureDaIncassare.removeAt(idx);
         numeroFattura = f['numero']?.toString() ?? ''; 
         
-        // 👈 ESTRAZIONE DATA SUPER-BLINDATA (Legge format italiani: 25/07, 25 Luglio, o ISO)
         if (f['data'] != null) {
           String rawData = f['data'].toString();
           bool parsed = false;
 
-          // 1. Formato testuale "25 Luglio 2026"
           final mesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
           for (int i = 0; i < mesi.length; i++) {
             if (rawData.contains(mesi[i])) {
@@ -642,7 +596,6 @@ class WalletProvider extends ChangeNotifier {
             }
           }
 
-          // 2. Formato con slash "25/07/2026"
           if (!parsed && rawData.contains('/')) {
             final parts = rawData.split('/');
             if (parts.length >= 2) {
@@ -651,7 +604,6 @@ class WalletProvider extends ChangeNotifier {
             }
           }
 
-          // 3. Formato Standard ISO "2026-07-25"
           if (!parsed) {
             try {
               final dt = DateTime.parse(rawData);
@@ -660,7 +612,6 @@ class WalletProvider extends ChangeNotifier {
             } catch (_) {}
           }
 
-          // Fallback di emergenza
           if (!parsed) {
             dataEmissioneFormattata = rawData.length > 5 ? rawData.substring(0, 5) : rawData;
           }
@@ -677,13 +628,11 @@ class WalletProvider extends ChangeNotifier {
 
     _fatturatoTotale += importoLordo;
 
-    // 👈 TITOLO DEFINITIVO
     final String suffissoData = dataEmissioneFormattata.isNotEmpty ? ' (del $dataEmissioneFormattata)' : '';
     final String titoloTransazione = numeroFattura.isNotEmpty 
         ? 'Fattura n.$numeroFattura$suffissoData - $cliente' 
         : 'Incasso: $cliente';
 
-    // Registra l'entrata nel Wallet con il nuovo titolo dettagliato
     addTransaction(
       title: titoloTransazione,
       amount: importoLordo,
@@ -697,9 +646,7 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🗑️ ELIMINA FATTURA E STORNA IL FATTURATO / WALLET
   void eliminaFatturaPiva(String idFattura) {
-    // 1. Controlla se la fattura era tra quelle già incassate
     final int idxIncassata = _fattureIncassate.indexWhere((f) => f['id'] == idFattura);
 
     if (idxIncassata != -1) {
@@ -708,10 +655,8 @@ class WalletProvider extends ChangeNotifier {
       final String cliente = fattura['cliente'] as String? ?? '';
       final String? contoAccredito = fattura['contoAccredito'] as String?;
 
-      // Storna il fatturato totale (aggiorna la Stima Tasse)
       _fatturatoTotale = (_fatturatoTotale - importoLordo).clamp(0.0, double.infinity);
 
-      // Storna il saldo dal conto del Wallet se presente
       if (contoAccredito != null) {
         final targetAccount = _accounts.firstWhere(
           (acc) => acc.title.contains(contoAccredito) || contoAccredito.contains(acc.title),
@@ -720,10 +665,8 @@ class WalletProvider extends ChangeNotifier {
         targetAccount.amount = (targetAccount.amount - importoLordo).clamp(0.0, double.infinity);
       }
 
-      // Rimuovi le transazioni associate dall'elenco del wallet
       _transactions.removeWhere((t) => t.title.contains(cliente));
     } else {
-      // Se era ancora da incassare, la rimuove solo dalle sospese
       _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
     }
 
@@ -731,7 +674,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🗑️ ELIMINA TRANSAZIONE MANUALE (Elimina sia la spesa che i futuri)
   void deleteTransaction(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
@@ -752,7 +694,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 🛑 OPZIONE A: MANTIENI LA SPESA ATTUALE, MA FERMA I FUTURI
   void stopRecurrence(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
@@ -766,7 +707,7 @@ class WalletProvider extends ChangeNotifier {
         category: tx.category,
         date: tx.date,
         accountId: tx.accountId,
-        isRecurrent: false, // Disattiva la ricorrenza
+        isRecurrent: false, 
         frequenza: null,
         giornoRicorrenza: null,
       );
@@ -775,7 +716,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 🙈 CANCELLA SOLO LA RATA DI UN MESE SPECIFICO (Senza toccare passato né futuri)
   void skipPrediction(String parentId, DateTime meseRiferimento) {
     final key = '${parentId}_${meseRiferimento.year}_${meseRiferimento.month}';
     if (!_skippedPredictions.contains(key)) {
@@ -785,14 +725,12 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 👻 OPZIONE B: ELIMINA LA SPESA ATTUALE, MA MANTIENI I FUTURI (Regola Fantasma)
   void deleteButKeepRecurrence(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
       final tx = _transactions[idx];
       final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? '1'), orElse: () => _accounts.first);
 
-      // 1. Storna il saldo dal conto
       if (tx.isIncome) {
         targetAccount.amount -= tx.amount;
       } else {
@@ -802,7 +740,6 @@ class WalletProvider extends ChangeNotifier {
         if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
       }
 
-      // 2. Converti in "Regola Fantasma"
       _transactions[idx] = TransactionModel(
         id: 'rule_${tx.id}',
         title: tx.title,
@@ -822,7 +759,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // ➕ METODO PER AGGIUNGERE UN NUOVO CONTO (CORRETTO)
   void addAccount({
     required String title,
     required String subtitle,
@@ -839,19 +775,14 @@ class WalletProvider extends ChangeNotifier {
       color: color,
     );
 
-    // 1. Usa la lista privata _accounts (che è modificabile)
     _accounts.add(newAccount);
-
-    // 2. Salva il nuovo conto nel LocalStorage
     _salvaDatiInLocalStorage();
-
-    // 3. Aggiorna l'interfaccia
     notifyListeners();
   }
 
-  // 🔄 RESET GLOBALE
-  void resetTuttiIDati() {
-    html.window.localStorage.clear();
+  Future<void> resetTuttiIDati() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // 👈 Cancella la memoria
 
     _accounts = [
       AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
@@ -859,7 +790,7 @@ class WalletProvider extends ChangeNotifier {
       AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
     ];
 
-    isPartitaIVA = true; // 👈 Mantiene attivo il profilo P.IVA anche dopo il reset
+    isPartitaIVA = true; 
     _spesoBisogni = 0.00;
     _spesoSvago = 0.00;
     _spesoRisparmi = 0.00;
@@ -871,7 +802,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-    // ✏️ MODIFICA NOME E SALDO CONTO
   void updateAccountDetails({
     required String accountId,
     required String newTitle,
@@ -886,21 +816,17 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-    // 🔀 RIORDINA LA LISTA DEI CONTI
   void reorderAccounts(int oldIndex, int newIndex) {
     if (oldIndex < newIndex) {
-      newIndex -= 1; // Aggiustamento indice richiesto da Flutter quando si sposta verso il basso
+      newIndex -= 1; 
     }
     final AccountModel item = _accounts.removeAt(oldIndex);
     _accounts.insert(newIndex, item);
 
-    _salvaDatiInLocalStorage(); // Salva il nuovo ordine nella memoria
+    _salvaDatiInLocalStorage(); 
     notifyListeners();
   }
 
-    // ==========================================
-  // 💸 PAGAMENTO F24 (Caso B & Delta)
-  // ==========================================
   void pagaF24({
     required String accountId,
     required double importoF24,
@@ -908,10 +834,8 @@ class WalletProvider extends ChangeNotifier {
   }) {
     final targetAccount = _accounts.firstWhere((acc) => acc.id == accountId);
 
-    // 1. Scala i soldi veri dal conto (La banca scende)
     targetAccount.amount -= importoF24;
 
-    // 2. Registra il movimento come uscita per non far sballare lo storico
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: 'Pagamento F24 / Tasse',
@@ -924,10 +848,8 @@ class WalletProvider extends ChangeNotifier {
     );
     _transactions.insert(0, newTx);
 
-    // 3. 🎯 GESTIONE DEL "SECCHIO TASSE" GLOBALE (Scala il debito)
     double remainingToDeduct = importoF24;
 
-    // Prima svuota le tasse virtuali dal conto che ha pagato
     if (targetAccount.virtualTaxAmount >= remainingToDeduct) {
       targetAccount.virtualTaxAmount -= remainingToDeduct;
       remainingToDeduct = 0;
@@ -935,7 +857,6 @@ class WalletProvider extends ChangeNotifier {
       remainingToDeduct -= targetAccount.virtualTaxAmount;
       targetAccount.virtualTaxAmount = 0;
 
-      // Se l'F24 era più alto, preleva la tassa virtuale dagli altri conti
       for (var acc in _accounts) {
         if (remainingToDeduct <= 0) break;
         if (acc.virtualTaxAmount >= remainingToDeduct) {
@@ -952,10 +873,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-
-  // ==========================================
-  // 🔄 GIROCONTO INTELLIGENTE (Con Gestione Cuscinetto Extra)
-  // ==========================================
   void eseguiGiroconto({
     required String daAccountId,
     required String aAccountId,
@@ -965,23 +882,18 @@ class WalletProvider extends ChangeNotifier {
     final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
     final accA = _accounts.firstWhere((a) => a.id == aAccountId);
 
-    // Controlli di sicurezza di base
     if (importo <= 0 || accDa.amount < importo) return;
 
-    // 1. GESTIONE DEL VINCOLO FISCALE
     if (isAccantonamentoTasse) {
-      // Trasferiamo la quota tasse fino al massimo disponibile sul conto di partenza
       double tasseDaSpostare = importo;
       if (tasseDaSpostare > accDa.virtualTaxAmount) {
-        tasseDaSpostare = accDa.virtualTaxAmount; // Se si sposta di più, sposta tutte le tasse disponibili
+        tasseDaSpostare = accDa.virtualTaxAmount; 
       }
 
       accDa.virtualTaxAmount -= tasseDaSpostare;
       accA.virtualTaxAmount += tasseDaSpostare;
-      // L'eccedenza di 'importo' rimarrà sul conto di destinazione come saldo reale puro (Cuscinetto)
     }
 
-    // 2. REGISTRAZIONE MOVIMENTO FISICO & STORICO
     addTransaction(
       title: isAccantonamentoTasse ? 'Accantonamento Tasse 🛡️' : 'Giroconto verso ${accA.title}',
       amount: importo,
@@ -999,7 +911,6 @@ class WalletProvider extends ChangeNotifier {
     );
   }
 
-  // 👈 FUNZIONE PER CAMBIARE STATO PRO/FREE AL TAP
   void toggleProUser() {
     _isProUser = !_isProUser;
     notifyListeners();

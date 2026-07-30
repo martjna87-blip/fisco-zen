@@ -38,9 +38,8 @@ class FiscoZenApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF101012),
       ),
       
-      // 👈 2. HO NASCOSTO LA VECCHIA HOME E INSERITO QUELLA NUOVA DA TESTARE
-      // home: const SetupScreen(), 
-      home: const SetupScreen(), // 👈 Usa SetupScreen invece di OnboardingWizard
+      // 👈 Avviamo la nuova schermata importata da 1_onboarding_wizard.dart
+      home: const OnboardingWizard(), 
     );
   }
 }
