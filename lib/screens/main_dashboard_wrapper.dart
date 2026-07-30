@@ -88,6 +88,12 @@ class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(2, (index) {
                   final bool isSelected = _currentPage == index;
+                  
+                  // 🎨 Colore dinamico: Verde Acqua (0) per P.IVA, Viola Ametista (1) per il Wallet
+                  final Color activeColor = (_currentPage == 0) 
+                      ? const Color(0xFF2DD4BF) 
+                      : const Color(0xFFA855F7);
+
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -95,7 +101,7 @@ class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
                     // Il pallino attivo diventa una "pillola" allungata, quello inattivo resta tondo
                     width: isSelected ? 24 : 8, 
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.2),
+                      color: isSelected ? activeColor : Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   );
