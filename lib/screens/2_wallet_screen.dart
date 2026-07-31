@@ -45,12 +45,18 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
-    final double tasseTotaliCalcolate = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    final double tasseScoperte = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
+    // 🎯 Tasse rimaste sul Conto Principale da spostare nel Salvadanaio
+    final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+
+    // 🎯 Totale Tasse Dovute = Già in Salvadanaio + Ancora da accantonare
+    final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
+
+    // 🎯 Quanto manca per il 100% è esattamente l'importo rimasto sul conto!
+    final double tasseScoperte = tasseDaAccantonare;
     final double importoMancanteReale = tasseScoperte > 0.01 ? tasseScoperte : 0.0;
 
     final TextEditingController importoController = TextEditingController(
@@ -228,12 +234,14 @@ class _WalletScreenState extends State<WalletScreen> {
     final spesoRisparmi = walletProvider.spesoRisparmi;
     final movimenti = walletProvider.transactions;
     
-    final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double riservaGiaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
-    final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
+    final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
+
+    final double residuoTasseDaCoprire = tasseDaAccantonare;
     final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;

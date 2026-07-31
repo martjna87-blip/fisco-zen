@@ -721,13 +721,26 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
 
-    // 🎯 La schermata obbedisce a quello che gli ordina la Home (widget.isPiva).
+    // La schermata obbedisce a quello che gli ordina la Home (widget.isPiva).
     // Se riceve 'false' (Dipendente), spegne tutto istantaneamente.
     final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
-    // 👈 NUOVO CALCOLO PRUDENZIALE: Somma le tasse lorde di tutti i conti ignorando l'acconto
-    final double totaleTasseLorde = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    final double nettoReale = saldoTotale - totaleTasseLorde;
+    // 🎯 1. Somma di tutti i conti AD ECCEZIONE del Salvadanaio Tasse
+    final double sommaContiLiquidi = accounts
+        .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+
+    // 🎯 2. Tasse ancora in sospeso da spostare dal Conto Principale
+    final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+
+    // 🎯 3. NETTO SPENDIBILE: Liquidità reale dei conti meno le tasse ancora in sospeso
+    final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+
+    // 🎯 4. TOTALE TASSE DOVUTE: Riserva già in Salvadanaio + Tasse in sospeso sul conto
+    final double riservaSalvadanaio = accounts
+        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+    final double totaleTasseLorde = tasseDaAccantonare + riservaSalvadanaio;
 
     return Dialog(
       backgroundColor: Colors.transparent,

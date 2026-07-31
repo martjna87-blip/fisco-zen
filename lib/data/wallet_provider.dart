@@ -655,6 +655,26 @@ class WalletProvider extends ChangeNotifier {
       date: dataObj,
     );
 
+    // 🎯 1. Rimuove la stima generica aggiunta in automatico da addTransaction
+    targetAccount.virtualTaxAmount = (targetAccount.virtualTaxAmount - (importoLordo * aliquotaFiscaleReale)).clamp(0.0, double.infinity);
+
+    // 🎯 2. Calcola le tasse reali della fattura
+    final double tasseFattura = importoTasse > 0 ? importoTasse : (importoLordo * aliquotaFiscaleReale);
+
+    // 🛡️ 3. Calcola il "cuscinetto libero" già presente nel Salvadanaio prima di questa fattura
+    final double riservaSalvadanaio = _accounts
+        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+
+    final double totaleTasseFatturePrecedenti = _fattureIncassate
+        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0)) - tasseFattura;
+
+    final double cuscinettoLibero = (riservaSalvadanaio - totaleTasseFatturePrecedenti).clamp(0.0, double.infinity);
+
+    // 🟢 4. Assegna al Conto Principale solo la quota tasse NON ancora coperta dal Salvadanaio
+    final double tasseDaAssegnare = (tasseFattura - cuscinettoLibero).clamp(0.0, double.infinity);
+    targetAccount.virtualTaxAmount += tasseDaAssegnare;
+
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -898,13 +918,7 @@ class WalletProvider extends ChangeNotifier {
     if (importo <= 0 || accDa.amount < importo) return;
 
     if (isAccantonamentoTasse) {
-      double tasseDaSpostare = importo;
-      if (tasseDaSpostare > accDa.virtualTaxAmount) {
-        tasseDaSpostare = accDa.virtualTaxAmount; 
-      }
-
-      accDa.virtualTaxAmount -= tasseDaSpostare;
-      accA.virtualTaxAmount += tasseDaSpostare;
+      accDa.virtualTaxAmount = (accDa.virtualTaxAmount - importo).clamp(0.0, double.infinity);
     }
 
     addTransaction(
@@ -977,4 +991,4 @@ class WalletProvider extends ChangeNotifier {
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }
-} // 👈 Unica parentesi graffa finale del file
+}
