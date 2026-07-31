@@ -181,6 +181,15 @@ class _WalletScreenState extends State<WalletScreen> {
               ElevatedButton(
                 onPressed: () {
                   if (importoInserito > 0) {
+                    if (contoConTasse.amount < importoInserito) {
+                      AppNotifications.mostraInAlto(
+                        context,
+                        'Saldo insufficiente su ${contoConTasse.title} per l\'accantonamento!',
+                        type: NotificationType.error,
+                      );
+                      return;
+                    }
+
                     walletProvider.eseguiGiroconto(
                       daAccountId: contoConTasse.id,
                       aAccountId: salvadanaioTasse.id,
@@ -419,8 +428,14 @@ class _WalletScreenState extends State<WalletScreen> {
                             .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
                             .fold(0.0, (sum, acc) => sum + acc.amount);
 
-                        final double percentuale = tasseTotaliCalcolate > 0 ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 2.0) : 1.0;
-                        final double percentualeText = tasseTotaliCalcolate > 0 ? (riservaAccantonata / tasseTotaliCalcolate * 100) : 100;
+                        final double percentuale = tasseTotaliCalcolate > 0.01 
+                            ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0) 
+                            : (riservaAccantonata > 0 ? 1.0 : 0.0);
+
+                        final double percentualeText = tasseTotaliCalcolate > 0.01 
+                            ? (riservaAccantonata / tasseTotaliCalcolate * 100) 
+                            : (riservaAccantonata > 0 ? 100.0 : 0.0);
+
                         final double cuscinettoExtra = riservaAccantonata > tasseTotaliCalcolate ? riservaAccantonata - tasseTotaliCalcolate : 0.0;
 
                         return Container(
