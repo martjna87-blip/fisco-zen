@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
   final bool? isPiva; // 👈 Dichiarazione della variabile mancante
@@ -86,19 +87,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 setState(() {
                   _contoEspansoIndex = null;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Conto "${account.title}" eliminato.'),
-                    backgroundColor: const Color(0xFFEF4444),
-                  ),
+                AppNotifications.mostraInAlto(
+                  context, 
+                  'Conto "${account.title}" eliminato! 🎉',
                 );
               } catch (e) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$e'.replaceAll('Exception: ', '')),
-                    backgroundColor: const Color(0xFFEF4444),
-                  ),
+                AppNotifications.mostraInAlto(
+                  context,
+                  '$e'.replaceAll('Exception: ', ''),
+                  type: NotificationType.error,
                 );
               }
             },
@@ -174,12 +172,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 setState(() {
                   _contoEspansoIndex = null;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Conto "$nuovoNome" aggiornato!'),
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                );
+                AppNotifications.mostraInAlto(
+                  context, 'Conto "$nuovoNome" aggiornato! 🎉'
+                  );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -455,11 +450,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
 
                 if (nome.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Inserisci un nome per il conto!'),
-                      backgroundColor: Color(0xFFEF4444),
-                    ),
+                  AppNotifications.mostraInAlto(
+                    context, 
+                    'Attenzione: copertura riserva tasse al 50%', 
+                    type: NotificationType.warning,
                   );
                   return;
                 }
@@ -487,21 +481,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   }
 
                   Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Conto "$nome" creato con successo!'),
-                      backgroundColor: const Color(0xFF10B981),
-                    ),
-                  );
+                  AppNotifications.mostraInAlto(
+                    context, 'Conto "$nome" creato con successo!🎉'
+                    );
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Errore creazione conto: $e'),
-                      backgroundColor: const Color(0xFFEF4444),
-                      duration: const Duration(seconds: 5),
-                    ),
-                  );
+
+                  AppNotifications.mostraInAlto(
+                    context, 
+                    'Errore creazione conto: $e', 
+                    type: NotificationType.error
+                    );
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -622,13 +611,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     );
 
                     Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo!'),
-                        backgroundColor: const Color(0xFF10B981),
-                      ),
-                    );
+                      AppNotifications.mostraInAlto(
+                      context, 'Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo! 🎉'
+                      );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -941,7 +926,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                   children: [
                                                     const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
                                                     const SizedBox(width: 6),
-                                                    const Text('FONDO TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    const Text('TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
                                                   ],
                                                 ),
                                                 const SizedBox.shrink(),
