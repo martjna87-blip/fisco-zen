@@ -234,15 +234,28 @@ class _WalletScreenState extends State<WalletScreen> {
     final spesoRisparmi = walletProvider.spesoRisparmi;
     final movimenti = walletProvider.transactions;
     
+    // 🎯 Attiva la vista P.IVA se richiesta dal widget o impostata nel provider
+    final bool mostraPiva = widget.isPiva || walletProvider.isPartitaIVA;
+
+    // 🎯 1. Tasse reali dovute dalle fatture incassate (Dovuto Ateco)
+    final double tasseRealiFatture = walletProvider.fattureIncassate
+        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+    final double tasseTotaliCalcolate = tasseRealiFatture;
+
+    // 🎯 2. Soldi al sicuro nel Salvadanaio
     final double riservaGiaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
+    // 🎯 3. Tasse in sospeso rimaste sul Conto Principale da coprire
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
-
     final double residuoTasseDaCoprire = tasseDaAccantonare;
-    final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
+
+    // 🎯 4. NETTO DISPONIBILE: Liquidità dei conti (escluso Salvadanaio) meno tasse in sospeso
+    final double sommaContiLiquidi = walletProvider.accounts
+        .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+    final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
@@ -429,7 +442,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(height: 12),
 
                   // 🛡️ 1. SERBATOIO RISERVA TASSE
-                  if (widget.isPiva) ...[
+                  if (mostraPiva) ...[
                     Builder(
                       builder: (context) {
                         final double riservaAccantonata = walletProvider.accounts
@@ -444,7 +457,9 @@ class _WalletScreenState extends State<WalletScreen> {
                             ? (riservaAccantonata / tasseTotaliCalcolate * 100) 
                             : (riservaAccantonata > 0 ? 100.0 : 0.0);
 
-                        final double cuscinettoExtra = riservaAccantonata > tasseTotaliCalcolate ? riservaAccantonata - tasseTotaliCalcolate : 0.0;
+                        final double cuscinettoExtraVal = riservaAccantonata > tasseTotaliCalcolate 
+                            ? (riservaAccantonata - tasseTotaliCalcolate) 
+                            : 0.0;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -493,7 +508,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
                                 child: LinearProgressIndicator(
-                                  value: (percentuale / 1.0).clamp(0.0, 1.0),
+                                  value: percentuale,
                                   minHeight: 8,
                                   backgroundColor: Colors.white10,
                                   valueColor: AlwaysStoppedAnimation<Color>(
@@ -502,32 +517,46 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
+                              // 📊 RIGA VALORI (DOVUTO VS IN SALVADANAIO)
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Dovuto Ateco: ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                    style: const TextStyle(color: Colors.white54, fontSize: 10),
                                   ),
                                   Text(
                                     'In Salvadanaio: ${riservaAccantonata.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
-                              if (cuscinettoExtra > 0) ...[
-                                const SizedBox(height: 8),
+
+                              // 🛡️ BADGE BLU: CUSCINETTO DI SICUREZZA EXTRA (Se presente)
+                              if (cuscinettoExtraVal > 0) ...[
+                                const SizedBox(height: 10),
                                 Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: coloreCard.withOpacity(0.92),
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
                                   ),
-                                  child: Text(
-                                    '🛡️ Cuscinetto extra: +${cuscinettoExtra.toStringAsFixed(2)} €',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 13),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Cuscinetto di sicurezza extra: +${cuscinettoExtraVal.toStringAsFixed(2)} €',
+                                        style: const TextStyle(
+                                          color: Color(0xFF3B82F6),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
