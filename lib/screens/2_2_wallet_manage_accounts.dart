@@ -54,6 +54,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   
   // 🗑️ DIALOG DI CONFERMA ELIMINAZIONE CONTO
   void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
+    // 🛡️ SCUDO DI SICUREZZA: Blocca l'eliminazione dei conti di sistema usando il Ruolo
+    if (account.role == AccountRole.principal || account.role == AccountRole.taxReserve) {
+      AppNotifications.mostraInAlto(
+        context,
+        ' "${account.title}" è un conto protetto e non può essere eliminato.',
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

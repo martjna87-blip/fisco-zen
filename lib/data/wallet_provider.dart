@@ -2,6 +2,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 👈 LA NUOVA CASSAFORTE UNIVERSALE
 
+// 🛡️ 1. ENUM PER I RUOLI DI SISTEMA INDELEBILI
+enum AccountRole {
+  principal,  // Conto Operativo Principale
+  taxReserve, // Salvadanaio Riserva Tasse
+  standard,   // Conto o Carta Libera (creabile/eliminabile dall'utente)
+}
+
 class AccountModel {
   final String id;
   String title; 
@@ -9,6 +16,7 @@ class AccountModel {
   double amount;
   double virtualTaxAmount;
   final Color color;
+  final AccountRole role; // 👈 RUOLO DI SISTEMA INDELEBILE
 
   AccountModel({
     required this.id,
@@ -17,6 +25,7 @@ class AccountModel {
     required this.amount,
     this.virtualTaxAmount = 0.0,
     required this.color,
+    this.role = AccountRole.standard, // 👈 Di default ogni conto è Standard
   });
 
   Map<String, dynamic> toJson() => {
@@ -26,16 +35,39 @@ class AccountModel {
         'amount': amount,
         'virtualTaxAmount': virtualTaxAmount,
         'color': color.value,
+        'role': role.name, // 👈 Salvataggio ruolo in memoria
       };
 
-  factory AccountModel.fromJson(Map<String, dynamic> json) => AccountModel(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        subtitle: json['subtitle'] as String,
-        amount: (json['amount'] as num).toDouble(),
-        virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0,
-        color: Color(json['color'] as int),
+  factory AccountModel.fromJson(Map<String, dynamic> json) {
+    AccountRole roleAssegnato = AccountRole.standard;
+
+    if (json['role'] != null) {
+      roleAssegnato = AccountRole.values.firstWhere(
+        (r) => r.name == json['role'],
+        orElse: () => AccountRole.standard,
       );
+    } else {
+      // 🛡️ AUTO-MIGRAZIONE: Se il dato salvato è vecchio, riconosce il ruolo dall'ID o dal Titolo
+      final String id = json['id'] as String;
+      final String title = (json['title'] as String).toLowerCase();
+
+      if (id == '1' || title.contains('principale')) {
+        roleAssegnato = AccountRole.principal;
+      } else if (id == '3' || title.contains('salvadanaio') || title.contains('acconto')) {
+        roleAssegnato = AccountRole.taxReserve;
+      }
+    }
+
+    return AccountModel(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      subtitle: json['subtitle'] as String,
+      amount: (json['amount'] as num).toDouble(),
+      virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0,
+      color: Color(json['color'] as int),
+      role: roleAssegnato,
+    );
+  }
 }
 
 class TransactionModel {
@@ -97,9 +129,9 @@ class TransactionModel {
 
 class WalletProvider extends ChangeNotifier {
   List<AccountModel> _accounts = [
-    AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
-    AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
-    AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+    AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+    AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+    AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
@@ -370,6 +402,13 @@ class WalletProvider extends ChangeNotifier {
   }
 
   void deleteAccount(String accountId) {
+    final target = _accounts.firstWhere((a) => a.id == accountId, orElse: () => _accounts.first);
+
+    // 🛡️ SCUDO DI SISTEMA: Impedisce l'eliminazione dei conti chiave
+    if (target.role == AccountRole.principal || target.role == AccountRole.taxReserve) {
+      throw Exception('I conti di sistema (Principale e Salvadanaio Tasse) non possono essere eliminati.');
+    }
+
     if (_accounts.length <= 1) {
       throw Exception('Impossibile eliminare: deve esserci almeno un conto attivo.');
     }
@@ -818,9 +857,9 @@ class WalletProvider extends ChangeNotifier {
     await prefs.clear(); // 👈 Cancella la memoria
 
     _accounts = [
-      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
-      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
-      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
     ];
 
     isPartitaIVA = true; 
