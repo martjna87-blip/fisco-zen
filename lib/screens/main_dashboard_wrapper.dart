@@ -101,9 +101,9 @@ class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
                     // Il pallino attivo diventa una "pillola" allungata, quello inattivo resta tondo
                     width: isSelected ? 24 : 8, 
                     decoration: BoxDecoration(
-                      color: isSelected ? activeColor : Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+  color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.2), // 🌊 Verde Acqua brillante
+  borderRadius: BorderRadius.circular(4),
+),
                   );
                 }),
               ),

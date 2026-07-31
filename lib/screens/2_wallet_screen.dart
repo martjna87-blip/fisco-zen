@@ -17,7 +17,19 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  
+
+  // 🎨 =======================================================================
+  // 🎛️ REGOLATORE COMANDO COLORI (MODIFICA SOLO QUESTI DUE PER CAMBIARE TUTTO!)
+  // ==========================================================================
+  //
+  // 🟢 OPZIONE 1 (SMERALDO):  Sfondo: Color(0xFF062C22) | Card: Color(0xFF0F3C2E)
+  // 🟣 OPZIONE 2 (AMETISTA):  Sfondo: Color(0xFF1E1B2E) | Card: Color(0xFF2A2438)
+  // 🟤 OPZIONE 3 (MOKA):      Sfondo: Color(0xFF1C1917) | Card: Color(0xFF292524)
+  //
+  final Color coloreSfondo = const Color(0xFF1C1917); // 👈 CAMBIA QUI LO SFONDO
+  final Color coloreCard   = const Color(0xFF292524); // 👈 CAMBIA QUI LE CARD / BOTTONI
+  // ==========================================================================
+
   // 🛡️ DIALOG RAPIDO CON GOAL TRACKER & FEEDBACK PERCENTUALE
   void _mostraDialogAccantonamentoTasse(BuildContext context) {
     final walletProvider = context.read<WalletProvider>();
@@ -30,15 +42,12 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
-    // 1. Calcoliamo i veri totali dal provider in modo preciso!
     final double tasseTotaliCalcolate = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
     final double tasseScoperte = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
-    
-    // Evitiamo bug di numeri infinitesimali forzando a zero i micro-resti
     final double importoMancanteReale = tasseScoperte > 0.01 ? tasseScoperte : 0.0;
 
     final TextEditingController importoController = TextEditingController(
@@ -60,8 +69,6 @@ class _WalletScreenState extends State<WalletScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
-          
-          // 2. NUOVA MATEMATICA: Calcolo della % sulla TOTALITÀ delle tasse!
           final double nuovaRiservaTotale = riservaGiaAccantonata + importoInserito;
           
           final double percentualeText = tasseTotaliCalcolate > 0.01 
@@ -77,7 +84,7 @@ class _WalletScreenState extends State<WalletScreen> {
               : 0.0;
 
           return AlertDialog(
-            backgroundColor: const Color(0xFF1C1C21),
+            backgroundColor: coloreCard,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
@@ -91,7 +98,6 @@ class _WalletScreenState extends State<WalletScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // RIEPILOGO CHIARO PER L'UTENTE
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -222,11 +228,10 @@ class _WalletScreenState extends State<WalletScreen> {
     final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
     final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
     
-    // 👈 CONDIZIONE ULTRA-SICURA: Trasforma il bottone in "Protette" se mancano meno di 1 centesimo
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0C),
+      backgroundColor: coloreSfondo,
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -236,11 +241,14 @@ class _WalletScreenState extends State<WalletScreen> {
               alignment: Alignment.center,
               children: [
                 Container(
-                  height: 220, // 👈 ALTEZZA RIDOTTA
+                  height: 220,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
-                        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop',
+                        'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=1000&auto=format&fit=crop',
+                      // altre immagini 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop'
+                      // altre immagini 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop'
+                      // altre immagini 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop'
                       ),
                       fit: BoxFit.cover,
                       opacity: 0.45,
@@ -248,15 +256,15 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 Container(
-                  height: 220, // 👈 ALTEZZA RIDOTTA
+                  height: 220,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        const Color(0xFF0A0A0C).withOpacity(0.5),
-                        const Color(0xFF0A0A0C),
+                        coloreSfondo.withOpacity(0.5),
+                        coloreSfondo,
                       ],
                     ),
                   ),
@@ -298,7 +306,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 0), // 👈 SPAZIO RIMOSSO PER ALZARE IL TESTO
+                    const SizedBox(height: 0),
                     const Text(
                       'PORTAFOGLIO PERSONALE',
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
@@ -344,7 +352,6 @@ class _WalletScreenState extends State<WalletScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   
-                                  // 👈 LOGICA BOTTONE AGGIORNATA
                                   if (!isTasseCoperte) 
                                     InkWell(
                                       onTap: () => _mostraDialogAccantonamentoTasse(context),
@@ -352,8 +359,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: coloreCard.withOpacity(0.92),
+                                          borderRadius: BorderRadius.circular(20),
                                           border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
                                         ),
                                         child: const Text(
@@ -369,8 +376,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: coloreCard.withOpacity(0.92),
+                                          borderRadius: BorderRadius.circular(20),
                                           border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
                                         ),
                                         child: const Row(
@@ -421,7 +428,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF141417).withOpacity(0.92),
+                            color: coloreCard.withOpacity(0.92),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.white.withOpacity(0.08)),
                           ),
@@ -492,8 +499,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF3B82F6).withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(6),
+                                    color: coloreCard.withOpacity(0.92),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
                                     '🛡️ Cuscinetto extra: +${cuscinettoExtra.toStringAsFixed(2)} €',
@@ -568,7 +575,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF141417).withOpacity(0.92),
+                      color: coloreCard.withOpacity(0.92),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.white.withOpacity(0.08)),
                     ),
@@ -607,8 +614,8 @@ class _WalletScreenState extends State<WalletScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF141417).withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(24),
+                      color: coloreCard.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.white.withOpacity(0.08)),
                     ),
                     child: Column(
@@ -709,10 +716,9 @@ class _WalletScreenState extends State<WalletScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        // NESSUNA ALTEZZA FISSA! Il box si modella al testo.
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF141417).withOpacity(0.92),
+          color: coloreCard.withOpacity(0.92),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
@@ -750,17 +756,21 @@ class _WalletScreenState extends State<WalletScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded( // 👈 Protegge il layout se lo schermo è stretto!
+        Expanded(
           child: Row(
             children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              Container(
+                width: 10, 
+                height: 10, 
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title, 
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                   maxLines: 1, 
-                  overflow: TextOverflow.ellipsis, // 👈 Aggiunge "..." se serve
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -782,7 +792,7 @@ class _WalletScreenState extends State<WalletScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF141417).withOpacity(0.92),
+        color: coloreCard.withOpacity(0.92),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
@@ -821,8 +831,8 @@ class _WalletScreenState extends State<WalletScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF141417).withOpacity(0.92),
-        borderRadius: BorderRadius.circular(18),
+        color: coloreCard.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
