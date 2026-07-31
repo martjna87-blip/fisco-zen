@@ -157,11 +157,10 @@ class ProUpgradeSheet extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('⚡ Integrazione In-App Purchase in arrivo!'),
-                              backgroundColor: Color(0xFFF59E0B),
-                            ),
+                          AppNotifications.mostraInAlto(
+                            context, 
+                            '⚡ Integrazione In-App Purchase in arrivo!', 
+                            type: NotificationType.warning,
                           );
                         },
                         style: ElevatedButton.styleFrom(

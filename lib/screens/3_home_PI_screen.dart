@@ -8,6 +8,7 @@ import '3_1_PI_incasso_fatture.dart';
 import '3_2_PI_registra_fattura.dart';
 import '3_3_PI_tasse_accantonamento.dart';
 import '3_5_PI_dettaglio_fatture_sheet.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
@@ -125,8 +126,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final accounts = walletProvider.accounts;
 
     if (accounts.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Devi avere almeno due conti per accantonare le tasse.')),
+      
+      AppNotifications.mostraInAlto(
+        context, 
+        'Devi avere almeno due conti per accantonare le tasse', 
+        type: NotificationType.warning,
       );
       return;
     }
@@ -275,16 +279,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       isAccantonamentoTasse: true,
                     );
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          extraCuscinetto > 0
-                              ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
-                              : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
-                        ),
-                        backgroundColor: const Color(0xFF3B82F6),
-                      ),
-                    );
+                    AppNotifications.mostraInAlto(
+                      context, 
+                      extraCuscinetto > 0
+                      ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
+                      : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
+                      );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -302,13 +302,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraFeedback(String messaggio) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(messaggio),
-        backgroundColor: const Color(0xFF2DD4BF),
-      ),
-    );
-  }
+  AppNotifications.mostraInAlto(context, messaggio);
+}
 
   void _mostraConfermaResetGlobale(BuildContext context, WalletProvider walletProvider) {
     showDialog(
@@ -340,12 +335,10 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               walletProvider.resetTuttiIDati();
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tutti i dati sono stati azzerati con successo!'),
-                  backgroundColor: Color(0xFFEF4444),
-                ),
-              );
+              AppNotifications.mostraInAlto(
+                context, 
+                'Tutti i dati sono stati azzerati con successo!🎉',
+                );
             },
             child: const Text('Azzera Tutto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -429,12 +422,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () async {
                             await walletProvider.resetSoloMovimentieFatture();
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Fatture e conti azzerati! Profilo ATECO conservato.'),
-                                duration: Duration(seconds: 2),
-                                backgroundColor: Color(0xFFEF4444),
-                              ),
+                            AppNotifications.mostraInAlto(
+                              context, 
+                              'Fatture e conti azzerati! Profilo ATECO conservato', 
+                              type: NotificationType.warning,
                             );
                           },
                           borderRadius: BorderRadius.circular(20),
@@ -493,18 +484,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         InkWell(
                           onTap: () {
                             walletProvider.toggleProUser();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  walletProvider.isProUser 
-                                      ? '✨ Modalità PRO Attivata (Test)' 
-                                      : '🔒 Modalità FREE Attivata (Test)',
-                                ),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: walletProvider.isProUser 
-                                    ? const Color(0xFFA855F7) 
-                                    : const Color(0xFFF59E0B),
-                              ),
+                            
+                            AppNotifications.mostraInAlto(
+                              context, 
+                              walletProvider.isProUser
+                              ? '✨ Modalità PRO Attivata (Test)' 
+                              : '🔒 Modalità FREE Attivata (Test)',
+                              type: NotificationType.warning,
                             );
                           },
                           borderRadius: BorderRadius.circular(12),

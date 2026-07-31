@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class DettaglioFattureSheet extends StatefulWidget {
   final List<Map<String, dynamic>>? fattureIncassate;
@@ -70,13 +71,10 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
               // 3. Forza il refresh immediato del widget
               setState(() {});
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Fattura di "${fattura['cliente']}" eliminata.'),
-                  backgroundColor: const Color(0xFFEF4444),
-                ),
-              );
+              AppNotifications.mostraInAlto(
+                context, 
+                'Fattura di "${fattura['cliente']}" eliminata 🎉',
+                );
             },
             child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),

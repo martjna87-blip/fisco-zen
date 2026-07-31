@@ -6,6 +6,7 @@ import '2_1_wallet_add_movement.dart';
 import '2_2_wallet_manage_accounts.dart';
 import '2_4_wallet_budget_pilot.dart';
 import '2_5_wallet_annual_summary.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -36,8 +37,10 @@ class _WalletScreenState extends State<WalletScreen> {
     final accounts = walletProvider.accounts;
 
     if (accounts.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Devi avere almeno due conti per accantonare le tasse.')),
+      AppNotifications.mostraInAlto(
+        context, 
+        'Devi avere almeno due conti per accantonare le tasse', 
+        type: NotificationType.warning,
       );
       return;
     }
@@ -185,15 +188,11 @@ class _WalletScreenState extends State<WalletScreen> {
                       isAccantonamentoTasse: true,
                     );
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          extraCuscinetto > 0
-                              ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
-                              : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
-                        ),
-                        backgroundColor: const Color(0xFF3B82F6),
-                      ),
+                    AppNotifications.mostraInAlto(
+                      context,
+                      extraCuscinetto > 0
+                          ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
+                          : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
                     );
                   }
                 },

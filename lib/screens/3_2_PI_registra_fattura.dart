@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class RegistraFatturaSheet extends StatefulWidget {
   final Function(String cliente, double importo, String dataFormattata)? onFatturaSalvata;
@@ -99,11 +100,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Usa il tasto PRO/FREE nell\'Header della Home per provare la modalità IA!'),
-                    backgroundColor: Color(0xFFA855F7),
-                  ),
+                AppNotifications.mostraInAlto(
+                  context, 
+                  'Usa il tasto PRO/FREE nell\'Header della Home per provare la modalità IA!', 
+                  type: NotificationType.warning,
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -126,23 +126,21 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final importoText = _importoController.text.trim();
 
     if (cliente.isEmpty || importoText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inserisci nome cliente e importo valido'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      AppNotifications.mostraInAlto(
+  context, 
+  'Inserisci nome cliente e importo valido', 
+  type: NotificationType.warning,
+);
       return;
     }
 
     final double? importo = double.tryParse(importoText.replaceAll(',', '.'));
     if (importo == null || importo <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Importo non valido'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      AppNotifications.mostraInAlto(
+        context, 
+        'Importo non valido', 
+        type: NotificationType.error
+        );
       return;
     }
 
@@ -163,12 +161,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata!'),
-        backgroundColor: const Color(0xFF10B981),
-      ),
-    );
+    AppNotifications.mostraInAlto(
+      context, 'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉'
+      );
   }
 
   @override
@@ -291,8 +286,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                             isPro: isPro,
                                             onTap: () {
                                               if (isPro) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('Apertura fotocamera OCR...')),
+                                                AppNotifications.mostraInAlto(
+                                                  context, 
+                                                  'Apertura fotocamera OCR...', 
+                                                  type: NotificationType.warning,
                                                 );
                                               } else {
                                                 _mostraPaywallPro('Scansione OCR');
@@ -309,8 +306,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                             isPro: isPro,
                                             onTap: () {
                                               if (isPro) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('Apertura selettore file...')),
+                                                AppNotifications.mostraInAlto(
+                                                  context, 
+                                                  'Apertura selettore file...', 
+                                                  type: NotificationType.warning,
                                                 );
                                               } else {
                                                 _mostraPaywallPro('Importazione PDF/XML');

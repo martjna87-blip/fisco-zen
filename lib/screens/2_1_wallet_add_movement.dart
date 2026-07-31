@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
+import '../widgets_shared/app_notifications.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -296,21 +297,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       setState(() => _isAnalyzing = true);
 
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)),
-              SizedBox(width: 12),
-              Text('Lettura intelligente scontrino in corso...'),
-            ],
-          ),
-          backgroundColor: Color(0xFF2DD4BF),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppNotifications.mostraInAlto(context, 'Lettura intelligente scontrino in corso... 🤖');
 
       await Future.delayed(const Duration(seconds: 2));
 
@@ -328,28 +315,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dati estratti! Controlla e salva.'),
-            backgroundColor: Color(0xFF10B981),
-            duration: Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotifications.mostraInAlto(
+          context, 'Dati estratti! Controlla e salva! 🎉'
+          );
       }
     } catch (e) {
       setState(() => _isAnalyzing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Impossibile aprire la fotocamera: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-            duration: const Duration(seconds: 5),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotifications.mostraInAlto(context, 'Impossibile aprire la fotocamera: $e', type: NotificationType.error);
       }
     }
   }
@@ -357,14 +330,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inserisci un importo valido!'), 
-          backgroundColor: Color(0xFFEF4444),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+
+      AppNotifications.mostraInAlto(
+        context, 
+        'Inserisci un importo valido!', 
+        type: NotificationType.error
+        );
       return;
     }
 
@@ -412,15 +383,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     });
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Movimento "$descrizione" registrato con successo!'),
-        backgroundColor: const Color(0xFF2DD4BF),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
@@ -459,13 +422,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           context.read<WalletProvider>().stopRecurrence(id);
                           Navigator.pop(ctx);
                           setState(() {});
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Ricorrenza interrotta! Le spese future sono state cancellate.'), 
-                              backgroundColor: Color(0xFFF59E0B),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+
+                          AppNotifications.mostraInAlto(
+                            context, 
+                            'Ricorrenza interrotta! Le spese future sono state cancellate', 
+                            type: NotificationType.warning,
                           );
                         },
                         child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -484,14 +445,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           context.read<WalletProvider>().deleteButKeepRecurrence(id);
                           Navigator.pop(ctx);
                           setState(() {});
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Movimento eliminato solo per questo mese!'), 
-                              backgroundColor: Color(0xFFF59E0B),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          
+                          AppNotifications.mostraInAlto(
+                            context, 'Movimento eliminato solo per questo mese! 🎉'
+                            );
                         },
                         child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -509,14 +466,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           context.read<WalletProvider>().deleteTransaction(id);
                           Navigator.pop(ctx);
                           setState(() {});
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Movimento "$desc" e futuri eliminati.'), 
-                              backgroundColor: const Color(0xFFEF4444),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+
+                          AppNotifications.mostraInAlto(
+                            context, 'Movimento "$desc" e futuri eliminati! 🎉'
+                            );
                         },
                         child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -542,14 +495,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     context.read<WalletProvider>().deleteTransaction(id);
                     Navigator.pop(ctx);
                     setState(() {});
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Movimento "$desc" eliminato.'), 
-                        backgroundColor: const Color(0xFFEF4444),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    
+                    AppNotifications.mostraInAlto(
+                      context, 'Movimento "$desc" eliminato 🎉'
+                      );
                   },
                   child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
@@ -601,13 +550,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                     Navigator.pop(ctx);
 
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Previsione eliminata solo per questo mese!'), 
-                        backgroundColor: Color(0xFFF59E0B),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    AppNotifications.mostraInAlto(
+                      context, 
+                      'Previsione emilinata solo per questo mese', 
+                      type: NotificationType.warning,
                     );
                   },
                   child: const Text('Elimina solo quella di questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
@@ -628,13 +574,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     Navigator.pop(ctx);
                     setState(() {});
 
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.'), 
-                        backgroundColor: Color(0xFFEF4444),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    AppNotifications.mostraInAlto(
+                      context, 
+                      'Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.', 
+                      type: NotificationType.warning,
                     );
                   },
                   child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
