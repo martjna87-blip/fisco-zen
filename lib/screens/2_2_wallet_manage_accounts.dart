@@ -921,7 +921,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                   children: [
                                                     const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
                                                     const SizedBox(width: 6),
-                                                    const Text('NETTO SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    const Text('LIQUIDITA':', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
                                                   ],
                                                 ),
                                                 const SizedBox.shrink(),
