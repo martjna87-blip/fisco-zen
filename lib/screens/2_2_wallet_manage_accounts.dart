@@ -941,24 +941,25 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                 ),
                                               ],
                                             ),
-                                            const TableRow(children: [SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8)]), // Spaziatura verticale
-                                            TableRow(
-                                              children: [
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
-                                                    const SizedBox(width: 6),
-                                                    const Text('TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                  ],
-                                                ),
-                                                const SizedBox.shrink(),
-                                                Text(
-                                                  '${totaleTasseLorde.toStringAsFixed(2)} €',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            ),
+                                            // 🙈 RIGA TASSE TEMPORANEAMENTE NASCOSTA PER TEST UX:
+                                            // const TableRow(children: [SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8)]),
+                                            // TableRow(
+                                            //   children: [
+                                            //     Row(
+                                            //       mainAxisSize: MainAxisSize.min,
+                                            //       children: [
+                                            //         const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
+                                            //         const SizedBox(width: 6),
+                                            //         const Text('TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                            //       ],
+                                            //     ),
+                                            //     const SizedBox.shrink(),
+                                            //     Text(
+                                            //       '${totaleTasseLorde.toStringAsFixed(2)} €',
+                                            //       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                            //     ),
+                                            //   ],
+                                            // ),
                                           ],
                                         ),
                                       ],

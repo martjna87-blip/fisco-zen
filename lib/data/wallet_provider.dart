@@ -39,6 +39,9 @@ class AccountModel {
       };
 
   factory AccountModel.fromJson(Map<String, dynamic> json) {
+    final String id = json['id'] as String;
+    final String title = (json['title'] as String? ?? '').toLowerCase();
+
     AccountRole roleAssegnato = AccountRole.standard;
 
     if (json['role'] != null) {
@@ -46,20 +49,17 @@ class AccountModel {
         (r) => r.name == json['role'],
         orElse: () => AccountRole.standard,
       );
-    } else {
-      // 🛡️ AUTO-MIGRAZIONE: Se il dato salvato è vecchio, riconosce il ruolo dall'ID o dal Titolo
-      final String id = json['id'] as String;
-      final String title = (json['title'] as String).toLowerCase();
+    }
 
-      if (id == '1' || title.contains('principale')) {
-        roleAssegnato = AccountRole.principal;
-      } else if (id == '3' || title.contains('salvadanaio') || title.contains('acconto')) {
-        roleAssegnato = AccountRole.taxReserve;
-      }
+    // 🛡️ FORCE RECOVERY: Se l'ID è '1' o '3', assegna SEMPRE il ruolo di sistema corretto
+    if (id == '1' || title.contains('principale')) {
+      roleAssegnato = AccountRole.principal;
+    } else if (id == '3' || title.contains('salvadanaio tasse') || title.contains('acconto tasse')) {
+      roleAssegnato = AccountRole.taxReserve;
     }
 
     return AccountModel(
-      id: json['id'] as String,
+      id: id,
       title: json['title'] as String,
       subtitle: json['subtitle'] as String,
       amount: (json['amount'] as num).toDouble(),
@@ -404,9 +404,14 @@ class WalletProvider extends ChangeNotifier {
   void deleteAccount(String accountId) {
     final target = _accounts.firstWhere((a) => a.id == accountId, orElse: () => _accounts.first);
 
-    // 🛡️ SCUDO DI SISTEMA: Impedisce l'eliminazione dei conti chiave
-    if (target.role == AccountRole.principal || target.role == AccountRole.taxReserve) {
-      throw Exception('I conti di sistema (Principale e Salvadanaio Tasse) non possono essere eliminati.');
+    // 🛡️ DOPPIO SCUDO: Blocca sia per Ruolo che per ID di sicurezza (1 e 3)
+    final bool isProtetto = target.role == AccountRole.principal || 
+                            target.role == AccountRole.taxReserve ||
+                            target.id == '1' || 
+                            target.id == '3';
+
+    if (isProtetto) {
+      throw Exception('"${target.title}" è un conto di sistema protetto e non può essere eliminato.');
     }
 
     if (_accounts.length <= 1) {
@@ -727,17 +732,66 @@ class WalletProvider extends ChangeNotifier {
       final String cliente = fattura['cliente'] as String? ?? '';
       final String? contoAccredito = fattura['contoAccredito'] as String?;
 
+      // 1. Storna il fatturato totale
       _fatturatoTotale = (_fatturatoTotale - importoLordo).clamp(0.0, double.infinity);
 
-      if (contoAccredito != null) {
-        final targetAccount = _accounts.firstWhere(
-          (acc) => acc.title.contains(contoAccredito) || contoAccredito.contains(acc.title),
-          orElse: () => _accounts.first,
+      // 2. Identifica i conti di sistema in modo sicuro
+      final contoPrincipale = _accounts.firstWhere(
+        (a) => a.role == AccountRole.principal || a.id == '1',
+        orElse: () => _accounts.first,
+      );
+
+      final salvadanaioTasse = _accounts.firstWhere(
+        (a) => a.role == AccountRole.taxReserve || a.id == '3',
+        orElse: () => _accounts.last,
+      );
+
+      // 3. Storna l'importo della fattura dal conto su cui era stata accreditata
+      final targetAccount = (contoAccredito != null)
+          ? _accounts.firstWhere(
+              (acc) => acc.title.contains(contoAccredito) || contoAccredito.contains(acc.title),
+              orElse: () => contoPrincipale,
+            )
+          : contoPrincipale;
+
+      targetAccount.amount = (targetAccount.amount - importoLordo).clamp(0.0, double.infinity);
+
+      // 4. Rimuove il movimento storico generato dall'incasso
+      _transactions.removeWhere((t) => t.title.contains(cliente));
+
+      // 🛡️ 5. REINTEGRO FISCALE MIRATO (Protegge i risparmi extra nel Salvadanaio!):
+      // A. Identifichiamo quante tasse erano legate a QUESTA specifica fattura eliminata
+      final double tasseFatturaEliminata = (fattura['importoTasse'] as num?)?.toDouble() ?? (importoLordo * aliquotaFiscaleReale);
+
+      // B. Restituiamo al Conto Principale al massimo le tasse di questa fattura (o quanto disponibile nel Salvadanaio)
+      final double quotaDaRestituire = tasseFatturaEliminata.clamp(0.0, salvadanaioTasse.amount);
+
+      if (quotaDaRestituire > 0) {
+        // Uscita dal Salvadanaio Tasse
+        addTransaction(
+          title: 'Storno Tasse Fattura 🔄',
+          amount: quotaDaRestituire,
+          isIncome: false,
+          category: 'Giroconto',
+          accountId: salvadanaioTasse.id,
         );
-        targetAccount.amount = (targetAccount.amount - importoLordo).clamp(0.0, double.infinity);
+
+        // Rientro sul Conto Principale
+        addTransaction(
+          title: 'Rientro Tasse (Storno Fattura) 🔄',
+          amount: quotaDaRestituire,
+          isIncome: true,
+          category: 'Giroconto',
+          accountId: contoPrincipale.id,
+        );
       }
 
-      _transactions.removeWhere((t) => t.title.contains(cliente));
+      // C. Ricalcoliamo le tasse in sospeso sulle fatture rimaste
+      final double totaleTasseRimanenti = _fattureIncassate
+          .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+
+      // 6. Aggiorna le tasse virtuali in sospeso sul Conto Principale
+      contoPrincipale.virtualTaxAmount = (totaleTasseRimanenti - salvadanaioTasse.amount).clamp(0.0, double.infinity);
     } else {
       _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
     }
@@ -956,12 +1010,24 @@ class WalletProvider extends ChangeNotifier {
 
     if (importo <= 0 || accDa.amount < importo) return;
 
-    if (isAccantonamentoTasse) {
-      accDa.virtualTaxAmount = (accDa.virtualTaxAmount - importo).clamp(0.0, double.infinity);
+    // 🎯 1. RICONOSCIMENTO AUTOMATICO DEI FLUSSI FISCALI SUI RUOLI
+    final bool eVersamentoTasse = accA.role == AccountRole.taxReserve || isAccantonamentoTasse;
+    final bool ePrelievoTasse = accDa.role == AccountRole.taxReserve;
+
+    String titoloDa = 'Giroconto verso ${accA.title}';
+    String titoloA = 'Giroconto da ${accDa.title}';
+
+    if (eVersamentoTasse) {
+      titoloDa = 'Accantonamento Tasse 🛡️';
+      titoloA = 'Ricezione Riserva Tasse 🛡️';
+    } else if (ePrelievoTasse) {
+      titoloDa = 'Prelievo da Riserva Tasse ⚠️';
+      titoloA = 'Rientro Liquidità da Tasse ⚠️';
     }
 
+    // 🎯 2. REGISTRAZIONE TRANSAZIONI E AGGIORNAMENTO SALDI CONTI
     addTransaction(
-      title: isAccantonamentoTasse ? 'Accantonamento Tasse 🛡️' : 'Giroconto verso ${accA.title}',
+      title: titoloDa,
       amount: importo,
       isIncome: false,
       category: 'Giroconto',
@@ -969,12 +1035,37 @@ class WalletProvider extends ChangeNotifier {
     );
 
     addTransaction(
-      title: isAccantonamentoTasse ? 'Ricezione Riserva Tasse 🛡️' : 'Giroconto da ${accDa.title}',
+      title: titoloA,
       amount: importo,
       isIncome: true,
       category: 'Giroconto',
       accountId: accA.id,
     );
+
+    // 🎯 3. MATEMATICA UNIVERSALE FISCALE:
+    // Se il trasferimento coinvolge il Salvadanaio Tasse (da o verso QUALSIASI conto),
+    // ricalcola al centesimo la quota di tasse in sospeso sul Conto Principale!
+    if (eVersamentoTasse || ePrelievoTasse) {
+      final contoPrincipale = _accounts.firstWhere(
+        (a) => a.role == AccountRole.principal,
+        orElse: () => _accounts.first,
+      );
+
+      // Totale tasse reale generato dalle fatture incassate
+      final double totaleTasseIncassate = _fattureIncassate
+          .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+
+      // Nuova riserva presente nel Salvadanaio Tasse dopo il movimento
+      final double riservaSalvadanaio = _accounts
+          .where((a) => a.role == AccountRole.taxReserve)
+          .fold(0.0, (sum, a) => sum + a.amount);
+
+      // Le tasse in sospeso sul Principale sono: Totale Dovuto - Riserva Accantonata
+      contoPrincipale.virtualTaxAmount = (totaleTasseIncassate - riservaSalvadanaio).clamp(0.0, double.infinity);
+    }
+
+    _salvaDatiInLocalStorage();
+    notifyListeners();
   }
 
   void toggleProUser() {
@@ -1014,9 +1105,9 @@ class WalletProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
 
     _accounts = [
-      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF)),
-      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B)),
-      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6)),
+      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
     ];
 
     _spesoBisogni = 0.00;
