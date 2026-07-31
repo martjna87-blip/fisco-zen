@@ -569,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const SizedBox(height: 0), // 👈 SPAZIO RIMOSSO PER ALZARE IL TESTO
                     const Text(
-                      'Gestione P.IVA',
+                      'GESTIONE P.IVA',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
