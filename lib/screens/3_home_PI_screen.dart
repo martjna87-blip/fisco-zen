@@ -364,15 +364,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
     final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
 
-    final double tasseTotaliCalcolate = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    // 🎯 1. Tasse reali dovute dalle fatture incassate (Dovuto Ateco)
+    final double tasseRealiFatture = walletProvider.fattureIncassate
+        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+    final double tasseTotaliCalcolate = tasseRealiFatture;
+
+    // 🎯 2. Soldi al sicuro nel Salvadanaio
     final double riservaGiaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
-    final double residuoTasseDaCoprire = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
-    final double nettoReale = patrimonioNetto - tasseTotaliCalcolate;
+    // 🎯 3. Tasse in sospeso rimaste sul Conto Principale da coprire
+    final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    final double residuoTasseDaCoprire = tasseDaAccantonare;
+
+    // 🎯 4. NETTO DISPONIBILE: Liquidità dei conti (escluso Salvadanaio) meno tasse in sospeso
+    final double sommaContiLiquidi = walletProvider.accounts
+        .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
+        .fold(0.0, (sum, a) => sum + a.amount);
+    final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
     
-    // 👈 CONDIZIONE ULTRA-SICURA
+    // 🎯 5. Stato copertura tasse (Accantona / Protette)
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     return Scaffold(
