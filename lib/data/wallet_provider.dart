@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // 👈 LA NUOVA CASSAFORTE UNIVERSALE
+import 'package:shared_preferences/shared_preferences.dart';
 
 // 🛡️ 1. ENUM PER I RUOLI DI SISTEMA INDELEBILI
 enum AccountRole {
@@ -16,7 +16,7 @@ class AccountModel {
   double amount;
   double virtualTaxAmount;
   final Color color;
-  final AccountRole role; // 👈 RUOLO DI SISTEMA INDELEBILE
+  final AccountRole role;
 
   AccountModel({
     required this.id,
@@ -25,7 +25,7 @@ class AccountModel {
     required this.amount,
     this.virtualTaxAmount = 0.0,
     required this.color,
-    this.role = AccountRole.standard, // 👈 Di default ogni conto è Standard
+    this.role = AccountRole.standard,
   });
 
   Map<String, dynamic> toJson() => {
@@ -35,7 +35,7 @@ class AccountModel {
         'amount': amount,
         'virtualTaxAmount': virtualTaxAmount,
         'color': color.value,
-        'role': role.name, // 👈 Salvataggio ruolo in memoria
+        'role': role.name,
       };
 
   factory AccountModel.fromJson(Map<String, dynamic> json) {
@@ -51,7 +51,6 @@ class AccountModel {
       );
     }
 
-    // 🛡️ FORCE RECOVERY: Se l'ID è '1' o '3', assegna SEMPRE il ruolo di sistema corretto
     if (id == '1' || title.contains('principale')) {
       roleAssegnato = AccountRole.principal;
     } else if (id == '3' || title.contains('salvadanaio tasse') || title.contains('acconto tasse')) {
@@ -139,9 +138,7 @@ class WalletProvider extends ChangeNotifier {
   bool _isProUser = false;
   bool get isProUser => _isProUser;
 
-// ===========================================================================
-  // 🪪 PROFILO ONBOARDING & MOTORE FISCALE
-  // ===========================================================================
+  // PROFILO ONBOARDING & MOTORE FISCALE
   String _codiceAteco = '62.02.00';
   double _coefficienteRedditivita = 0.78;
   String _tipoCassa = 'gestioneSeparata';
@@ -161,9 +158,6 @@ class WalletProvider extends ChangeNotifier {
   double _fatturatoStimatoAnnuo = 35000.0;
   int _mesiAttiviIncasso = 10;
 
-// ===========================================================================
-  // 🎯 MOTORE DI CALCOLO: VERDETTO FISCALE & STRATEGICO
-  // ===========================================================================
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,
     double? nettoTargetCustom,
@@ -248,10 +242,7 @@ class WalletProvider extends ChangeNotifier {
       'fatturatoLordoNecessarioForTarget': fatturatoLordoNecessarioForTarget,
     };
   }
-  
-// ==========================================
-  // ⚙️ CONFIGURAZIONE E MATEMATICA FISCALE ATECO
-  // ==========================================
+
   bool isPartitaIVA = true; 
   double accontiVersatiAnnoPrecedente = 100.0; 
   
@@ -274,10 +265,7 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ==========================================
   // 📊 MATEMATICA E STATISTICHE GLOBALI
-  // ==========================================
-
   double get patrimonioNetto => _accounts.fold(0.0, (sum, item) => sum + item.amount);
   double get _tasseLordeAccantonate => _accounts.fold(0.0, (sum, item) => sum + item.virtualTaxAmount);
 
@@ -404,7 +392,6 @@ class WalletProvider extends ChangeNotifier {
   void deleteAccount(String accountId) {
     final target = _accounts.firstWhere((a) => a.id == accountId, orElse: () => _accounts.first);
 
-    // 🛡️ DOPPIO SCUDO: Blocca sia per Ruolo che per ID di sicurezza (1 e 3)
     final bool isProtetto = target.role == AccountRole.principal || 
                             target.role == AccountRole.taxReserve ||
                             target.id == '1' || 
@@ -431,7 +418,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
-  // 📥 LETTURA ISTANTANEA DA SHAREDPREFERENCES (NUOVO METODO)
   Future<void> _caricaDatiDaLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -442,7 +428,6 @@ class WalletProvider extends ChangeNotifier {
       aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 100.0;
 
-      // 📥 Caricamento variabili fiscali dal Questionario
       _codiceAteco = prefs.getString('codiceAteco') ?? '62.02.00';
       _nettoTargetMensile = prefs.getDouble('nettoTargetMensile') ?? 2000.0;
       _fatturatoStimatoAnnuo = prefs.getDouble('fatturatoStimatoAnnuo') ?? 35000.0;
@@ -483,13 +468,13 @@ class WalletProvider extends ChangeNotifier {
         _skippedPredictions = decoded.map((s) => s.toString()).toList();
       }
 
-      notifyListeners(); // 👈 Aggiorna l'UI appena i dati sono caricati
+      _aggiornaTasseVirtuali();
+      notifyListeners();
     } catch (e) {
       debugPrint('Errore durante la lettura: $e');
     }
   }
 
-  // 💾 SALVATAGGIO IN SHAREDPREFERENCES (NUOVO METODO)
   Future<void> _salvaDatiInLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -500,7 +485,6 @@ class WalletProvider extends ChangeNotifier {
       await prefs.setDouble('aliquotaInps', aliquotaInps);
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
 
-      // 💾 Salvataggio variabili fiscali dal Questionario
       await prefs.setBool('onboarding_completed', true);
       await prefs.setString('codiceAteco', _codiceAteco);
       await prefs.setDouble('nettoTargetMensile', _nettoTargetMensile);
@@ -520,6 +504,43 @@ class WalletProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Errore durante il salvataggio: $e');
     }
+  }
+
+  // ==========================================
+  // 🧮 MOTORE DI CALCOLO DINAMICO TASSE
+  // ==========================================
+
+  double get totaleTasseDovute {
+    return _fattureIncassate.fold(
+      0.0,
+      (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0),
+    );
+  }
+
+  double get saldoSalvadanaioTasse {
+    final salvadanaio = _accounts.firstWhere(
+      (a) => a.role == AccountRole.taxReserve || a.id == '3',
+      orElse: () => _accounts.last,
+    );
+    return salvadanaio.amount;
+  }
+
+  double get tasseScoperteContoPrincipale {
+    final scoperte = totaleTasseDovute - saldoSalvadanaioTasse;
+    return scoperte > 0 ? scoperte : 0.0;
+  }
+
+  void _aggiornaTasseVirtuali() {
+    for (var account in _accounts) {
+      account.virtualTaxAmount = 0.0;
+    }
+
+    final contoPrincipale = _accounts.firstWhere(
+      (a) => a.role == AccountRole.principal || a.id == '1',
+      orElse: () => _accounts.first,
+    );
+
+    contoPrincipale.virtualTaxAmount = tasseScoperteContoPrincipale;
   }
 
   void addTransaction({
@@ -558,11 +579,6 @@ class WalletProvider extends ChangeNotifier {
 
     if (isIncome) {
       targetAccount.amount += amount;
-      
-      if (category == 'P.IVA') {
-        targetAccount.virtualTaxAmount += (amount * aliquotaFiscaleReale);
-      }
-      
     } else {
       targetAccount.amount -= amount;
       if (category == 'Bisogni') _spesoBisogni += amount;
@@ -570,6 +586,7 @@ class WalletProvider extends ChangeNotifier {
       if (category == 'Risparmi') _spesoRisparmi += amount;
     }
 
+    _aggiornaTasseVirtuali();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -610,74 +627,16 @@ class WalletProvider extends ChangeNotifier {
     );
 
     final String dataFinale = dataIncasso ?? 'Oggi';
-
     DateTime dataObj = DateTime.now();
-    if (dataIncasso != null) {
-      try {
-        final parti = dataIncasso.split(' ');
-        if (parti.length >= 3) {
-          final g = int.parse(parti[0]);
-          final a = int.parse(parti[2]);
-          final mesi = [
-            'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-            'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-          ];
-          final m = mesi.indexOf(parti[1]) + 1;
-          if (m > 0) dataObj = DateTime(a, m, g);
-        }
-      } catch (_) {}
-    }
-
-    String numeroFattura = '';
-    String dataEmissioneFormattata = '';
 
     if (idFattura != null) {
       final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
       if (idx != -1) {
         final f = _fattureDaIncassare.removeAt(idx);
-        numeroFattura = f['numero']?.toString() ?? ''; 
-        
-        if (f['data'] != null) {
-          String rawData = f['data'].toString();
-          bool parsed = false;
-
-          final mesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
-          for (int i = 0; i < mesi.length; i++) {
-            if (rawData.contains(mesi[i])) {
-              final parts = rawData.split(' ');
-              if (parts.isNotEmpty) {
-                dataEmissioneFormattata = '${parts[0].padLeft(2, '0')}/${(i + 1).toString().padLeft(2, '0')}';
-                parsed = true;
-                break;
-              }
-            }
-          }
-
-          if (!parsed && rawData.contains('/')) {
-            final parts = rawData.split('/');
-            if (parts.length >= 2) {
-              dataEmissioneFormattata = '${parts[0].padLeft(2, '0')}/${parts[1].padLeft(2, '0')}';
-              parsed = true;
-            }
-          }
-
-          if (!parsed) {
-            try {
-              final dt = DateTime.parse(rawData);
-              dataEmissioneFormattata = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
-              parsed = true;
-            } catch (_) {}
-          }
-
-          if (!parsed) {
-            dataEmissioneFormattata = rawData.length > 5 ? rawData.substring(0, 5) : rawData;
-          }
-        }
-
         _fattureIncassate.add({
           ...f,
           'dataIncasso': dataFinale,
-          'importoTasse': importoTasse,
+          'importoTasse': importoTasse > 0 ? importoTasse : (importoLordo * aliquotaFiscaleReale),
           'contoAccredito': contoDestinazione,
         });
       }
@@ -685,13 +644,8 @@ class WalletProvider extends ChangeNotifier {
 
     _fatturatoTotale += importoLordo;
 
-    final String suffissoData = dataEmissioneFormattata.isNotEmpty ? ' (del $dataEmissioneFormattata)' : '';
-    final String titoloTransazione = numeroFattura.isNotEmpty 
-        ? 'Fattura n.$numeroFattura$suffissoData - $cliente' 
-        : 'Incasso: $cliente';
-
     addTransaction(
-      title: titoloTransazione,
+      title: 'Incasso: $cliente',
       amount: importoLordo,
       isIncome: true,
       category: 'P.IVA',
@@ -699,26 +653,7 @@ class WalletProvider extends ChangeNotifier {
       date: dataObj,
     );
 
-    // 🎯 1. Rimuove la stima generica aggiunta in automatico da addTransaction
-    targetAccount.virtualTaxAmount = (targetAccount.virtualTaxAmount - (importoLordo * aliquotaFiscaleReale)).clamp(0.0, double.infinity);
-
-    // 🎯 2. Calcola le tasse reali della fattura
-    final double tasseFattura = importoTasse > 0 ? importoTasse : (importoLordo * aliquotaFiscaleReale);
-
-    // 🛡️ 3. Calcola il "cuscinetto libero" già presente nel Salvadanaio prima di questa fattura
-    final double riservaSalvadanaio = _accounts
-        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
-        .fold(0.0, (sum, a) => sum + a.amount);
-
-    final double totaleTasseFatturePrecedenti = _fattureIncassate
-        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0)) - tasseFattura;
-
-    final double cuscinettoLibero = (riservaSalvadanaio - totaleTasseFatturePrecedenti).clamp(0.0, double.infinity);
-
-    // 🟢 4. Assegna al Conto Principale solo la quota tasse NON ancora coperta dal Salvadanaio
-    final double tasseDaAssegnare = (tasseFattura - cuscinettoLibero).clamp(0.0, double.infinity);
-    targetAccount.virtualTaxAmount += tasseDaAssegnare;
-
+    _aggiornaTasseVirtuali();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -732,21 +667,13 @@ class WalletProvider extends ChangeNotifier {
       final String cliente = fattura['cliente'] as String? ?? '';
       final String? contoAccredito = fattura['contoAccredito'] as String?;
 
-      // 1. Storna il fatturato totale
       _fatturatoTotale = (_fatturatoTotale - importoLordo).clamp(0.0, double.infinity);
 
-      // 2. Identifica i conti di sistema in modo sicuro
       final contoPrincipale = _accounts.firstWhere(
         (a) => a.role == AccountRole.principal || a.id == '1',
         orElse: () => _accounts.first,
       );
 
-      final salvadanaioTasse = _accounts.firstWhere(
-        (a) => a.role == AccountRole.taxReserve || a.id == '3',
-        orElse: () => _accounts.last,
-      );
-
-      // 3. Storna l'importo della fattura dal conto su cui era stata accreditata
       final targetAccount = (contoAccredito != null)
           ? _accounts.firstWhere(
               (acc) => acc.title.contains(contoAccredito) || contoAccredito.contains(acc.title),
@@ -754,44 +681,11 @@ class WalletProvider extends ChangeNotifier {
             )
           : contoPrincipale;
 
-      targetAccount.amount = (targetAccount.amount - importoLordo).clamp(0.0, double.infinity);
+      targetAccount.amount -= importoLordo;
 
-      // 4. Rimuove il movimento storico generato dall'incasso
       _transactions.removeWhere((t) => t.title.contains(cliente));
 
-      // 🛡️ 5. REINTEGRO FISCALE MIRATO (Protegge i risparmi extra nel Salvadanaio!):
-      // A. Identifichiamo quante tasse erano legate a QUESTA specifica fattura eliminata
-      final double tasseFatturaEliminata = (fattura['importoTasse'] as num?)?.toDouble() ?? (importoLordo * aliquotaFiscaleReale);
-
-      // B. Restituiamo al Conto Principale al massimo le tasse di questa fattura (o quanto disponibile nel Salvadanaio)
-      final double quotaDaRestituire = tasseFatturaEliminata.clamp(0.0, salvadanaioTasse.amount);
-
-      if (quotaDaRestituire > 0) {
-        // Uscita dal Salvadanaio Tasse
-        addTransaction(
-          title: 'Storno Tasse Fattura 🔄',
-          amount: quotaDaRestituire,
-          isIncome: false,
-          category: 'Giroconto',
-          accountId: salvadanaioTasse.id,
-        );
-
-        // Rientro sul Conto Principale
-        addTransaction(
-          title: 'Rientro Tasse (Storno Fattura) 🔄',
-          amount: quotaDaRestituire,
-          isIncome: true,
-          category: 'Giroconto',
-          accountId: contoPrincipale.id,
-        );
-      }
-
-      // C. Ricalcoliamo le tasse in sospeso sulle fatture rimaste
-      final double totaleTasseRimanenti = _fattureIncassate
-          .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
-
-      // 6. Aggiorna le tasse virtuali in sospeso sul Conto Principale
-      contoPrincipale.virtualTaxAmount = (totaleTasseRimanenti - salvadanaioTasse.amount).clamp(0.0, double.infinity);
+      _aggiornaTasseVirtuali();
     } else {
       _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
     }
@@ -815,6 +709,7 @@ class WalletProvider extends ChangeNotifier {
         if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
       }
 
+      _aggiornaTasseVirtuali();
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
@@ -880,6 +775,7 @@ class WalletProvider extends ChangeNotifier {
         giornoRicorrenza: tx.giornoRicorrenza,
       );
 
+      _aggiornaTasseVirtuali();
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
@@ -908,7 +804,7 @@ class WalletProvider extends ChangeNotifier {
 
   Future<void> resetTuttiIDati() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // 👈 Cancella la memoria
+    await prefs.clear();
 
     _accounts = [
       AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
@@ -925,6 +821,7 @@ class WalletProvider extends ChangeNotifier {
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();
 
+    _aggiornaTasseVirtuali();
     notifyListeners();
   }
 
@@ -974,27 +871,7 @@ class WalletProvider extends ChangeNotifier {
     );
     _transactions.insert(0, newTx);
 
-    double remainingToDeduct = importoF24;
-
-    if (targetAccount.virtualTaxAmount >= remainingToDeduct) {
-      targetAccount.virtualTaxAmount -= remainingToDeduct;
-      remainingToDeduct = 0;
-    } else {
-      remainingToDeduct -= targetAccount.virtualTaxAmount;
-      targetAccount.virtualTaxAmount = 0;
-
-      for (var acc in _accounts) {
-        if (remainingToDeduct <= 0) break;
-        if (acc.virtualTaxAmount >= remainingToDeduct) {
-          acc.virtualTaxAmount -= remainingToDeduct;
-          remainingToDeduct = 0;
-        } else {
-          remainingToDeduct -= acc.virtualTaxAmount;
-          acc.virtualTaxAmount = 0;
-        }
-      }
-    }
-
+    _aggiornaTasseVirtuali();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1010,7 +887,6 @@ class WalletProvider extends ChangeNotifier {
 
     if (importo <= 0 || accDa.amount < importo) return;
 
-    // 🎯 1. RICONOSCIMENTO AUTOMATICO DEI FLUSSI FISCALI SUI RUOLI
     final bool eVersamentoTasse = accA.role == AccountRole.taxReserve || isAccantonamentoTasse;
     final bool ePrelievoTasse = accDa.role == AccountRole.taxReserve;
 
@@ -1025,7 +901,10 @@ class WalletProvider extends ChangeNotifier {
       titoloA = 'Rientro Liquidità da Tasse ⚠️';
     }
 
-    // 🎯 2. REGISTRAZIONE TRANSAZIONI E AGGIORNAMENTO SALDI CONTI
+    // 🎯 addTransaction si occupa GIÀ di aggiornare i saldi dei due conti!
+    // Non dobbiamo fare accDa.amount -= importo a mano qui.
+
+    // 1. Registra l'uscita dal primo conto
     addTransaction(
       title: titoloDa,
       amount: importo,
@@ -1034,6 +913,7 @@ class WalletProvider extends ChangeNotifier {
       accountId: accDa.id,
     );
 
+    // 2. Registra l'entrata nel secondo conto
     addTransaction(
       title: titoloA,
       amount: importo,
@@ -1042,27 +922,7 @@ class WalletProvider extends ChangeNotifier {
       accountId: accA.id,
     );
 
-    // 🎯 3. MATEMATICA UNIVERSALE FISCALE:
-    // Se il trasferimento coinvolge il Salvadanaio Tasse (da o verso QUALSIASI conto),
-    // ricalcola al centesimo la quota di tasse in sospeso sul Conto Principale!
-    if (eVersamentoTasse || ePrelievoTasse) {
-      final contoPrincipale = _accounts.firstWhere(
-        (a) => a.role == AccountRole.principal,
-        orElse: () => _accounts.first,
-      );
-
-      // Totale tasse reale generato dalle fatture incassate
-      final double totaleTasseIncassate = _fattureIncassate
-          .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
-
-      // Nuova riserva presente nel Salvadanaio Tasse dopo il movimento
-      final double riservaSalvadanaio = _accounts
-          .where((a) => a.role == AccountRole.taxReserve)
-          .fold(0.0, (sum, a) => sum + a.amount);
-
-      // Le tasse in sospeso sul Principale sono: Totale Dovuto - Riserva Accantonata
-      contoPrincipale.virtualTaxAmount = (totaleTasseIncassate - riservaSalvadanaio).clamp(0.0, double.infinity);
-    }
+    _aggiornaTasseVirtuali();
 
     _salvaDatiInLocalStorage();
     notifyListeners();
@@ -1073,9 +933,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===========================================================================
-  // 💾 SALVATAGGIO PROFILO FISCALE DAL WIZARD
-  // ===========================================================================
   void salvaProfiloFiscale({
     required String codiceAteco,
     required double coeffRedditivitaVal,
@@ -1098,12 +955,7 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===========================================================================
-  // 🔄 RESET MORBIDO: AZZERA FATTURE E MOVIMENTI MA MANTIENE IL QUESTIONARIO
-  // ===========================================================================
   Future<void> resetSoloMovimentieFatture() async {
-    final prefs = await SharedPreferences.getInstance();
-
     _accounts = [
       AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
       AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
@@ -1118,6 +970,7 @@ class WalletProvider extends ChangeNotifier {
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();
 
+    _aggiornaTasseVirtuali();
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }
