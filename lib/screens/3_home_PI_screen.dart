@@ -542,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 12),
                               SizedBox(width: 3),
                               Text(
-                                'V2.2 Stabile', // 👈 Cambia questo testo in futuro per i tuoi test
+                                'V2.3 Stabile', // 👈 Cambia questo testo in futuro per i tuoi test
                                 style: TextStyle(
                                   color: Color(0xFF2DD4BF),
                                   fontSize: 10,

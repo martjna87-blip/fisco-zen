@@ -927,22 +927,29 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardOpen = bottomInset > 0;
+Widget build(BuildContext context) {
+  final screenSize = MediaQuery.of(context).size;
+  final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+  final isKeyboardOpen = bottomInset > 0;
+  // 1️⃣ Misuriamo lo spazio dell'orologio/notch dello smartphone
+  final topSafeArea = MediaQuery.of(context).padding.top + 12;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      child: SafeArea(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            width: double.infinity,
-            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
-            color: const Color(0xFF18181B),
-            child: Stack(
+  return Dialog(
+    backgroundColor: Colors.transparent,
+    // 2️⃣ Blocchiamo l'inizio del Pop-up SOTTO l'orologio
+    insetPadding: EdgeInsets.only(
+      left: 10,
+      right: 10,
+      top: topSafeArea, // 👈 La scheda parte esattamente sotto la batteria/ora
+      bottom: isKeyboardOpen ? 10 : 16,
+    ),
+    child: ClipRRect( // 👈 Togliamo SafeArea da qui
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity, // 👈 Altezza fluida e uguale per tutti i telefoni
+        color: const Color(0xFF18181B),
+        child: Stack(
               children: [
                 Positioned.fill(
                   child: Image.network(
@@ -1082,7 +1089,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ],
             ),
           ),
-        ),
       ),
     );
   }
