@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -928,168 +929,77 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardOpen = bottomInset > 0;
-    
-    // 🛡️ Prendiamo l'altezza hardware REALE dell'orologio (viewPadding) + 24px di respiro
-    final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 24.0;
+    final String titoloModal = _tipoMovimento == 'riepilogo'
+        ? 'Riepilogo Movimenti'
+        : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata');
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.only(
-        left: 10,
-        right: 10,
-        top: topMargin, // 🎯 Spinge la scheda ~75px sotto il bordo del telefono!
-        bottom: isKeyboardOpen ? 10 : 20,
-      ),
-    child: ClipRRect( // 👈 Togliamo SafeArea da qui
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        width: double.infinity,
-        height: double.infinity, // 👈 Altezza fluida e uguale per tutti i telefoni
-        color: const Color(0xFF18181B),
-        child: Stack(
+    return AppPopupWrapper(
+      title: titoloModal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: Row(
               children: [
-                Positioned.fill(
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFF0F172A),
-                    ),
+                Expanded(
+                  child: _buildTypeTab(
+                    label: 'Riepilogo',
+                    isSelected: _tipoMovimento == 'riepilogo',
+                    color: const Color(0xFF2DD4BF),
+                    onTap: () {
+                      _pageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                    },
                   ),
                 ),
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withOpacity(0.75),
+                Expanded(
+                  child: _buildTypeTab(
+                    label: 'Uscita',
+                    isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
+                    color: const Color(0xFFEF4444),
+                    onTap: () {
+                      _pageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                    },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => Navigator.pop(context),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                ),
-                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _tipoMovimento == 'riepilogo'
-                                  ? 'Riepilogo Movimenti'
-                                  : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata'),
-                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(22),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF18181B).withOpacity(0.60),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: Colors.white.withOpacity(0.15)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildTypeTab(
-                                            label: 'Riepilogo',
-                                            isSelected: _tipoMovimento == 'riepilogo',
-                                            color: const Color(0xFF2DD4BF),
-                                            onTap: () {
-                                              _pageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                                            },
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: _buildTypeTab(
-                                            label: 'Uscita',
-                                            isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
-                                            color: const Color(0xFFEF4444),
-                                            onTap: () {
-                                              _pageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                                            },
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: _buildTypeTab(
-                                            label: 'Entrata',
-                                            isSelected: _tipoMovimento == 'entrata',
-                                            color: const Color(0xFF10B981),
-                                            onTap: () {
-                                              _pageController.animateToPage(2, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Expanded(
-                                    child: PageView(
-                                      controller: _pageController,
-                                      physics: const BouncingScrollPhysics(),
-                                      onPageChanged: (index) {
-                                        setState(() {
-                                          if (index == 0) _tipoMovimento = 'riepilogo';
-                                          else if (index == 1) _tipoMovimento = 'uscita';
-                                          else if (index == 2) _tipoMovimento = 'entrata';
-                                        });
-                                      },
-                                      children: [
-                                        _buildSchermataRiepilogo(),
-                                        _buildFormMovimento(isSpesa: true),
-                                        _buildFormMovimento(isSpesa: false),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: _buildTypeTab(
+                    label: 'Entrata',
+                    isSelected: _tipoMovimento == 'entrata',
+                    color: const Color(0xFF10B981),
+                    onTap: () {
+                      _pageController.animateToPage(2, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                    },
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  if (index == 0) _tipoMovimento = 'riepilogo';
+                  else if (index == 1) _tipoMovimento = 'uscita';
+                  else if (index == 2) _tipoMovimento = 'entrata';
+                });
+              },
+              children: [
+                _buildSchermataRiepilogo(),
+                _buildFormMovimento(isSpesa: true),
+                _buildFormMovimento(isSpesa: false),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
