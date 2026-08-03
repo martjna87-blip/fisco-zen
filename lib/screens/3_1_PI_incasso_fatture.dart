@@ -151,10 +151,11 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    // LEGGI SEMPRE LA LISTA AGGIORNATA DAL PROVIDER
     final fattureAttuali = walletProvider.fattureDaIncassare;
     final contiDisponibili = widget.contiWallet ?? walletProvider.accounts.map((a) => a.title).toList();
 
@@ -164,433 +165,405 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // SFONDO CLICCABILE PER CHIUDERE
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              height: screenHeight * 0.85,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                image: const DecorationImage(
-                  image: NetworkImage('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=1000&auto=format&fit=crop'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.40), Colors.black.withOpacity(0.85)],
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      child: SafeArea(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            width: double.infinity,
+            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
+            color: const Color(0xFF141417),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.network(
+                    'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=1000&auto=format&fit=crop',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(0xFF0F172A),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          // CARD FROSTED GLASS
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 18),
-              child: Container(
-                height: screenHeight * 0.80,
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141417).withOpacity(0.80),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.75),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // HEADER
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
-                              onPressed: () => Navigator.pop(context),
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                ),
+                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
                               'Processo di Incasso',
                               style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // LISTA FATTURE DA INCASSARE
-                    Expanded(
-                      child: fattureAttuali.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Nessuna fattura da incassare!',
-                                style: TextStyle(color: Colors.white54, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141417).withOpacity(0.75),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(color: Colors.white.withOpacity(0.15)),
                               ),
-                            )
-                          : ListView.builder(
-                              physics: const BouncingScrollPhysics(),
-                              itemCount: fattureAttuali.length,
-                              itemBuilder: (context, index) {
-                                final f = fattureAttuali[index];
-                                final String id = f['id'] as String;
-                                final bool isEspansa = _fatturaEspansaId == id;
-                                final double lordo = (f['importo'] as num).toDouble();
-                                final String nomeCliente = f['cliente'] as String;
-
-                                // 🧮 CALCOLO FISCALE COMPLETO (SALDO Y + ACCONTI Y+1)
-                                final double imponibile = lordo * widget.coefficienteRedditivita;
-
-                                // 1. Tasse Saldo Anno Corrente (Y)
-                                final double inpsY = imponibile * widget.aliquotaInps;
-                                final double impostaY = imponibile * widget.aliquotaImposta;
-                                final double totaleSaldoY = inpsY + impostaY;
-
-                                // 2. Acconti Anno Successivo (Y+1)
-                                final double accontoInpsY1 = inpsY * 0.80;       // 80% INPS
-                                final double accontoImpostaY1 = impostaY * 1.00;  // 100% Imposta Sostitutiva
-                                final double totaleAccontiY1 = accontoInpsY1 + accontoImpostaY1;
-
-                                // 3. Totale da accantonare & Netto Spendibile Reale
-                                final double tasseTotaliAccantonare = totaleSaldoY + totaleAccontiY1;
-                                final double disponibileNetto = lordo - tasseTotaliAccantonare;
-
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  decoration: BoxDecoration(
-                                    color: isEspansa ? Colors.black.withOpacity(0.55) : Colors.black.withOpacity(0.30),
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: isEspansa ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
-                                      width: isEspansa ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      // INTESTAZIONE FATTURA
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            _fatturaEspansaId = isEspansa ? null : id;
-                                            _isTendinaContiAperta = false;
-                                          });
-                                        },
-                                        borderRadius: BorderRadius.circular(18),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(14),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      nomeCliente,
-                                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      '${f['numero'] ?? ''} • ${f['data'] ?? ''}',
-                                                      style: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    '+${lordo.toStringAsFixed(2)} €',
-                                                    style: const TextStyle(color: Color(0xFF10B981), fontSize: 15, fontWeight: FontWeight.bold),
-                                                  ),
-                                                  const SizedBox(width: 8),
-
-                                                  // 👈 FRECCETTA APERTURA PULITA (CESTINO RIMOZIONE SICURA ALL'INTERNO)
-                                                  Icon(
-                                                    isEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                    color: Colors.white54,
-                                                    size: 20,
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
+                              child: fattureAttuali.isEmpty
+                                  ? const Center(
+                                      child: Text(
+                                        'Nessuna fattura da incassare!',
+                                        style: TextStyle(color: Colors.white54, fontSize: 13),
                                       ),
+                                    )
+                                  : ListView.builder(
+                                      physics: const BouncingScrollPhysics(),
+                                      itemCount: fattureAttuali.length,
+                                      itemBuilder: (context, index) {
+                                        final f = fattureAttuali[index];
+                                        final String id = f['id'] as String;
+                                        final bool isEspansa = _fatturaEspansaId == id;
+                                        final double lordo = (f['importo'] as num).toDouble();
+                                        final String nomeCliente = f['cliente'] as String;
 
-                                      // PROCESSO DI INCASSO ESPANSO
-                                      if (isEspansa) ...[
-                                        const Divider(color: Colors.white12, height: 1),
-                                        Padding(
-                                          padding: const EdgeInsets.all(14),
+                                        final double imponibile = lordo * widget.coefficienteRedditivita;
+                                        final double inpsY = imponibile * widget.aliquotaInps;
+                                        final double impostaY = imponibile * widget.aliquotaImposta;
+                                        final double totaleSaldoY = inpsY + impostaY;
+
+                                        final double accontoInpsY1 = inpsY * 0.80;
+                                        final double accontoImpostaY1 = impostaY * 1.00;
+                                        final double totaleAccontiY1 = accontoInpsY1 + accontoImpostaY1;
+
+                                        final double tasseTotaliAccantonare = totaleSaldoY + totaleAccontiY1;
+                                        final double disponibileNetto = lordo - tasseTotaliAccantonare;
+
+                                        return AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          margin: const EdgeInsets.only(bottom: 10),
+                                          decoration: BoxDecoration(
+                                            color: isEspansa ? Colors.black.withOpacity(0.55) : Colors.black.withOpacity(0.30),
+                                            borderRadius: BorderRadius.circular(18),
+                                            border: Border.all(
+                                              color: isEspansa ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
+                                              width: isEspansa ? 1.5 : 1,
+                                            ),
+                                          ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              // DETTAGLI INCASSO (NETTO VERDE + BLU TASSE UNIFICATO)
-                                              Container(
-                                                padding: const EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.35),
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: Colors.white12),
-                                                ),
-                                                child: Column(
-                                                  children: [
-                                                    _buildDetailRow(Icons.add_circle_outline, 'Entrata Incasso Lordo:', '+${lordo.toStringAsFixed(2)} €', const Color(0xFF10B981)),
-                                                    const SizedBox(height: 6),
-                                                    _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '+${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
-                                                    const SizedBox(height: 6),
-                                                    _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
-                                                    const Divider(color: Colors.white12, height: 14),
-                                                    _buildDetailRow(Icons.remove_circle_outline, 'Saldo Tasse (Anno Y):', '-${totaleSaldoY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
-                                                    const SizedBox(height: 6),
-                                                    _buildDetailRow(Icons.history_toggle_off_rounded, 'Acconti (Anno Y+1):', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              const SizedBox(height: 14),
-
-                                              // SELEZIONE CONTO A TENDINA IN-LINE (BLINDATO)
-                                              const Text('SELEZIONA CONTO DI ACCREDITO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                              const SizedBox(height: 6),
-                                              
-                                              AnimatedContainer(
-                                                duration: const Duration(milliseconds: 200),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.4),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: _isTendinaContiAperta ? const Color(0xFF2DD4BF) : Colors.white12,
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  children: [
-                                                    // TESTATA TENDINA
-                                                    InkWell(
-                                                      onTap: () {
-                                                        setState(() {
-                                                          _isTendinaContiAperta = !_isTendinaContiAperta;
-                                                        });
-                                                      },
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                        child: Row(
-                                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                          children: [
-                                                            Expanded(
-                                                              child: Row(
-                                                                children: [
-                                                                  const Icon(Icons.account_balance_outlined, color: Color(0xFF2DD4BF), size: 16),
-                                                                  const SizedBox(width: 8),
-                                                                  Expanded(
-                                                                    child: Text(
-                                                                      _contoSelezionato ?? 'Seleziona un conto',
-                                                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                            const SizedBox(width: 6),
-                                                            Icon(
-                                                              _isTendinaContiAperta ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                              color: const Color(0xFF2DD4BF),
-                                                              size: 18,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-
-                                                    // ELEMENTI TENDINA APERTA
-                                                    if (_isTendinaContiAperta) ...[
-                                                      const Divider(color: Colors.white12, height: 1),
-                                                      Column(
-                                                        children: contiDisponibili.map((conto) {
-                                                          final bool isSelected = conto == _contoSelezionato;
-                                                          return InkWell(
-                                                            onTap: () {
-                                                              setState(() {
-                                                                _contoSelezionato = conto;
-                                                                _isTendinaContiAperta = false;
-                                                              });
-                                                            },
-                                                            child: Container(
-                                                              width: double.infinity,
-                                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                              color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.15) : Colors.transparent,
-                                                              child: Row(
-                                                                children: [
-                                                                  Icon(
-                                                                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                                                    color: isSelected ? const Color(0xFF2DD4BF) : Colors.white38,
-                                                                    size: 16,
-                                                                  ),
-                                                                  const SizedBox(width: 10),
-                                                                  Expanded(
-                                                                    child: Text(
-                                                                      conto,
-                                                                      style: TextStyle(
-                                                                        color: isSelected ? Colors.white : Colors.white70,
-                                                                        fontSize: 12,
-                                                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                                      ),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }).toList(),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ),
-
-                                              const SizedBox(height: 12),
-
-                                              // DATA INCASSO (BLINDATO)
-                                              const Text('DATA INCASSO FATTURA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                              const SizedBox(height: 6),
                                               InkWell(
-                                                onTap: () => _selezionaData(context),
-                                                borderRadius: BorderRadius.circular(12),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black.withOpacity(0.4),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                    border: Border.all(color: Colors.white12),
-                                                  ),
+                                                onTap: () {
+                                                  setState(() {
+                                                    _fatturaEspansaId = isEspansa ? null : id;
+                                                    _isTendinaContiAperta = false;
+                                                  });
+                                                },
+                                                borderRadius: BorderRadius.circular(18),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(14),
                                                   child: Row(
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
                                                       Expanded(
-                                                        child: Row(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
                                                           children: [
-                                                            const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 15),
-                                                            const SizedBox(width: 8),
-                                                            Expanded(
-                                                              child: Text(
-                                                                _formattaDataInItaliano(_dataSelezionata),
-                                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                                maxLines: 1,
-                                                                overflow: TextOverflow.ellipsis,
-                                                              ),
+                                                            Text(
+                                                              nomeCliente,
+                                                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                            const SizedBox(height: 2),
+                                                            Text(
+                                                              '${f['numero'] ?? ''} • ${f['data'] ?? ''}',
+                                                              style: const TextStyle(color: Colors.white54, fontSize: 11),
                                                             ),
                                                           ],
                                                         ),
                                                       ),
-                                                      const SizedBox(width: 6),
-                                                      const Text('Modifica', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                                                      Row(
+                                                        children: [
+                                                          Text(
+                                                            '+${lordo.toStringAsFixed(2)} €',
+                                                            style: const TextStyle(color: Color(0xFF10B981), fontSize: 15, fontWeight: FontWeight.bold),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Icon(
+                                                            isEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                            color: Colors.white54,
+                                                            size: 20,
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ],
                                                   ),
                                                 ),
                                               ),
+                                              if (isEspansa) ...[
+                                                const Divider(color: Colors.white12, height: 1),
+                                                Padding(
+                                                  padding: const EdgeInsets.all(14),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets.all(12),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black.withOpacity(0.35),
+                                                          borderRadius: BorderRadius.circular(14),
+                                                          border: Border.all(color: Colors.white12),
+                                                        ),
+                                                        child: Column(
+                                                          children: [
+                                                            _buildDetailRow(Icons.add_circle_outline, 'Entrata Incasso Lordo:', '+${lordo.toStringAsFixed(2)} €', const Color(0xFF10B981)),
+                                                            const SizedBox(height: 6),
+                                                            _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '+${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+                                                            const SizedBox(height: 6),
+                                                            _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
+                                                            const Divider(color: Colors.white12, height: 14),
+                                                            _buildDetailRow(Icons.remove_circle_outline, 'Saldo Tasse (Anno Y):', '-${totaleSaldoY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
+                                                            const SizedBox(height: 6),
+                                                            _buildDetailRow(Icons.history_toggle_off_rounded, 'Acconti (Anno Y+1):', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 14),
+                                                      const Text('SELEZIONA CONTO DI ACCREDITO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                                      const SizedBox(height: 6),
+                                                      AnimatedContainer(
+                                                        duration: const Duration(milliseconds: 200),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black.withOpacity(0.4),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          border: Border.all(
+                                                            color: _isTendinaContiAperta ? const Color(0xFF2DD4BF) : Colors.white12,
+                                                          ),
+                                                        ),
+                                                        child: Column(
+                                                          children: [
+                                                            InkWell(
+                                                              onTap: () {
+                                                                setState(() {
+                                                                  _isTendinaContiAperta = !_isTendinaContiAperta;
+                                                                });
+                                                              },
+                                                              borderRadius: BorderRadius.circular(12),
+                                                              child: Padding(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                                child: Row(
+                                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                  children: [
+                                                                    Expanded(
+                                                                      child: Row(
+                                                                        children: [
+                                                                          const Icon(Icons.account_balance_outlined, color: Color(0xFF2DD4BF), size: 16),
+                                                                          const SizedBox(width: 8),
+                                                                          Expanded(
+                                                                            child: Text(
+                                                                              _contoSelezionato ?? 'Seleziona un conto',
+                                                                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(width: 6),
+                                                                    Icon(
+                                                                      _isTendinaContiAperta ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                                      color: const Color(0xFF2DD4BF),
+                                                                      size: 18,
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            if (_isTendinaContiAperta) ...[
+                                                              const Divider(color: Colors.white12, height: 1),
+                                                              Column(
+                                                                children: contiDisponibili.map((conto) {
+                                                                  final bool isSelected = conto == _contoSelezionato;
+                                                                  return InkWell(
+                                                                    onTap: () {
+                                                                      setState(() {
+                                                                        _contoSelezionato = conto;
+                                                                        _isTendinaContiAperta = false;
+                                                                      });
+                                                                    },
+                                                                    child: Container(
+                                                                      width: double.infinity,
+                                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                                      color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.15) : Colors.transparent,
+                                                                      child: Row(
+                                                                        children: [
+                                                                          Icon(
+                                                                            isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                                                            color: isSelected ? const Color(0xFF2DD4BF) : Colors.white38,
+                                                                            size: 16,
+                                                                          ),
+                                                                          const SizedBox(width: 10),
+                                                                          Expanded(
+                                                                            child: Text(
+                                                                              conto,
+                                                                              style: TextStyle(
+                                                                                color: isSelected ? Colors.white : Colors.white70,
+                                                                                fontSize: 12,
+                                                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                                              ),
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                }).toList(),
+                                                              ),
+                                                            ],
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 12),
+                                                      const Text('DATA INCASSO FATTURA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                                      const SizedBox(height: 6),
+                                                      InkWell(
+                                                        onTap: () => _selezionaData(context),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black.withOpacity(0.4),
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            border: Border.all(color: Colors.white12),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                            children: [
+                                                              Expanded(
+                                                                child: Row(
+                                                                  children: [
+                                                                    const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 15),
+                                                                    const SizedBox(width: 8),
+                                                                    Expanded(
+                                                                      child: Text(
+                                                                        _formattaDataInItaliano(_dataSelezionata),
+                                                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                                                        maxLines: 1,
+                                                                        overflow: TextOverflow.ellipsis,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              const Text('Modifica', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 16),
+                                                      SizedBox(
+                                                        width: double.infinity,
+                                                        child: ElevatedButton(
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: const Color(0xFF2DD4BF),
+                                                            foregroundColor: Colors.black,
+                                                            padding: const EdgeInsets.symmetric(vertical: 14),
+                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                                            elevation: 0,
+                                                          ),
+                                                          onPressed: () {
+                                                            if (_contoSelezionato != null) {
+                                                              final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
 
-                                              const SizedBox(height: 16),
+                                                              context.read<WalletProvider>().incassaFatturaPiva(
+                                                                idFattura: id,
+                                                                cliente: nomeCliente,
+                                                                importoLordo: lordo,
+                                                                importoTasse: tasseTotaliAccantonare,
+                                                                contoDestinazione: _contoSelezionato!,
+                                                                dataIncasso: dataFormatted,
+                                                              );
 
-                                              // PULSANTE CONFERMA INCASSO (A LARGHEZZA PIENA)
-                                              SizedBox(
-                                                width: double.infinity,
-                                                child: ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: const Color(0xFF2DD4BF),
-                                                    foregroundColor: Colors.black,
-                                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                                    elevation: 0,
-                                                  ),
-                                                  onPressed: () {
-                                                    if (_contoSelezionato != null) {
-                                                      final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
+                                                              if (widget.onIncasse != null) {
+                                                                widget.onIncasse!(
+                                                                  id,
+                                                                  _contoSelezionato!,
+                                                                  lordo,
+                                                                  tasseTotaliAccantonare,
+                                                                  dataFormatted,
+                                                                );
+                                                              }
 
-                                                     // 1. INCASSO REALE CON TOTALE COMPLETO DI ACCONTI E DATA SCELTA
-                                                      context.read<WalletProvider>().incassaFatturaPiva(
-                                                        idFattura: id,
-                                                        cliente: nomeCliente,
-                                                        importoLordo: lordo,
-                                                        importoTasse: tasseTotaliAccantonare,
-                                                        contoDestinazione: _contoSelezionato!,
-                                                        dataIncasso: dataFormatted,
-                                                      );
-
-                                                      // 2. CALLBACK LOCALE SE PRESENTE
-                                                      if (widget.onIncasse != null) {
-                                                        widget.onIncasse!(
-                                                          id,
-                                                          _contoSelezionato!,
-                                                          lordo,
-                                                          tasseTotaliAccantonare,
-                                                          dataFormatted,
-                                                        );
-                                                      }
-
-                                                      // 3. CHIUDI MODALE
-                                                      Navigator.pop(context);
-                                                    }
-                                                  },
-                                                  child: const Text(
-                                                    'Conferma Incasso e Accantona',
-                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                              Navigator.pop(context);
+                                                            }
+                                                          },
+                                                          child: const Text(
+                                                            'Conferma Incasso e Accantona',
+                                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 10),
+                                                      Center(
+                                                        child: TextButton.icon(
+                                                          onPressed: () => _confermaEliminazione(context, f),
+                                                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 15),
+                                                          label: const Text(
+                                                            'Elimina questa fattura',
+                                                            style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                              ),
-
-                                              const SizedBox(height: 10),
-
-                                              // 🗑️ PULSANTE ELIMINA PROTETTO IN FONDO ALLA SCHEDA
-                                              Center(
-                                                child: TextButton.icon(
-                                                  onPressed: () => _confermaEliminazione(context, f),
-                                                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 15),
-                                                  label: const Text(
-                                                    'Elimina questa fattura',
-                                                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ),
+                                              ],
                                             ],
                                           ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                );
-                              },
+                                        );
+                                      },
+                                    ),
                             ),
-                    ),
-                  ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

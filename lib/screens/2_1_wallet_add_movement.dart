@@ -940,7 +940,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           borderRadius: BorderRadius.circular(28),
           child: Container(
             width: double.infinity,
-            height: isKeyboardOpen ? screenSize.height * 0.90 : screenSize.height * 0.80,
+            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
             color: const Color(0xFF18181B),
             child: Stack(
               children: [

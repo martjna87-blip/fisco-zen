@@ -607,321 +607,320 @@ class _BudgetPilotSheetState extends State<BudgetPilotSheet> {
     final double pctRealeVariabili = totaleSpesoReale > 0 ? (spesoVariabili / totaleSpesoReale) * 100 : 0;
     final double pctRealeRisparmio = totaleSpesoReale > 0 ? (spesoRisparmio / totaleSpesoReale) * 100 : 0;
 
-    // 📍 STRUTTURA DIALOG A DOPPIO RIQUADRO IDENTICA A REGISTRA FATTURA
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 10, 
-        vertical: isKeyboardOpen ? 10 : 14,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: SizedBox(
-          width: double.infinity,
-          height: screenSize.height * 0.88,
-          child: Stack(
-            children: [
-              // 1. IMMAGINE SFONDO ATMOSFERICA
-              Positioned.fill(
-                child: Image.network(
-                  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: const Color(0xFF0F172A),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      child: SafeArea( // 🛡️ PROTEZIONE ANTI-NOTCH PER LA 'X'
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            width: double.infinity,
+            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
+            color: const Color(0xFF18181B),
+            child: Stack(
+              children: [
+                // 1. IMMAGINE SFONDO ATMOSFERICA
+                Positioned.fill(
+                  child: Image.network(
+                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(0xFF0F172A),
+                    ),
                   ),
                 ),
-              ),
 
-              // 2. OVERLAY SCURO SFUMATO
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.75),
+                // 2. OVERLAY SCURO SFUMATO
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.75),
+                  ),
                 ),
-              ),
 
-              // 3. CONTENUTO CON HEADER CIRCOLARE E SCHEDE GLASS
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    // --- HEADER CON BOTTONE (X) CIRCOLARE (BLINDATO OVERFLOW) ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () => Navigator.pop(context),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.12),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                    ),
-                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'Pilotaggio Budget',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Row(
-                          children: [
-                            InkWell(
-                              onTap: _mostraDialogPersonalizzaPercentuali,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: _mostraDialogAggiungiVoceBudget,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                    SizedBox(width: 3),
-                                    Text(
-                                      'Voce',
-                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // ==========================================
-                    // 🔲 RIQUADRO 1: CORPO PRINCIPALE GLASSMORPHIC
-                    // ==========================================
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF18181B).withOpacity(0.60),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: Colors.white.withOpacity(0.15)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                // 3. CONTENUTO CON HEADER CIRCOLARE E SCHEDE GLASS
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    children: [
+                      // --- HEADER CON BOTTONE (X) CIRCOLARE (BLINDATO OVERFLOW) ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
                               children: [
-                                // NAVIGATORE MESE
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.4),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 16),
-                                        onPressed: () => _cambiaMese(-1),
-                                        tooltip: 'Mese Precedente',
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () => Navigator.pop(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white.withOpacity(0.2)),
                                       ),
-                                      Text(
-                                        stringaMeseCorrente.toUpperCase(),
-                                        style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
-                                        onPressed: () => _cambiaMese(1),
-                                        tooltip: 'Mese Successivo',
-                                      ),
-                                    ],
+                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                                    ),
                                   ),
                                 ),
-
-                                const SizedBox(height: 12),
-
-                                // CONTENUTO SCROLLABILE
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    controller: _scrollController,
-                                    physics: const BouncingScrollPhysics(),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // CIAMBELLA REALE VS OBIETTIVO
-                                        Container(
-                                          padding: const EdgeInsets.all(14),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.35),
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              SizedBox(
-                                                width: 80,
-                                                height: 80,
-                                                child: CustomPaint(
-                                                  painter: _BudgetDonutPainter(
-                                                    pctFisse: pctRealeFisse,
-                                                    pctVariabili: pctRealeVariabili,
-                                                    pctRisparmio: pctRealeRisparmio,
-                                                  ),
-                                                  child: Center(
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        const Text('SPESO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
-                                                        Text('${totaleSpesoReale.toInt()}€', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 14),
-
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text('RIPARTIZIONE REALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                                                    const SizedBox(height: 6),
-                                                    _buildLegendaItem('Fisse', pctRealeFisse, _percentFisse, const Color(0xFF2DD4BF)),
-                                                    const SizedBox(height: 4),
-                                                    _buildLegendaItem('Variabili', pctRealeVariabili, _percentVariabili, const Color(0xFFF59E0B)),
-                                                    const SizedBox(height: 4),
-                                                    _buildLegendaItem('Risparmio', pctRealeRisparmio, _percentRisparmio, const Color(0xFF3B82F6)),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        const SizedBox(height: 14),
-                                        const Text('CATEGORIE DI PILOTAGGIO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                                        const SizedBox(height: 8),
-
-                                        // CARDE CATEGORIE
-                                        _buildBudgetProgressCard(
-                                          categoriaKey: '50% Spese Fisse',
-                                          titolo: '${_percentFisse.toInt()}% Spese Fisse',
-                                          speso: spesoFisse,
-                                          pianificato: previstoFisse,
-                                          targetMaxPct: targetMaxFisse,
-                                          colore: const Color(0xFF2DD4BF),
-                                          icona: Icons.home_outlined,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildBudgetProgressCard(
-                                          categoriaKey: '30% Spese Variabili',
-                                          titolo: '${_percentVariabili.toInt()}% Spese Variabili',
-                                          speso: spesoVariabili,
-                                          pianificato: previstoVariabili,
-                                          targetMaxPct: targetMaxVariabili,
-                                          colore: const Color(0xFFF59E0B),
-                                          icona: Icons.shopping_bag_outlined,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildBudgetProgressCard(
-                                          categoriaKey: '20% Risparmio',
-                                          titolo: '${_percentRisparmio.toInt()}% Risparmio',
-                                          speso: spesoRisparmio,
-                                          pianificato: previstoRisparmio,
-                                          targetMaxPct: targetMaxRisparmio,
-                                          colore: const Color(0xFF3B82F6),
-                                          icona: Icons.savings_outlined,
-                                        ),
-
-                                        const SizedBox(height: 12),
-                                      ],
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Pilotaggio Budget',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: _mostraDialogPersonalizzaPercentuali,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: _mostraDialogAggiungiVoceBudget,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'Voce',
+                                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
 
-                    if (!isKeyboardOpen) ...[
                       const SizedBox(height: 12),
 
                       // ==========================================
-                      // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
+                      // 🔲 RIQUADRO 1: CORPO PRINCIPALE GLASSMORPHIC
                       // ==========================================
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF18181B).withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.white.withOpacity(0.15)),
-                            ),
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF18181B).withOpacity(0.60),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(color: Colors.white.withOpacity(0.15)),
                               ),
-                              child: const Text(
-                                'Annulla e Chiudi',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // NAVIGATORE MESE
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.4),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 16),
+                                          onPressed: () => _cambiaMese(-1),
+                                          tooltip: 'Mese Precedente',
+                                        ),
+                                        Text(
+                                          stringaMeseCorrente.toUpperCase(),
+                                          style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                                          onPressed: () => _cambiaMese(1),
+                                          tooltip: 'Mese Successivo',
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // CONTENUTO SCROLLABILE
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      physics: const BouncingScrollPhysics(),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // CIAMBELLA REALE VS OBIETTIVO
+                                          Container(
+                                            padding: const EdgeInsets.all(14),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(0.35),
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 80,
+                                                  height: 80,
+                                                  child: CustomPaint(
+                                                    painter: _BudgetDonutPainter(
+                                                      pctFisse: pctRealeFisse,
+                                                      pctVariabili: pctRealeVariabili,
+                                                      pctRisparmio: pctRealeRisparmio,
+                                                    ),
+                                                    child: Center(
+                                                      child: Column(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          const Text('SPESO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
+                                                          Text('${totaleSpesoReale.toInt()}€', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 14),
+
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Text('RIPARTIZIONE REALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                                                      const SizedBox(height: 6),
+                                                      _buildLegendaItem('Fisse', pctRealeFisse, _percentFisse, const Color(0xFF2DD4BF)),
+                                                      const SizedBox(height: 4),
+                                                      _buildLegendaItem('Variabili', pctRealeVariabili, _percentVariabili, const Color(0xFFF59E0B)),
+                                                      const SizedBox(height: 4),
+                                                      _buildLegendaItem('Risparmio', pctRealeRisparmio, _percentRisparmio, const Color(0xFF3B82F6)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          const SizedBox(height: 14),
+                                          const Text('CATEGORIE DI PILOTAGGIO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                          const SizedBox(height: 8),
+
+                                          // CARDE CATEGORIE
+                                          _buildBudgetProgressCard(
+                                            categoriaKey: '50% Spese Fisse',
+                                            titolo: '${_percentFisse.toInt()}% Spese Fisse',
+                                            speso: spesoFisse,
+                                            pianificato: previstoFisse,
+                                            targetMaxPct: targetMaxFisse,
+                                            colore: const Color(0xFF2DD4BF),
+                                            icona: Icons.home_outlined,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          _buildBudgetProgressCard(
+                                            categoriaKey: '30% Spese Variabili',
+                                            titolo: '${_percentVariabili.toInt()}% Spese Variabili',
+                                            speso: spesoVariabili,
+                                            pianificato: previstoVariabili,
+                                            targetMaxPct: targetMaxVariabili,
+                                            colore: const Color(0xFFF59E0B),
+                                            icona: Icons.shopping_bag_outlined,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          _buildBudgetProgressCard(
+                                            categoriaKey: '20% Risparmio',
+                                            titolo: '${_percentRisparmio.toInt()}% Risparmio',
+                                            speso: spesoRisparmio,
+                                            pianificato: previstoRisparmio,
+                                            targetMaxPct: targetMaxRisparmio,
+                                            colore: const Color(0xFF3B82F6),
+                                            icona: Icons.savings_outlined,
+                                          ),
+
+                                          const SizedBox(height: 12),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
+
+                      if (!isKeyboardOpen) ...[
+                        const SizedBox(height: 12),
+
+                        // ==========================================
+                        // 🔲 RIQUADRO 2: TASTO CHIUDI BOTTOM GLASS
+                        // ==========================================
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF18181B).withOpacity(0.65),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                              ),
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: const Text(
+                                  'Annulla e Chiudi',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

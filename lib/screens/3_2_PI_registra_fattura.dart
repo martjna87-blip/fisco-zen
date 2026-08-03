@@ -171,24 +171,18 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final isPro = context.watch<WalletProvider>().isProUser;
     final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    
     final isKeyboardOpen = bottomInset > 0;
-    final dialogHeight = isKeyboardOpen ? screenSize.height * 0.78 : screenSize.height * 0.82;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 10, 
-        vertical: isKeyboardOpen ? 10 : 14,
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      child: SafeArea(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
-          child: SizedBox(
+          child: Container(
             width: double.infinity,
-            height: dialogHeight,
+            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
+            color: const Color(0xFF18181B),
             child: Stack(
               children: [
                 Positioned.fill(
@@ -209,44 +203,40 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
-                      // HEADER CON TASTO "X"
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () => Navigator.pop(context),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.12),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                    ),
-                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                                  ),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
                                 ),
+                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                               ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                'Registra Fattura',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Registra Fattura',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 12),
-
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(22),
@@ -274,8 +264,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-
-                                    // 🎯 CARD PRO AFFIANCATE
                                     Row(
                                       children: [
                                         Expanded(
@@ -319,11 +307,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                         ),
                                       ],
                                     ),
-
                                     const SizedBox(height: 16),
                                     const Divider(color: Colors.white12, height: 1),
                                     const SizedBox(height: 14),
-
                                     const Text(
                                       'INSERIMENTO MANUALE',
                                       style: TextStyle(
@@ -334,8 +320,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-
-                                    // 1. RIGA NUMERO E DATA AFFIANCATI (50/50)
                                     Row(
                                       children: [
                                         Expanded(
@@ -376,16 +360,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                       ],
                                     ),
                                     const SizedBox(height: 10),
-
-                                    // 2. CLIENTE
                                     TextField(
                                       controller: _clienteController,
                                       style: const TextStyle(color: Colors.white, fontSize: 13),
                                       decoration: _buildInputDecoration('Nome Cliente / Azienda', Icons.person_outline),
                                     ),
                                     const SizedBox(height: 10),
-
-                                    // 3. IMPORTO LORDO IN EVIDENZA
                                     TextField(
                                       controller: _importoController,
                                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -393,8 +373,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                       decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
                                     ),
                                     const SizedBox(height: 16),
-
-                                    // BOTTONE SALVA
                                     SizedBox(
                                       width: double.infinity,
                                       height: 46,
