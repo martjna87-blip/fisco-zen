@@ -27,25 +27,86 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
 
-  // 📝 LISTA VOCI DI SPESA & PIANIFICAZIONE
+  // 📝 LISTA VOCI DI SPESA CON STATI REALI (Pianificato vs Pagato vs In Corso)
   final List<Map<String, dynamic>> _vociPianificate = [
     // 📌 BISOGNI FISSI (50%)
-    {'nome': 'Affitto / Mutuo', 'categoria': 'Bisogni (50%)', 'previsto': 650.00, 'speso': 650.00, 'tipo': 'mensile'},
-    {'nome': 'Bollette & Utenze', 'categoria': 'Bisogni (50%)', 'previsto': 140.00, 'speso': 110.00, 'tipo': 'mensile'},
-    {'nome': 'Spesa Alimentare', 'categoria': 'Bisogni (50%)', 'previsto': 350.00, 'speso': 280.00, 'tipo': 'mensile'},
-    
-    // 📅 SPESE ANNALI SPALMATE (Il visualizzatore di sicurezza)
-    {'nome': 'Assicurazione Auto', 'categoria': 'Bisogni (50%)', 'previsto': 120.00, 'speso': 120.00, 'tipo': 'annuale_spalmata', 'totaleAnnuale': 1440.00, 'scadenza': 'Novembre'},
-    {'nome': 'Bollo Auto & Tagliando', 'categoria': 'Bisogni (50%)', 'previsto': 40.00, 'speso': 40.00, 'tipo': 'annuale_spalmata', 'totaleAnnuale': 480.00, 'scadenza': 'Maggio'},
+    {
+      'nome': 'Affitto / Mutuo',
+      'categoria': 'Bisogni (50%)',
+      'previsto': 650.00,
+      'speso': 650.00,
+      'tipo': 'mensile',
+      'stato': 'pagato' // ✓ Già addebitato sul conto
+    },
+    {
+      'nome': 'Bollette & Utenze',
+      'categoria': 'Bisogni (50%)',
+      'previsto': 140.00,
+      'speso': 0.00,
+      'tipo': 'mensile',
+      'stato': 'in_attesa' // ⏳ Non ancora pagate questo mese
+    },
+    {
+      'nome': 'Spesa Alimentare',
+      'categoria': 'Bisogni (50%)',
+      'previsto': 350.00,
+      'speso': 410.00,
+      'tipo': 'variabile',
+      'stato': 'in_corso' // 🩵 In consumo durante il mese
+    },
+    {
+      'nome': 'Assicurazione Auto',
+      'categoria': 'Bisogni (50%)',
+      'previsto': 120.00,
+      'speso': 120.00,
+      'tipo': 'annuale_spalmata',
+      'totaleAnnuale': 1440.00,
+      'stato': 'accantonato' // 🟦 Quota mensile messa da parte
+    },
 
     // 🎉 SVAGO & VITA (30%)
-    {'nome': 'Ristoranti & Uscite', 'categoria': 'Svago (30%)', 'previsto': 200.00, 'speso': 160.00, 'tipo': 'mensile'},
-    {'nome': 'Hobby & Palestra', 'categoria': 'Svago (30%)', 'previsto': 80.00, 'speso': 80.00, 'tipo': 'mensile'},
-    {'nome': 'Abbonamenti Streaming', 'categoria': 'Svago (30%)', 'previsto': 30.00, 'speso': 30.00, 'tipo': 'mensile'},
+    {
+      'nome': 'Ristoranti & Uscite',
+      'categoria': 'Svago (30%)',
+      'previsto': 200.00,
+      'speso': 160.00,
+      'tipo': 'variabile',
+      'stato': 'in_corso'
+    },
+    {
+      'nome': 'Hobby & Palestra',
+      'categoria': 'Svago (30%)',
+      'previsto': 80.00,
+      'speso': 80.00,
+      'tipo': 'mensile',
+      'stato': 'pagato'
+    },
+    {
+      'nome': 'Abbonamenti Streaming',
+      'categoria': 'Svago (30%)',
+      'previsto': 30.00,
+      'speso': 30.00,
+      'tipo': 'mensile',
+      'stato': 'pagato'
+    },
 
     // 🐷 RISPARMI & FUTURO (20%)
-    {'nome': 'Fondo Emergenze', 'categoria': 'Risparmio (20%)', 'previsto': 300.00, 'speso': 300.00, 'tipo': 'mensile'},
-    {'nome': 'Accantonamento Vacanze', 'categoria': 'Risparmio (20%)', 'previsto': 200.00, 'speso': 200.00, 'tipo': 'mensile'},
+    {
+      'nome': 'Fondo Emergenze',
+      'categoria': 'Risparmio (20%)',
+      'previsto': 300.00,
+      'speso': 300.00,
+      'tipo': 'mensile',
+      'stato': 'accantonato'
+    },
+    {
+      'nome': 'Accantonamento Vacanze',
+      'categoria': 'Risparmio (20%)',
+      'previsto': 200.00,
+      'speso': 200.00,
+      'tipo': 'mensile',
+      'stato': 'accantonato'
+    },
   ];
 
   @override
@@ -180,12 +241,12 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // ➕ DIALOG NUOVA SPESA (CON OPZIONE SPESA ANNUALE SPALMATA)
+  // ➕ DIALOG NUOVA SPESA
   void _mostraDialogAggiungiSpesa() {
     final TextEditingController nomeCtrl = TextEditingController();
     final TextEditingController importoCtrl = TextEditingController();
     String categoriaSel = 'Bisogni (50%)';
-    String tipoSpesaSel = 'mensile'; // 'mensile' oppure 'annuale'
+    String tipoSpesaSel = 'mensile';
 
     showDialog(
       context: context,
@@ -321,8 +382,9 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                         'nome': nome,
                         'categoria': categoriaSel,
                         'previsto': isAnnuale ? importo / 12 : importo,
-                        'speso': isAnnuale ? importo / 12 : importo,
+                        'speso': isAnnuale ? importo / 12 : 0.0,
                         'tipo': isAnnuale ? 'annuale_spalmata' : 'mensile',
+                        'stato': isAnnuale ? 'accantonato' : 'in_attesa',
                         if (isAnnuale) 'totaleAnnuale': importo,
                       });
                     });
@@ -610,53 +672,93 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
           const SizedBox(height: 12),
 
-          // ELENCO VOCI INCLUSE NELLA CATEGORIA
+          // ELENCO VOCI INTELLIGENTE (Pianificato vs Saldata vs In Corso)
           Column(
-            children: voci.map((v) {
-              final isAnnuale = v['tipo'] == 'annuale_spalmata';
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isAnnuale ? Icons.calendar_month_rounded : Icons.fiber_manual_record_rounded,
-                          color: isAnnuale ? const Color(0xFF3B82F6) : Colors.white38,
-                          size: isAnnuale ? 13 : 8,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          v['nome'],
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                        if (isAnnuale) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Spalmata (${(v['totaleAnnuale'] as double).toInt()}€/anno)',
-                              style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 8, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Text(
-                      '${(v['speso'] as double).toStringAsFixed(2)} €/mese',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+            children: voci.map((v) => _buildVoceTile(v)).toList(),
           ),
         ],
+      ),
+    );
+  }
+
+  // 🧩 COMPONENTE RIGA SINGOLA SPESA CON INDICATORI CHIARI
+  Widget _buildVoceTile(Map<String, dynamic> v) {
+    final double previsto = (v['previsto'] as num).toDouble();
+    final double speso = (v['speso'] as num).toDouble();
+    final String tipo = v['tipo'] ?? 'mensile';
+    final String stato = v['stato'] ?? 'in_corso';
+    final double rimasto = previsto - speso;
+
+    Widget badgeStato;
+    String testoDestra;
+    Color coloreDestra = Colors.white;
+
+    if (tipo == 'annuale_spalmata') {
+      final double totaleAnnuale = (v['totaleAnnuale'] as num?)?.toDouble() ?? (previsto * 12);
+      badgeStato = _buildBadgeTag('Accantonata (${totaleAnnuale.toInt()}€/anno)', const Color(0xFF3B82F6));
+      testoDestra = '${speso.toStringAsFixed(0)} € / mese';
+      coloreDestra = const Color(0xFF3B82F6);
+    } else if (stato == 'pagato') {
+      badgeStato = _buildBadgeTag('✓ Saldata', const Color(0xFF10B981));
+      testoDestra = '${speso.toStringAsFixed(0)} €';
+      coloreDestra = const Color(0xFF10B981);
+    } else if (stato == 'in_attesa') {
+      badgeStato = _buildBadgeTag('⏳ In Attesa', const Color(0xFFF59E0B));
+      testoDestra = '0 € / ${previsto.toStringAsFixed(0)} €';
+      coloreDestra = const Color(0xFFF59E0B);
+    } else {
+      final bool sforato = rimasto < 0;
+      badgeStato = _buildBadgeTag(
+        sforato ? 'Sforato di ${(-rimasto).toInt()}€' : 'Restano ${rimasto.toInt()}€',
+        sforato ? const Color(0xFFEF4444) : const Color(0xFF2DD4BF),
+      );
+      testoDestra = '${speso.toStringAsFixed(0)} € di ${previsto.toStringAsFixed(0)} €';
+      coloreDestra = sforato ? const Color(0xFFEF4444) : Colors.white;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  v['nome'],
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 3),
+                badgeStato,
+              ],
+            ),
+          ),
+          Text(
+            testoDestra,
+            style: TextStyle(color: coloreDestra, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadgeTag(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );
   }

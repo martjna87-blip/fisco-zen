@@ -219,17 +219,22 @@ class SerbatoioTasseWidget extends StatelessWidget {
         ? (riservaAccantonata - tasseTotaliCalcolate)
         : 0.0;
 
+    final Color statusColor = percentualeText >= 100 
+        ? const Color(0xFF10B981) 
+        : const Color(0xFFF59E0B);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cardColor.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // 🛡️ HEADER: ICONA + TITOLO + BADGE PERCENTUALE
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -249,15 +254,13 @@ class SerbatoioTasseWidget extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: percentualeText >= 100
-                        ? const Color(0xFF10B981).withOpacity(0.15)
-                        : const Color(0xFFF59E0B).withOpacity(0.15),
+                    color: statusColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${percentualeText.toStringAsFixed(0)}% Coperto',
                     style: TextStyle(
-                      color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      color: statusColor,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -266,34 +269,70 @@ class SerbatoioTasseWidget extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: percentuale,
-              minHeight: 8,
-              backgroundColor: Colors.white10,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+
+          const SizedBox(height: 18),
+
+          // ⭕ GRAFICO CIRCOLARE CON VALORE AL CENTRO
+          Center(
+            child: SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Anello di Sfondo (Traccia opaca)
+                  SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: CircularProgressIndicator(
+                      value: 1.0,
+                      strokeWidth: 9,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.08)),
+                    ),
+                  ),
+                  // Anello Avanzamento Reale
+                  SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: CircularProgressIndicator(
+                      value: percentuale,
+                      strokeWidth: 9,
+                      strokeCap: StrokeCap.round,
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                    ),
+                  ),
+                  // Testo al centro (Label + Importo)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'IN SALVADANAIO',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${riservaAccantonata.toStringAsFixed(0)} €',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Dovuto Ateco: ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                style: const TextStyle(color: Colors.white54, fontSize: 10),
-              ),
-              Text(
-                'In Salvadanaio: ${riservaAccantonata.toStringAsFixed(0)} €',
-                style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+
+          // 🛡️ CUSCINETTO DI SICUREZZA EXTRA (Se presente)
           if (cuscinettoExtraVal > 0) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

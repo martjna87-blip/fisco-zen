@@ -477,154 +477,118 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 5. CONTENUTO CENTRATO: SOLO LE METRICHE FINANZIARIE
+                // 5. CONTENUTO CENTRATO: DUAL METRICS P.IVA (Con Terminologia Fiscale Rigorosa)
                 Padding(
-                  padding: EdgeInsets.only(top: topPadding + 20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: EdgeInsets.only(top: topPadding + 24, left: 16, right: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // 💡 Etichetta discreta per chiarire la cifra
-                      const Text(
-                        'PATRIMONIO',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                            style: const TextStyle(
-                              color: Colors.white, 
-                              fontSize: 44, 
-                              fontWeight: FontWeight.bold, 
-                              letterSpacing: -1,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      // 📊 1. FATTURATO LORDO INCASSATO
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => DettaglioFattureSheet(
+                                fattureIncassate: fattureIncassate,
+                                coefficienteRedditivita: _coefficienteRedditivita,
+                                aliquotaImposta: _aliquotaImposta,
+                                aliquotaInps: _aliquotaInps,
+                              ),
+                            );
+                          },
+                          onLongPress: () {
+                            AppPopupWrapper.mostraInfo(
+                              context: context,
+                              icon: Icons.receipt_long_rounded,
+                              color: const Color(0xFF2DD4BF),
+                              titolo: 'Fatturato Incassato',
+                              descrizione: 'Somma totale dei compensi realmente incassati nel periodo fiscale. È l\'importo su cui viene applicato il tuo Coefficiente di Redditività ATECO.',
+                              formula: 'Incassato Reale',
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // 💳 1. NETTO REALE (Tap: Nessuna azione / LongPress: Info Pop-up)
-                                InkWell(
-                                  onTap: () {}, // 👈 Lasciato vuoto o disattivato così non apre nulla al tap rapido
-                                  onLongPress: () {
-                                    AppPopupWrapper.mostraInfo(
-                                      context: context,
-                                      icon: Icons.payments_rounded,
-                                      color: const Color(0xFF10B981),
-                                      titolo: 'Liquidità Reale Spendibile',
-                                      descrizione: 'Sono i tuoi veri soldi personali spendibili. Calcolati prendendo i saldi dei tuoi conti e togliendo le tasse stimate in sospeso.',
-                                      formula: 'Conti Liquidi − Tasse da Accantonare',
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '${nettoReale.toStringAsFixed(0)} €',
-                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
+                              const Text(
+                                'FATTURATO LORDO',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${fatturato.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: -1,
                                   ),
                                 ),
-                              const SizedBox(height: 4),
-
-                              // 🐷 2. STIMA TASSE & BADGE
-                              Row(
-                                children: [
-                                  // Tasse: Tap -> Scheda Dettaglio | Long Press -> Info Pop-up
-                                  InkWell(
-                                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                                    onLongPress: () {
-                                      AppPopupWrapper.mostraInfo(
-                                        context: context,
-                                        icon: Icons.savings_rounded,
-                                        color: const Color(0xFF3B82F6),
-                                        titolo: 'Riserva Tasse Calcolata',
-                                        descrizione: 'È la quota totale delle tasse dovute sulle fatture incassate (Imposta Sostitutiva + INPS).',
-                                        formula: 'Stima Fiscale ATECO + Contributi',
-                                      );
-                                    },
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 2),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  
-                                  // 🛡️ 3. BADGE (Accantona / Protette)
-                                  // Tap -> Apre Dialog Giroconto | Long Press -> Info Pop-up
-                                  InkWell(
-                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                    onLongPress: () {
-                                      AppPopupWrapper.mostraInfo(
-                                        context: context,
-                                        icon: isTasseCoperte ? Icons.shield_rounded : Icons.warning_amber_rounded,
-                                        color: isTasseCoperte ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
-                                        titolo: isTasseCoperte ? 'Tasse 100% Protette! 🛡️' : 'Accantonamento Tasse',
-                                        descrizione: isTasseCoperte
-                                            ? 'Hai già trasferito la totalità delle tasse dovute nel Salvadanaio. La tua liquidità sul conto principale è al sicuro da spese accidentali!'
-                                            : 'Ci sono tasse stimate che risiedono ancora sul tuo conto principale. Tocca il pulsante per spostarle nel Salvadanaio e metterle al sicuro.',
-                                      );
-                                    },
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: isTasseCoperte
-                                            ? const Color(0xFF10B981).withOpacity(0.15)
-                                            : const Color(0xFF3B82F6).withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: isTasseCoperte
-                                              ? const Color(0xFF10B981).withOpacity(0.4)
-                                              : const Color(0xFF3B82F6).withOpacity(0.5),
-                                        ),
-                                      ),
-                                      child: isTasseCoperte
-                                          ? const Row(
-                                              children: [
-                                                Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                                SizedBox(width: 3),
-                                                Text(
-                                                  'Protette',
-                                                  style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            )
-                                          : const Text(
-                                              'Accantona',
-                                              style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
-                                            ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                      ),
+
+                      // Separatore visivo centrale discreto
+                      Container(
+                        height: 38,
+                        width: 1,
+                        color: Colors.white12,
+                      ),
+
+                      // 🛡️ 2. TASSE DOVUTE (Saldo Anno Corrente + Acconto Anno Successivo)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                          onLongPress: () {
+                            AppPopupWrapper.mostraInfo(
+                              context: context,
+                              icon: Icons.shield_rounded,
+                              color: const Color(0xFF3B82F6),
+                              titolo: 'Stima Tasse Totali (Saldo + Acconti)',
+                              descrizione: 'Quota complessiva da accantonare per la dichiarazione dei redditi. Include sia il Saldo dell\'anno in corso che l\'Acconto per l\'anno successivo (Imposta Sostitutiva + INPS)',
+                              formula: 'Saldo Anno Corrente + Acconti Anno Successivo',
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'TASSE DOVUTE',
+                                style: TextStyle(
+                                  color: Color(0xFF3B82F6),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${tasseTotaliCalcolate.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                  style: const TextStyle(
+                                    color: Color(0xFF3B82F6),
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: -1,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -661,6 +625,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // 1. NUOVA FATTURA (+ Registra)
                         Expanded(
                           child: _buildMiniCard(
                             icon: Icons.add_circle_outline_rounded,
@@ -671,16 +636,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 8),
 
+                        // 2. DA INCASSARE (Sostituisce Stima Tasse, apre la finestra incasso)
                         Expanded(
                           child: _buildMiniCard(
-                            icon: Icons.shield_outlined,
-                            title: 'Stima Tasse\nP.IVA',
-                            value: '${stimaTasseTotaleComplessivo.toStringAsFixed(2)} €',
-                            onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                            icon: Icons.hourglass_top_rounded,
+                            title: 'Da\nincassare',
+                            value: '${fattureDaIncassare.length} (${totaleInSospeso.toStringAsFixed(0)} €)',
+                            onTap: () => _mostraDialogIncassoFatture(walletProvider),
                           ),
                         ),
                         const SizedBox(width: 8),
 
+                        // 3. DETTAGLIO FATTURE (Fatture già incassate)
                         Expanded(
                           child: _buildMiniCard(
                             icon: Icons.analytics_outlined,
@@ -700,109 +667,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  GestureDetector(
-                    onTap: () => _mostraDialogIncassoFatture(walletProvider),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF141417).withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Fatture da Incassare',
-                                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
-                            ],
-                          ),
-                          
-                          const SizedBox(height: 12),
-
-                          Text(
-                            _formattaValuta(totaleInSospeso),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Lordo Totale in attesa di saldo',
-                            style: TextStyle(color: Colors.white38, fontSize: 10),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        'Netto Stimato',
-                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '+${_formattaValuta(nettoStimatoInSospeso)}',
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                Container(height: 24, width: 1, color: const Color(0xFFF59E0B).withOpacity(0.3)),
-
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        'Tasse Stimate',
-                                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '-${_formattaValuta(tasseStimateInSospeso)}',
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
 

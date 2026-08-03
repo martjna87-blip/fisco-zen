@@ -9,6 +9,7 @@ import '2_5_wallet_annual_summary.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '2_4_wallet_budget_pilot_v2.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -688,10 +689,9 @@ class _WalletScreenState extends State<WalletScreen> {
                           title: 'Pilotaggio\nBudget',
                           value: 'Pianificazione',
                           onTap: () {
-                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
                             AppPopupWrapper.mostra(
                               context: context,
-                              child: const BudgetPilotSheet(),
+                              child: const PianoSpesaSheet(), // 👈 V2 Attivata!
                             );
                           },
                         ),
