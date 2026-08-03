@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 👈 Motore Haptic per la vibrazione nativa
 
 class AppPopupWrapper extends StatelessWidget {
   final String title;
@@ -21,8 +22,7 @@ class AppPopupWrapper extends StatelessWidget {
     this.onClose,
   });
 
-  /// 🛡️ METODO UNIVERSALE PER APRIRE QUALSIASI POP-UP
-  /// Garantisce la STESSA animazione di apertura, lo STESSO sfondo oscurato e la STESSA simmetria in tutta l'app!
+  /// 🛡️ METODO UNIVERSALE PER APRIRE QUALSIASI POP-UP DI SCHERMATA
   static Future<T?> mostra<T>({
     required BuildContext context,
     required Widget child,
@@ -31,7 +31,7 @@ class AppPopupWrapper extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Chiudi',
-      barrierColor: Colors.black.withOpacity(0.70), // Sfondo scuro elegante
+      barrierColor: Colors.black.withOpacity(0.70),
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, anim1, anim2) => child,
       transitionBuilder: (context, anim1, anim2, childWidget) {
@@ -54,7 +54,7 @@ class AppPopupWrapper extends StatelessWidget {
     );
   }
 
-  /// 💡 POP-UP INFORMATIVO UNIVERSALE (Spiegazioni Tap-to-Explore)
+  /// 💡 POP-UP INFORMATIVO UNIVERSALE (Con Vibrazione Haptic e Simmetria Assoluta)
   static Future<void> mostraInfo({
     required BuildContext context,
     required IconData icon,
@@ -63,6 +63,10 @@ class AppPopupWrapper extends StatelessWidget {
     required String descrizione,
     String? formula,
   }) {
+    // 📳 1. VIBRAZIONE NATIVA (Garantita su iOS/Android per QUALSIASI elemento)
+    HapticFeedback.mediumImpact();
+
+    // 🖼️ 2. APERTURA SCHEDA INFORMATIVA
     return mostra(
       context: context,
       child: Dialog(
@@ -156,7 +160,6 @@ class AppPopupWrapper extends StatelessWidget {
             color: const Color(0xFF18181B),
             child: Stack(
               children: [
-                // 1. SFONDO FOTOGRAFICO STANDARD O CUSTOM
                 Positioned.fill(
                   child: Image.network(
                     backgroundImageUrl ??
@@ -167,20 +170,15 @@ class AppPopupWrapper extends StatelessWidget {
                     ),
                   ),
                 ),
-                
-                // 2. OVERLAY SCURO
                 Positioned.fill(
                   child: Container(
                     color: Colors.black.withOpacity(0.75),
                   ),
                 ),
-
-                // 3. STRUTTURA CONTENUTO (HEADER + CORPO)
                 Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
-                      // HEADER STANDARD CON TASTO X, TITOLO E BADGE OPZIONALE
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -197,11 +195,9 @@ class AppPopupWrapper extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.12),
                                         shape: BoxShape.circle,
-                                        border:
-                                            Border.all(color: Colors.white.withOpacity(0.2)),
+                                        border: Border.all(color: Colors.white.withOpacity(0.2)),
                                       ),
-                                      child: const Icon(Icons.close_rounded,
-                                          color: Colors.white, size: 20),
+                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                                     ),
                                   ),
                                 ),
@@ -224,23 +220,18 @@ class AppPopupWrapper extends StatelessWidget {
                           if (badgeText != null) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: (badgeColor ?? const Color(0xFF2DD4BF))
-                                    .withOpacity(0.2),
+                                color: (badgeColor ?? const Color(0xFF2DD4BF)).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: (badgeColor ?? const Color(0xFF2DD4BF))
-                                      .withOpacity(0.5),
+                                  color: (badgeColor ?? const Color(0xFF2DD4BF)).withOpacity(0.5),
                                 ),
                               ),
                               child: Text(
                                 badgeText!,
                                 style: TextStyle(
-                                  color: badgeTextColor ??
-                                      badgeColor ??
-                                      const Color(0xFF2DD4BF),
+                                  color: badgeTextColor ?? badgeColor ?? const Color(0xFF2DD4BF),
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -250,8 +241,6 @@ class AppPopupWrapper extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // CORPO PRINCIPALE
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(22),
@@ -262,8 +251,7 @@ class AppPopupWrapper extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: const Color(0xFF18181B).withOpacity(0.60),
                                 borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(0.15)),
+                                border: Border.all(color: Colors.white.withOpacity(0.15)),
                               ),
                               child: child,
                             ),
