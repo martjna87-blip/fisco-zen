@@ -1,8 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+import 'package:provider/provider.dart';
 
-// Import delle schermate
+import '../data/wallet_provider.dart';
+import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
+import '1_onboarding_wizard.dart';
 import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
@@ -27,33 +30,33 @@ class MainMenu extends StatefulWidget {
 
 class _MainMenuState extends State<MainMenu> {
   int _currentIndex = 0;
-  late List<Widget> _screens;
 
   @override
-  void initState() {
-    super.initState();
-    _screens = [
+  Widget build(BuildContext context) {
+    final List<Widget> screens = [
       MainDashboardWrapper(
         hasPartitaIva: widget.hasPartitaIva,
         codiceAtecoIniziale: widget.codiceAtecoIniziale,
         coefficienteIniziale: widget.coefficienteIniziale,
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
       ),
-      const SizedBox.shrink(), 
-      const Center(child: Text('Notifiche / Scadenze (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
-      const Center(child: Text('Profilo & Impostazioni (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
+      const SizedBox.shrink(),
+      const Center(
+        child: Text(
+          'Notifiche / Scadenze (In arrivo)',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      ),
+      const ProfiloSandboxScreen(),
     ];
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
-      extendBody: true, 
+      extendBody: true,
       bottomNavigationBar: _buildGlassBottomNav(),
     );
   }
@@ -91,7 +94,7 @@ class _MainMenuState extends State<MainMenu> {
 
   Widget _buildNavItem({required IconData icon, required int index, required String label}) {
     final isSelected = _currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -122,7 +125,6 @@ class _MainMenuState extends State<MainMenu> {
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // 🎯 APERTURA UNIVERSALE UNIFORMATA
         AppPopupWrapper.mostra(
           context: context,
           child: const AddMovementSheet(initialTab: 'uscita'),
@@ -143,6 +145,200 @@ class _MainMenuState extends State<MainMenu> {
           ],
         ),
         child: const Icon(Icons.add_rounded, color: Colors.black, size: 24),
+      ),
+    );
+  }
+}
+
+// 🎯 SCHERMATA SEPARATA PER PROFILO & TEST SANDBOX
+class ProfiloSandboxScreen extends StatelessWidget {
+  const ProfiloSandboxScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Profilo & Test Sandbox',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Strumenti di controllo per simulare il comportamento dell\'app.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+
+              // 🔴 TASTO 1: RESET CONTI & FATTURE
+              InkWell(
+                onTap: () async {
+                  final walletProvider = context.read<WalletProvider>();
+                  await walletProvider.resetSoloMovimentieFatture();
+                  if (!context.mounted) return;
+                  AppNotifications.mostraInAlto(
+                    context, 
+                    'Fatture e conti azzerati! Profilo ATECO conservato', 
+                    type: NotificationType.warning,
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.refresh_rounded, color: Color(0xFFEF4444), size: 20),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Azzera Conti e Fatture', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text('Mantiene intatto il tuo profilo ATECO', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 🟡 TASTO 2: RESET TOTALE & PRIMO AVVIO
+              InkWell(
+                onTap: () async {
+                  final walletProvider = context.read<WalletProvider>();
+                  await walletProvider.resetTuttiIDati();
+                  if (!context.mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const OnboardingWizard(),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.restart_alt_rounded, color: Color(0xFFF59E0B), size: 20),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Reset Totale (Primo Avvio)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text('Riavvia il questionario iniziale da zero', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 🟣 TASTO 3: TOGGLE PRO / FREE
+              Consumer<WalletProvider>(
+                builder: (context, walletProvider, child) {
+                  return InkWell(
+                    onTap: () {
+                      walletProvider.toggleProUser();
+                      AppNotifications.mostraInAlto(
+                        context, 
+                        walletProvider.isProUser
+                            ? '✨ Modalità PRO Attivata (Test)' 
+                            : '🔒 Modalità FREE Attivata (Test)',
+                        type: NotificationType.warning,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: walletProvider.isProUser 
+                            ? const Color(0xFFA855F7).withOpacity(0.15) 
+                            : Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: walletProvider.isProUser 
+                              ? const Color(0xFFA855F7).withOpacity(0.4) 
+                              : Colors.white10,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.workspace_premium_rounded, 
+                            color: walletProvider.isProUser ? const Color(0xFFA855F7) : Colors.white54, 
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  walletProvider.isProUser ? 'Piano Attivo: Fisco Zen PRO ✨' : 'Piano Attivo: Fisco Zen FREE 🔒', 
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                const Text('Tocca per passare da Free a Pro per i tuoi test', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const Spacer(),
+
+              // 🏷️ BADGE VERSIONE
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 14),
+                      SizedBox(width: 6),
+                      Text('Versione V3.0 Stabile', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 70),
+            ],
+          ),
+        ),
       ),
     );
   }

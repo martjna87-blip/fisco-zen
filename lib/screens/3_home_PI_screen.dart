@@ -390,11 +390,11 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER P.IVA IMMERSIVO (SFONDO SOTTO L'OROLOGIO)
+            // 🎯 HEADER P.IVA IMMERSIVO & NATIVO (Stile iOS/Android)
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. Immagine di sfondo che sale fino al bordo del vetro
+                // 1. Immagine di sfondo Edge-to-Edge
                 Container(
                   height: headerHeight,
                   decoration: const BoxDecoration(
@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                // 2. Gradiente sfumato che parte dalla cima
+                // 2. Gradiente sfumato
                 Container(
                   height: headerHeight,
                   decoration: BoxDecoration(
@@ -423,141 +423,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 3. Pulsanti in alto a sinistra (sotto l'orologio)
+                // 3. 🎯 TITOLO DI PAGINA IN ALTO A SINISTRA (Stile H1 Nativo)
                 Positioned(
-                  top: topPadding + 10,
-                  left: 16,
-                  child: Row(
-                    children: [
-                      // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE
-                      InkWell(
-                        onTap: () async {
-                          await walletProvider.resetSoloMovimentieFatture();
-                          if (!context.mounted) return;
-                          AppNotifications.mostraInAlto(
-                            context, 
-                            'Fatture e conti azzerati! Profilo ATECO conservato', 
-                            type: NotificationType.warning,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.20),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
-                          ),
-                          child: const Icon(Icons.refresh_rounded, color: Color(0xFFEF4444), size: 16),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO
-                      InkWell(
-                        onTap: () async {
-                          await walletProvider.resetTuttiIDati();
-                          if (!context.mounted) return;
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const OnboardingWizard(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B).withOpacity(0.20),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.restart_alt_rounded, color: Color(0xFFF59E0B), size: 13),
-                              SizedBox(width: 4),
-                              Text(
-                                'PRIMO AVVIO',
-                                style: TextStyle(
-                                  color: Color(0xFFF59E0B),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // 3️⃣ TASTINO TEST MODE FREE / PRO
-                      InkWell(
-                        onTap: () {
-                          walletProvider.toggleProUser();
-                          
-                          AppNotifications.mostraInAlto(
-                            context, 
-                            walletProvider.isProUser
-                            ? '✨ Modalità PRO Attivata (Test)' 
-                            : '🔒 Modalità FREE Attivata (Test)',
-                            type: NotificationType.warning,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: walletProvider.isProUser 
-                                ? const Color(0xFFA855F7).withOpacity(0.2) 
-                                : const Color(0xFFF59E0B).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: walletProvider.isProUser 
-                                  ? const Color(0xFFA855F7) 
-                                  : const Color(0xFFF59E0B),
-                            ),
-                          ),
-                          child: Text(
-                            walletProvider.isProUser ? '✨ PRO' : '🔒 FREE',
-                            style: TextStyle(
-                              color: walletProvider.isProUser 
-                                  ? const Color(0xFFA855F7) 
-                                  : const Color(0xFFF59E0B),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // 🏷️ 4️⃣ BADGE VERSIONE IN CORSO
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2DD4BF).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF2DD4BF)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 12),
-                            SizedBox(width: 3),
-                            Text(
-                              'V1.0 Stabile',
-                              style: TextStyle(
-                                color: Color(0xFF2DD4BF),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  top: topPadding + 12,
+                  left: 20,
+                  child: const Text(
+                    'Gestione P.IVA',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
 
@@ -585,28 +462,35 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 5. CONTENUTO CENTRATO E PROTETTO DALLA NOTCH
+                // 5. CONTENUTO CENTRATO: SOLO LE METRICHE FINANZIARIE
                 Padding(
                   padding: EdgeInsets.only(top: topPadding + 20),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // 💡 Etichetta discreta per chiarire la cifra
                       const Text(
-                        'GESTIONE P.IVA',
+                        'PATRIMONIO',
                         style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                          color: Colors.white54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
                             '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, letterSpacing: -1),
+                            style: const TextStyle(
+                              color: Colors.white, 
+                              fontSize: 44, 
+                              fontWeight: FontWeight.bold, 
+                              letterSpacing: -1,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Column(

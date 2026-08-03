@@ -270,11 +270,11 @@ class _WalletScreenState extends State<WalletScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO IMMERSIVO (SFONDO SOTTO L'OROLOGIO)
+            // 🎯 HEADER WALLET IMMERSIVO & NATIVO (Stile iOS/Android)
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. Immagine che sale fino al bordo del vetro
+                // 1. Immagine di sfondo Edge-to-Edge
                 Container(
                   height: headerHeight,
                   decoration: const BoxDecoration(
@@ -287,7 +287,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ),
                 ),
-                // 2. Sfocatura/Sfumatura che sale in cima
+                // 2. Sfocatura/Sfumatura
                 Container(
                   height: headerHeight,
                   decoration: BoxDecoration(
@@ -303,17 +303,30 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 3. Pulsante Riepilogo (posizionato sotto la barra dell'orologio)
+                // 3. 🎯 TITOLO DI PAGINA IN ALTO A SINISTRA (Stile H1 Nativo)
+                Positioned(
+                  top: topPadding + 12,
+                  left: 20,
+                  child: const Text(
+                    'Portafoglio Personale',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+
+                // 4. Pulsante Riepilogo in alto a destra
                 Positioned(
                   top: topPadding + 10,
                   right: 16,
                   child: FilledButton.icon(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AnnualSummarySheet(),
-                        ),
+                      AppPopupWrapper.mostra(
+                        context: context,
+                        child: const AnnualSummarySheet(),
                       );
                     },
                     icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
@@ -334,17 +347,23 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 4. CONTENUTO CENTRATO E PROTETTO DALLA NOTCH
+                // 5. CONTENUTO CENTRATO: SOLO LE METRICHE FINANZIARIE
                 Padding(
                   padding: EdgeInsets.only(top: topPadding + 20),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // 💡 Etichetta discreta per chiarire la cifra
                       const Text(
-                        'PORTAFOGLIO PERSONALE',
-                        style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
+                        'PATRIMONIO',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -353,7 +372,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 42,
+                              fontSize: 44,
                               fontWeight: FontWeight.bold,
                               letterSpacing: -1,
                             ),
