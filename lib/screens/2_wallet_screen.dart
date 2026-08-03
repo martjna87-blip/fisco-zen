@@ -8,6 +8,7 @@ import '2_4_wallet_budget_pilot.dart';
 import '2_5_wallet_annual_summary.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -580,11 +581,10 @@ class _WalletScreenState extends State<WalletScreen> {
                           title: 'Movimenti',
                           value: 'Entrata / Uscita',
                           onTap: () {
-                            showModalBottomSheet(
+                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
+                            AppPopupWrapper.mostra(
                               context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const AddMovementSheet(initialTab: 'riepilogo'),
+                              child: const AddMovementSheet(initialTab: 'riepilogo'),
                             );
                           },
                         ),
@@ -596,11 +596,10 @@ class _WalletScreenState extends State<WalletScreen> {
                           title: 'Gestione\nConti',
                           value: '3 Attivi',
                           onTap: () {
-                            showModalBottomSheet(
+                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
+                            AppPopupWrapper.mostra(
                               context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => ManageAccountsSheet(isPiva: widget.isPiva),
+                              child: ManageAccountsSheet(isPiva: widget.isPiva),
                             );
                           },
                         ),
@@ -612,11 +611,10 @@ class _WalletScreenState extends State<WalletScreen> {
                           title: 'Pilotaggio\nBudget',
                           value: 'Pianificazione',
                           onTap: () {
-                            showModalBottomSheet(
+                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
+                            AppPopupWrapper.mostra(
                               context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const BudgetPilotSheet(),
+                              child: const BudgetPilotSheet(),
                             );
                           },
                         ),
