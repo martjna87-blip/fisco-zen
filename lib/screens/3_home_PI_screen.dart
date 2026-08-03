@@ -127,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final accounts = walletProvider.accounts;
 
     if (accounts.length < 2) {
-      
       AppNotifications.mostraInAlto(
         context, 
         'Devi avere almeno due conti per accantonare le tasse', 
@@ -285,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       extraCuscinetto > 0
                       ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
                       : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
-                      );
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -303,8 +302,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraFeedback(String messaggio) {
-  AppNotifications.mostraInAlto(context, messaggio);
-}
+    AppNotifications.mostraInAlto(context, messaggio);
+  }
 
   void _mostraConfermaResetGlobale(BuildContext context, WalletProvider walletProvider) {
     showDialog(
@@ -339,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
               AppNotifications.mostraInAlto(
                 context, 
                 'Tutti i dati sono stati azzerati con successo!🎉',
-                );
+              );
             },
             child: const Text('Azzera Tutto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -364,27 +363,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
     final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
 
-    // 🎯 1. Tasse reali dovute dalle fatture incassate (Dovuto Ateco)
     final double tasseRealiFatture = walletProvider.fattureIncassate
         .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
     final double tasseTotaliCalcolate = tasseRealiFatture;
 
-    // 🎯 2. Soldi al sicuro nel Salvadanaio
     final double riservaGiaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
-    // 🎯 3. Tasse in sospeso rimaste sul Conto Principale da coprire
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double residuoTasseDaCoprire = tasseDaAccantonare;
 
-    // 🎯 4. NETTO DISPONIBILE: Liquidità dei conti (escluso Salvadanaio) meno tasse in sospeso
     final double sommaContiLiquidi = walletProvider.accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
     final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
     
-    // 🎯 5. Stato copertura tasse (Accantona / Protette)
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     return Scaffold(
@@ -398,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
               alignment: Alignment.center,
               children: [
                 Container(
-                  height: 220, // 👈 ALTEZZA RIDOTTA
+                  height: 220,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
@@ -410,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Container(
-                  height: 220, // 👈 ALTEZZA RIDOTTA
+                  height: 220,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -430,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: SafeArea(
                     child: Row(
                       children: [
-                        // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE (CONSERVA IL PROFILO E LA HOME)
+                        // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE
                         InkWell(
                           onTap: () async {
                             await walletProvider.resetSoloMovimentieFatture();
@@ -454,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 6),
 
-                        // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO (TORNA AL QUESTIONARIO)
+                        // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO
                         InkWell(
                           onTap: () async {
                             await walletProvider.resetTuttiIDati();
@@ -491,9 +485,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
 
-                        // 👈 TASTINO TEST MODE FREE / PRO
+                        // 3️⃣ TASTINO TEST MODE FREE / PRO
                         InkWell(
                           onTap: () {
                             walletProvider.toggleProUser();
@@ -532,6 +526,32 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 6),
+
+                        // 🏷️ 4️⃣ BADGE MOSTRA VERSIONE IN CORSO
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2DD4BF).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2DD4BF)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 12),
+                              SizedBox(width: 3),
+                              Text(
+                                'V2.1 Stabile', // 👈 Cambia questo testo in futuro per i tuoi test
+                                style: TextStyle(
+                                  color: Color(0xFF2DD4BF),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -566,7 +586,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 0), // 👈 SPAZIO RIMOSSO PER ALZARE IL TESTO
+                    const SizedBox(height: 0),
                     const Text(
                       'GESTIONE P.IVA',
                       style: TextStyle(
@@ -609,10 +629,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 
-                                // 👈 LOGICA BOTTONE AGGIORNATA
                                 if (!isTasseCoperte) 
                                   InkWell(
-                                    onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 APRE IL POPUP GIUSTO
+                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
                                     borderRadius: BorderRadius.circular(6),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -629,7 +648,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   )
                                 else
                                   InkWell(
-                                    onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 CLICCABILE ANCHE QUI
+                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
                                     borderRadius: BorderRadius.circular(6),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -668,12 +687,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ 1. SERBATOIO RISERVA TASSE (WIDGET CONDIVISO CON IL WALLET!)
                   const SerbatoioTasseWidget(
                     cardColor: Color(0xFF141417),
                   ),
 
-                  // 2. I 3 QUADRANTI D'AZIONE (Ora indistruttibili con IntrinsicHeight)
                   IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -722,7 +739,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 3. FATTURE DA INCASSARE
                   GestureDetector(
                     onTap: () => _mostraDialogIncassoFatture(walletProvider),
                     child: Container(
