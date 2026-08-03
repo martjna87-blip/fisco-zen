@@ -927,22 +927,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   @override
-Widget build(BuildContext context) {
-  final screenSize = MediaQuery.of(context).size;
-  final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-  final isKeyboardOpen = bottomInset > 0;
-  // 1️⃣ Misuriamo lo spazio dell'orologio/notch dello smartphone
-  final topSafeArea = MediaQuery.of(context).padding.top + 12;
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+    
+    // 🛡️ Prendiamo l'altezza hardware REALE dell'orologio (viewPadding) + 24px di respiro
+    final notchHeight = MediaQuery.of(context).viewPadding.top;
+    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 24.0;
 
-  return Dialog(
-    backgroundColor: Colors.transparent,
-    // 2️⃣ Blocchiamo l'inizio del Pop-up SOTTO l'orologio
-    insetPadding: EdgeInsets.only(
-      left: 10,
-      right: 10,
-      top: topSafeArea, // 👈 La scheda parte esattamente sotto la batteria/ora
-      bottom: isKeyboardOpen ? 10 : 16,
-    ),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.only(
+        left: 10,
+        right: 10,
+        top: topMargin, // 🎯 Spinge la scheda ~75px sotto il bordo del telefono!
+        bottom: isKeyboardOpen ? 10 : 20,
+      ),
     child: ClipRRect( // 👈 Togliamo SafeArea da qui
       borderRadius: BorderRadius.circular(28),
       child: Container(
