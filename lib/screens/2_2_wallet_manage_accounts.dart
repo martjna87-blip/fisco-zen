@@ -5,7 +5,7 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
-  final bool? isPiva; // 👈 Dichiarazione della variabile mancante
+  final bool? isPiva;
 
   const ManageAccountsSheet({super.key, this.isPiva});
 
@@ -15,7 +15,7 @@ class ManageAccountsSheet extends StatefulWidget {
 
 class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   final ScrollController _scrollController = ScrollController();
-  int? _contoEspansoIndex; // Per espandere la cella in-line
+  int? _contoEspansoIndex;
 
   @override
   void dispose() {
@@ -23,7 +23,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     super.dispose();
   }
 
-  // 🎨 ASSEGNA IL COLORE IN BASE ALLA TIPOLOGIA
   Color _getAccountTypeColor(String tipo) {
     switch (tipo) {
       case 'Carta Prepagata / Debito':
@@ -38,7 +37,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     }
   }
 
-  // 🏛️ RICONOSCE L'ICONA IN AUTOMATICO
   IconData _getAccountIcon(AccountModel account) {
     final text = '${account.title} ${account.subtitle}'.toLowerCase();
     if (text.contains('carta') || text.contains('prepagata') || text.contains('debito')) {
@@ -52,9 +50,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     }
   }
   
-  // 🗑️ DIALOG DI CONFERMA ELIMINAZIONE CONTO
   void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
-    // 🛡️ SCUDO DI SICUREZZA: Blocca l'eliminazione dei conti di sistema usando il Ruolo
     if (account.role == AccountRole.principal || account.role == AccountRole.taxReserve) {
       AppNotifications.mostraInAlto(
         context,
@@ -117,7 +113,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // ✏️ DIALOG MODIFICA NOME E SALDO CONTO
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
@@ -199,47 +194,28 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // SCROLL AUTOMATICO REGOLATO FLUIDO
-  void _scrollToOffset(double deltaPixels) {
-    Future.delayed(const Duration(milliseconds: 180), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          (_scrollController.offset + deltaPixels).clamp(0.0, _scrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOutCubic,
-        );
-      }
-    });
-  }
-
-  // FUNZIONE PER APRIRE IL DETTAGLIO MOVIMENTI DEL CONTO REALI CON DIVISORI PER MESE
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
 
-    // 1. FILTRO INTELLIGENTE PER ID O TITOLO
     final movimentiConto = transactions.where((t) =>
       t.accountId == account.id ||
       t.title.contains(account.title) ||
       account.title.contains(t.title)
     ).toList();
 
-    // 2. ORDINAMENTO PER DATA (dal più recente al più vecchio)
     movimentiConto.sort((a, b) => b.date.compareTo(a.date));
 
-    // Nomi dei mesi in italiano
     const List<String> nomiMesi = [
       'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
       'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
     ];
 
-    // 3. COSTRUZIONE DELLA LISTA DI WIDGET CON DIVISORI
     List<Widget> elementiLista = [];
     String? meseAnnoCorrente;
 
     for (var tx in movimentiConto) {
       String meseAnno = '${nomiMesi[tx.date.month - 1].toUpperCase()} ${tx.date.year}';
 
-      // Se il mese cambia, aggiunge la riga divisoria in grigio chiaro/trasparente
       if (meseAnno != meseAnnoCorrente) {
         meseAnnoCorrente = meseAnno;
         elementiLista.add(
@@ -248,7 +224,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
             margin: const EdgeInsets.only(top: 10, bottom: 6),
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08), // Grigio chiaro coerente col tema scuro
+              color: Colors.white.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -264,7 +240,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
         );
       }
 
-      // Riga movimento standard
       final String sign = tx.isIncome ? '+' : '-';
       final String impFormatted = '$sign${tx.amount.toStringAsFixed(2)} €';
       final String dataStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}';
@@ -272,7 +247,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       elementiLista.add(_buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome));
     }
 
-    // 4. MOSTRA DIALOG
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -308,7 +282,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     )
                   : ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.45, // Evita overflow su liste lunghe
+                        maxHeight: MediaQuery.of(context).size.height * 0.45,
                       ),
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
@@ -358,7 +332,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // DIALOG NUOVO CONTO COMPLETAMENTE CUSTOMIZZABILE
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeController = TextEditingController();
     final TextEditingController dettaglioController = TextEditingController();
@@ -385,7 +358,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. NOME CONTO
                 TextField(
                   controller: nomeController,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -398,8 +370,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // 2. DETTAGLIO / SOTTOTITOLO OPZIONALE
                 TextField(
                   controller: dettaglioController,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -412,11 +382,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // 3. SELETTORE TIPOLOGIA CONTO
                 const Text('TIPOLOGIA CONTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-
                 _buildDialogInlineSelector(
                   selectedValue: tipoSelezionato,
                   isExpanded: isTipoEspanso,
@@ -430,8 +397,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   },
                 ),
                 const SizedBox(height: 12),
-
-                // 4. SALDO INIZIALE
                 TextField(
                   controller: saldoController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -462,7 +427,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 if (nome.isEmpty) {
                   AppNotifications.mostraInAlto(
                     context, 
-                    'Attenzione: copertura riserva tasse al 50%', 
+                    'Attenzione: inserire il nome del conto', 
                     type: NotificationType.warning,
                   );
                   return;
@@ -473,7 +438,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
                   final coloreConto = _getAccountTypeColor(tipoSelezionato);
 
-                  // Aggiunge il conto assegnando colore e sottotitolo corretti
                   provider.addAccount(
                     title: nome,
                     subtitle: sottotitoloFinale,
@@ -492,15 +456,14 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
                   Navigator.pop(context);
                   AppNotifications.mostraInAlto(
-                    context, 'Conto "$nome" creato con successo!🎉'
-                    );
+                    context, 'Conto "$nome" creato con successo! 🎉'
+                  );
                 } catch (e) {
-
                   AppNotifications.mostraInAlto(
                     context, 
                     'Errore creazione conto: $e', 
                     type: NotificationType.error
-                    );
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -516,8 +479,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  
-  // DIALOG GIROCONTO STANDARD PER TRASFERIMENTO LIQUIDITÀ
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
 
@@ -612,7 +573,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     final accDa = accounts.firstWhere((a) => a.title == daConto);
                     final accA = accounts.firstWhere((a) => a.title == aConto);
 
-                    // Giroconto puro di liquidità
                     provider.eseguiGiroconto(
                       daAccountId: accDa.id,
                       aAccountId: accA.id,
@@ -621,9 +581,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     );
 
                     Navigator.pop(context);
-                      AppNotifications.mostraInAlto(
+                    AppNotifications.mostraInAlto(
                       context, 'Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo! 🎉'
-                      );
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -723,46 +683,36 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
+    final topPadding = MediaQuery.of(context).padding.top + 10; // 🛡️ BARRIERA ANTI-NOTCH
 
     final walletProvider = context.watch<WalletProvider>();
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
 
-    // La schermata obbedisce a quello che gli ordina la Home (widget.isPiva).
-    // Se riceve 'false' (Dipendente), spegne tutto istantaneamente.
     final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
-    // 🎯 1. Somma di tutti i conti AD ECCEZIONE del Salvadanaio Tasse
     final double sommaContiLiquidi = accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    // 🎯 2. Tasse ancora in sospeso da spostare dal Conto Principale
     final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-
-    // 🎯 3. NETTO SPENDIBILE: Liquidità reale dei conti meno le tasse ancora in sospeso
     final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
-
-    // 🎯 4. TOTALE TASSE DOVUTE: Riserva già in Salvadanaio + Tasse in sospeso sul conto
-    final double riservaSalvadanaio = accounts
-        .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
-        .fold(0.0, (sum, a) => sum + a.amount);
-    final double totaleTasseLorde = tasseDaAccantonare + riservaSalvadanaio;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 10, 
-        vertical: isKeyboardOpen ? 10 : 14,
+      insetPadding: EdgeInsets.only(
+        left: 10, 
+        right: 10,
+        top: topPadding, // 🎯 BLINDA IL TOP SOTTO L'OROLOGIO
+        bottom: isKeyboardOpen ? 10 : 14,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: screenSize.height * 0.88,
+          height: double.infinity, // 🎯 FISARMONICA FLUIDA CON LA TASTIERA
           child: Stack(
             children: [
               Positioned.fill(
@@ -774,17 +724,16 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                 ),
               ),
-
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.75),
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
+                    // 📌 INTESTAZIONE FISSA (Tasto 'X' bloccato in vista)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -848,9 +797,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
@@ -910,28 +857,26 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                           ),
                                         ],
                                       ),
-
-                                      // 👈 WIDGET P.IVA: NETTO E TASSE PERFETTAMENTE ALLINEATI
                                       if (mostraPiva) ...[
                                         const SizedBox(height: 12),
                                         const Divider(color: Colors.white12, height: 1),
                                         const SizedBox(height: 12),
                                         Table(
                                           columnWidths: const {
-                                            0: IntrinsicColumnWidth(), // Adatta la colonna all'etichetta più lunga
-                                            1: FixedColumnWidth(12),   // Spazio fisso in mezzo
-                                            2: FlexColumnWidth(),      // Il resto dello spazio ai numeri
+                                            0: IntrinsicColumnWidth(),
+                                            1: FixedColumnWidth(12),
+                                            2: FlexColumnWidth(),
                                           },
                                           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                                           children: [
                                             TableRow(
                                               children: [
-                                                Row(
+                                                const Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
-                                                    const SizedBox(width: 6),
-                                                    const Text('LIQUIDITA:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
+                                                    SizedBox(width: 6),
+                                                    Text('LIQUIDITA:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
                                                   ],
                                                 ),
                                                 const SizedBox.shrink(),
@@ -941,34 +886,13 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                 ),
                                               ],
                                             ),
-                                            // 🙈 RIGA TASSE TEMPORANEAMENTE NASCOSTA PER TEST UX:
-                                            // const TableRow(children: [SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8)]),
-                                            // TableRow(
-                                            //   children: [
-                                            //     Row(
-                                            //       mainAxisSize: MainAxisSize.min,
-                                            //       children: [
-                                            //         const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
-                                            //         const SizedBox(width: 6),
-                                            //         const Text('TASSE:', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
-                                            //       ],
-                                            //     ),
-                                            //     const SizedBox.shrink(),
-                                            //     Text(
-                                            //       '${totaleTasseLorde.toStringAsFixed(2)} €',
-                                            //       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                            //     ),
-                                            //   ],
-                                            // ),
                                           ],
                                         ),
                                       ],
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 14),
-
                                 Expanded(
                                   child: SingleChildScrollView(
                                     controller: _scrollController,
@@ -984,9 +908,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-
                                         ReorderableListView.builder(
-                                          buildDefaultDragHandles: false, // 👈 RIMUOOVE LA LINETTA AUTOMATICA A DESTRA
+                                          buildDefaultDragHandles: false,
                                           shrinkWrap: true,
                                           physics: const NeverScrollableScrollPhysics(),
                                           itemCount: accounts.length,
@@ -1008,13 +931,12 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                 border: Border.all(color: Colors.white.withOpacity(0.08)),
                                               ),
                                               child: InkWell(
-                                                onTap: () => _mostraDettaglioMovimentiConto(context, account), // 👈 TAP APRE I MOVIMENTI
+                                                onTap: () => _mostraDettaglioMovimentiConto(context, account),
                                                 borderRadius: BorderRadius.circular(16),
                                                 child: Padding(
                                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                                                   child: Row(
                                                     children: [
-                                                      // 👈 DRAG HANDLE RIPARATO
                                                       ReorderableDragStartListener(
                                                         index: index,
                                                         child: const Padding(
@@ -1022,7 +944,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                           child: Icon(Icons.drag_handle_rounded, color: Colors.white38, size: 20),
                                                         ),
                                                       ),
-
                                                       Container(
                                                         padding: const EdgeInsets.all(8),
                                                         decoration: BoxDecoration(
@@ -1036,7 +957,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                         ),
                                                       ),
                                                       const SizedBox(width: 12),
-                                                      
                                                       Expanded(
                                                         child: Column(
                                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1098,8 +1018,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                                           ],
                                                         ],
                                                       ),
-                                                      
-                                                      // 👈 MENU A TENDINA (MODIFICA / ELIMINA)
                                                       PopupMenuButton<String>(
                                                         icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),
                                                         color: const Color(0xFF1C1C21),
@@ -1138,8 +1056,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                         ),
                       ),
                     ),
-
-                    // 👈 Bottone rimosso per ottimizzare la UX
                   ],
                 ),
               ),

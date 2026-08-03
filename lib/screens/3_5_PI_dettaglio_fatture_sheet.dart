@@ -23,15 +23,14 @@ class DettaglioFattureSheet extends StatefulWidget {
 }
 
 class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
-  int _meseSelezionato = 0; // 0 = Anno Intero, 1 = Gen, 2 = Feb, ecc.
-  final Set<String> _expandedFattureIds = {}; // 👈 TRACCIA LE CARD APERTE AL TAP
+  int _meseSelezionato = 0; 
+  final Set<String> _expandedFattureIds = {}; 
 
   final List<String> _mesiStr = [
     'Anno', 'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giug',
     'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
   ];
 
-  // METODO PER MOSTRARE IL DIALOGO DI CONFERMA ED ELIMINARE ISTANTANEAMENTE
   void _confermaEliminazione(BuildContext context, Map<String, dynamic> fattura) {
     showDialog(
       context: context,
@@ -62,19 +61,15 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
             onPressed: () {
               final String? id = fattura['id'] as String?;
               if (id != null) {
-                // 1. Rimuovi dal Provider globale
                 Provider.of<WalletProvider>(context, listen: false).eliminaFatturaPiva(id);
               }
 
-              // 2. Chiudi modale di conferma
               Navigator.pop(ctx);
-
-              // 3. Forza il refresh immediato del widget
               setState(() {});
               AppNotifications.mostraInAlto(
                 context, 
                 'Fattura di "${fattura['cliente']}" eliminata 🎉',
-                );
+              );
             },
             child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -83,19 +78,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     );
   }
 
-  // METODO FILTRO INTELLIGENTE PER I MESI
   List<Map<String, dynamic>> _getFattureFiltrate(List<Map<String, dynamic>> sorgenteFatture) {
     if (_meseSelezionato == 0) {
       return sorgenteFatture;
     }
 
     return sorgenteFatture.where((f) {
-      // 1. Controlla se esiste un valore numerico 'mese'
       if (f['mese'] != null && f['mese'] is int) {
         return f['mese'] == _meseSelezionato;
       }
 
-      // 2. Controlla il campo 'data'
       final rawData = f['data'];
       if (rawData != null) {
         if (rawData is DateTime) {
@@ -103,13 +95,11 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
         }
 
         if (rawData is String) {
-          // Prova ISO (es. "2026-05-18")
           final parsedIso = DateTime.tryParse(rawData);
           if (parsedIso != null) {
             return parsedIso.month == _meseSelezionato;
           }
 
-          // Prova formato IT (es. "18/05/2026")
           final parti = rawData.split(RegExp(r'[/.-]'));
           if (parti.length >= 2) {
             final meseParsed = int.tryParse(parti[1]);
@@ -124,16 +114,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final walletProvider = Provider.of<WalletProvider>(context);
-
-    // LEGGI DIRETTAMENTE DAL PROVIDER PER AVERE AGGIORNAMENTI REALI IN TEMPO REALE
-    final listaTutteIncassate = walletProvider.fattureIncassate;
-    final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
-
-    // METODO PER ESTRARRE SOLO GIORNO E MESE (es. "18/05")
   String _formattaGiornoMese(dynamic rawData) {
     if (rawData == null) return '';
     if (rawData is DateTime) {
@@ -144,13 +124,11 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     if (rawData is String) {
       final parti = rawData.split(RegExp(r'[/.-]'));
       if (parti.length >= 2) {
-        // Formato "18/05/2026"
         if (parti[0].length <= 2) {
           final g = parti[0].padLeft(2, '0');
           final m = parti[1].padLeft(2, '0');
           return '$g/$m';
         } 
-        // Formato "2026-05-18"
         else if (parti[0].length == 4 && parti.length >= 3) {
           final m = parti[1].padLeft(2, '0');
           final g = parti[2].padLeft(2, '0');
@@ -161,7 +139,17 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     return '';
   }
 
-    // Calcolo Totali Fiscale sulla LISTA FILTRATA
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+    final topPadding = MediaQuery.of(context).padding.top + 10; // 🛡️ BARRIERA ANTI-NOTCH
+
+    final walletProvider = Provider.of<WalletProvider>(context);
+
+    final listaTutteIncassate = walletProvider.fattureIncassate;
+    final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
+
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
@@ -192,15 +180,19 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      insetPadding: EdgeInsets.only(
+        left: 10, 
+        right: 10,
+        top: topPadding, // 🎯 BLINDA IL TOP SOTTO L'OROLOGIO
+        bottom: isKeyboardOpen ? 10 : 14,
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: screenSize.height * 0.86,
+          height: double.infinity, // 🎯 FISARMONICA FLUIDA CON LA TASTIERA
           child: Stack(
             children: [
-              // 1. IMMAGINE DI SFONDO ATMOSFERICA
               Positioned.fill(
                 child: Image.network(
                   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
@@ -210,20 +202,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                   ),
                 ),
               ),
-
-              // 2. OVERLAY SCURO
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.75),
                 ),
               ),
-
-              // 3. CONTENUTO GLASS
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    // --- HEADER & TITOLO BLINDATO ---
+                    // 📌 INTESTAZIONE FISSA (Tasto 'X' bloccato in vista)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -281,12 +269,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
-                    // ==========================================
-                    // 🔲 RIQUADRO 1: LISTA FATTURE CON FILTRI
-                    // ==========================================
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
@@ -301,7 +284,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                             ),
                             child: Column(
                               children: [
-                                // FILTRI MESI HORIZONTAL
                                 SizedBox(
                                   height: 32,
                                   child: ListView.builder(
@@ -335,10 +317,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     },
                                   ),
                                 ),
-
                                 const SizedBox(height: 10),
-
-                                // LISTA FATTURE SINTETICA CON ACCORDION
                                 Expanded(
                                   child: fattureFiltrate.isEmpty
                                       ? Center(
@@ -398,7 +377,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                   child: Column(
                                                     crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
-                                                      // RIGA PRINCIPALE (NOME & LORDO)
                                                       Row(
                                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                         children: [
@@ -435,10 +413,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                           ),
                                                         ],
                                                       ),
-
                                                       const SizedBox(height: 8),
-
-                                                      // RIGA SINTETICA NETTO / TASSE (PROTEGGI-OVERFLOW)
                                                       Row(
                                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                         children: [
@@ -461,8 +436,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                           ),
                                                         ],
                                                       ),
-
-                                                      // SPACCATO ANALITICO FISCALE (APERTURA AL TAP)
                                                       if (isExpanded) ...[
                                                         const SizedBox(height: 10),
                                                         Divider(color: Colors.white.withOpacity(0.12), height: 1),
@@ -483,8 +456,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                                         const SizedBox(height: 2),
                                                         _buildRowDetail('Netto Rimanente Reale:', '+${nettoRimanenteCard.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
                                                         const SizedBox(height: 10),
-
-                                                        // PULSANTE ELIMINA PULITO E PROTETTO IN FONDOCARD
                                                         Align(
                                                           alignment: Alignment.centerRight,
                                                           child: InkWell(
@@ -523,12 +494,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
-                    // ==========================================
-                    // 🔲 RIEPILOGO FISCALE COMPATTO (STICKY BOTTOM)
-                    // ==========================================
                     ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: BackdropFilter(

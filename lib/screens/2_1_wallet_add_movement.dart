@@ -26,7 +26,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   String _vistaRiepilogo = 'categoria'; 
   int? _categoriaEspansaIndex; 
 
-  // 🛡️ TRACCIAMENTO LOCALE DELLE PREVISIONI CANCELLATE PER SINGOLO MESE
   final Set<String> _skippedPredictionIds = {};
 
   final TextEditingController _amountController = TextEditingController();
@@ -317,7 +316,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       if (mounted) {
         AppNotifications.mostraInAlto(
           context, 'Dati estratti! Controlla e salva! 🎉'
-          );
+        );
       }
     } catch (e) {
       setState(() => _isAnalyzing = false);
@@ -330,12 +329,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
-
       AppNotifications.mostraInAlto(
         context, 
         'Inserisci un importo valido!', 
         type: NotificationType.error
-        );
+      );
       return;
     }
 
@@ -448,7 +446,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           
                           AppNotifications.mostraInAlto(
                             context, 'Movimento eliminato solo per questo mese! 🎉'
-                            );
+                          );
                         },
                         child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -469,7 +467,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                           AppNotifications.mostraInAlto(
                             context, 'Movimento "$desc" e futuri eliminati! 🎉'
-                            );
+                          );
                         },
                         child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -498,7 +496,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     
                     AppNotifications.mostraInAlto(
                       context, 'Movimento "$desc" eliminato 🎉'
-                      );
+                    );
                   },
                   child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
@@ -507,7 +505,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🛡️ POPUP SPECIFICO PER I MESI FUTURI (PREVISIONI)
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
@@ -537,7 +534,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () {
-                    // 🎯 1. Cancella la previsione sia nel Provider che nel tracciamento locale della schermata
                     final provider = Provider.of<WalletProvider>(context, listen: false);
                     
                     try {
@@ -552,7 +548,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                     AppNotifications.mostraInAlto(
                       context, 
-                      'Previsione emilinata solo per questo mese', 
+                      'Previsione eliminata solo per questo mese', 
                       type: NotificationType.warning,
                     );
                   },
@@ -932,21 +928,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
+    final topPadding = MediaQuery.of(context).padding.top + 10; // 🛡️ BARRIERA ANTI-NOTCH
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 10, 
-        vertical: isKeyboardOpen ? 10 : 14,
+      insetPadding: EdgeInsets.only(
+        left: 10, 
+        right: 10,
+        top: topPadding, // 🎯 BLINDA IL TOP SOTTO L'OROLOGIO
+        bottom: isKeyboardOpen ? 10 : 14,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: screenSize.height * 0.88,
+          height: double.infinity, // 🎯 FISARMONICA FLUIDA CON LA TASTIERA
           child: Stack(
             children: [
               Positioned.fill(
@@ -967,6 +965,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
+                    // 📌 INTESTAZIONE FISSA (La 'X' NON SI SPOSTA MAI!)
                     Row(
                       children: [
                         Material(
@@ -1112,9 +1111,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       };
     }).toList();
 
-    // 🎯 ESTRAZIONE FLESSIBILE E SICURA DELL'ID GENITORE PER IL SALTO SINGOLO
     final List<Map<String, dynamic>> previsti = walletProvider.getMovimentiPrevisti(_meseSelezionatoRiepilogo)
-        .where((tx) => !_skippedPredictionIds.contains(tx.id)) // 🛡️ FILTRA I SINGOLI MESI CANCELLATI LOCALMENTE
+        .where((tx) => !_skippedPredictionIds.contains(tx.id))
         .map((tx) {
       String parentId = tx.id;
       if (parentId.startsWith('prev_')) {
@@ -2182,18 +2180,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPageDot(bool isActive, Color color) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: isActive ? 20 : 6, 
-      height: 6,
-      decoration: BoxDecoration(
-        color: isActive ? color : Colors.white24,
-        borderRadius: BorderRadius.circular(3),
       ),
     );
   }

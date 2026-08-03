@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'screens/1_setup_screen.dart';       // La vecchia schermata
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'screens/1_setup_screen.dart';       // La vecchia schermata
 import 'screens/1_onboarding_wizard.dart';
 import 'screens/1_main_menu.dart';
 import 'data/wallet_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🎨 CONFIGURAZIONE BARRA DI STATO EDGE-TO-EDGE
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Rende lo sfondo trasparente
+      statusBarIconBrightness: Brightness.light, // Icone chiare su Android
+      statusBarBrightness: Brightness.dark, // iOS: Brightness.dark = scritte bianche (orologio/batteria)
+    ),
+  );
+
   runApp(
     MultiProvider(
       providers: [
@@ -38,9 +50,14 @@ class FiscoZenApp extends StatelessWidget {
       locale: const Locale('it', 'IT'),
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF101012),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFF1E1E2C),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+        ),
       ),
-      // 👈 Avviamo dallo smistatore intelligente
-      home: const SplashScreen(), 
+      home: const SplashScreen(),
     );
   }
 }
