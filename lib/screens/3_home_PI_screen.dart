@@ -639,8 +639,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  const SerbatoioTasseWidget(
-                    cardColor: Color(0xFF141417),
+                  // 🛡️ SERBATOIO RISERVA TASSE (Tap -> Accantona su tutta la card | LongPress -> Info Pop-up)
+                  GestureDetector(
+                    onTap: () => _mostraDialogAccantonamentoTasse(context),
+                    onLongPress: () {
+                      AppPopupWrapper.mostraInfo(
+                        context: context,
+                        icon: Icons.shield_rounded,
+                        color: const Color(0xFF3B82F6),
+                        titolo: 'Serbatoio Riserva Tasse',
+                        descrizione: 'Mostra lo stato di copertura delle tue tasse stimate. Fai un tap per accantonare subito le tasse scoperte nel Salvadanaio.',
+                        formula: 'In Salvadanaio ÷ Dovuto ATECO',
+                      );
+                    },
+                    child: const SerbatoioTasseWidget(
+                      cardColor: Color(0xFF141417),
+                    ),
                   ),
 
                   IntrinsicHeight(

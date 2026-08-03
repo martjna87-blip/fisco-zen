@@ -383,67 +383,112 @@ class _WalletScreenState extends State<WalletScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${nettoReale.toStringAsFixed(0)} €',
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    
-                                    if (!isTasseCoperte) 
-                                      InkWell(
-                                        onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: coloreCard.withOpacity(0.92),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
-                                          ),
-                                          child: const Text(
-                                            'Accantona',
-                                            style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
-                                          ),
+                                // 💳 1. NETTO REALE (Tap: Nessuna azione | LongPress: Info Pop-up)
+                                InkWell(
+                                  onTap: () {},
+                                  onLongPress: () {
+                                    AppPopupWrapper.mostraInfo(
+                                      context: context,
+                                      icon: Icons.payments_rounded,
+                                      color: const Color(0xFF10B981),
+                                      titolo: 'Liquidità Reale Spendibile',
+                                      descrizione: 'Sono i tuoi veri soldi personali spendibili. Calcolati prendendo i saldi dei tuoi conti e togliendo le tasse stimate in sospeso.',
+                                      formula: 'Conti Liquidi − Tasse da Accantonare',
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${nettoReale.toStringAsFixed(0)} €',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                         ),
-                                      )
-                                    else
-                                      InkWell(
-                                        onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: coloreCard.withOpacity(0.92),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                          ),
-                                          child: const Row(
-                                            children: [
-                                              Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                              SizedBox(width: 3),
-                                              Text(
-                                                'Protette',
-                                                style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+
+                                // 🐷 2. STIMA TASSE & BADGE
+                                Row(
+                                  children: [
+                                    // Tasse (Tap: Nessuna azione | LongPress: Info Pop-up)
+                                    InkWell(
+                                      onTap: () {},
+                                      onLongPress: () {
+                                        AppPopupWrapper.mostraInfo(
+                                          context: context,
+                                          icon: Icons.savings_rounded,
+                                          color: const Color(0xFF3B82F6),
+                                          titolo: 'Riserva Tasse Calcolata',
+                                          descrizione: 'È la stima totale delle tasse dovute sulle fatture incassate (Imposta Sostitutiva + INPS).',
+                                          formula: 'Stima Fiscale ATECO + Contributi',
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 2),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                    ),
+                                    const SizedBox(width: 8),
+
+                                    // 🛡️ 3. BADGE (Tap: Dialog Giroconto | LongPress: Info Pop-up)
+                                    InkWell(
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                      onLongPress: () {
+                                        AppPopupWrapper.mostraInfo(
+                                          context: context,
+                                          icon: isTasseCoperte ? Icons.shield_rounded : Icons.warning_amber_rounded,
+                                          color: isTasseCoperte ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+                                          titolo: isTasseCoperte ? 'Tasse 100% Protette! 🛡️' : 'Accantonamento Tasse',
+                                          descrizione: isTasseCoperte
+                                              ? 'Hai già trasferito la totalità delle tasse dovute nel Salvadanaio. La tua liquidità sul conto principale è al sicuro da spese accidentali!'
+                                              : 'Ci sono tasse stimate che risiedono ancora sul tuo conto principale. Fai un tap per spostarle nel Salvadanaio e metterle al sicuro.',
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: coloreCard.withOpacity(0.92),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isTasseCoperte
+                                                ? const Color(0xFF10B981).withOpacity(0.4)
+                                                : const Color(0xFF3B82F6).withOpacity(0.5),
+                                          ),
+                                        ),
+                                        child: isTasseCoperte
+                                            ? const Row(
+                                                children: [
+                                                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'Protette',
+                                                    style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              )
+                                            : const Text(
+                                                'Accantona',
+                                                style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                              ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
@@ -465,7 +510,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ 1. SERBATOIO RISERVA TASSE
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE (Tap -> Accantona | LongPress -> Info Pop-up)
                   if (mostraPiva) ...[
                     Builder(
                       builder: (context) {
@@ -485,106 +530,119 @@ class _WalletScreenState extends State<WalletScreen> {
                             ? (riservaAccantonata - tasseTotaliCalcolate) 
                             : 0.0;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: coloreCard.withOpacity(0.92),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withOpacity(0.08)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 18),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Serbatoio Riserva Tasse',
-                                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: percentualeText >= 100 
-                                          ? const Color(0xFF10B981).withOpacity(0.15) 
-                                          : const Color(0xFFF59E0B).withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(8),
+                        return GestureDetector(
+                          onTap: () => _mostraDialogAccantonamentoTasse(context),
+                          onLongPress: () {
+                            AppPopupWrapper.mostraInfo(
+                              context: context,
+                              icon: Icons.shield_rounded,
+                              color: const Color(0xFF3B82F6),
+                              titolo: 'Serbatoio Riserva Tasse',
+                              descrizione: 'Mostra lo stato di copertura delle tue tasse stimate. Fai un tap per accantonare subito le tasse scoperte nel Salvadanaio.',
+                              formula: 'In Salvadanaio ÷ Dovuto ATECO',
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: coloreCard.withOpacity(0.92),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 18),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Serbatoio Riserva Tasse',
+                                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
-                                    child: Text(
-                                      '${percentualeText.toStringAsFixed(0)}% Coperto',
-                                      style: TextStyle(
-                                        color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: percentualeText >= 100 
+                                            ? const Color(0xFF10B981).withOpacity(0.15) 
+                                            : const Color(0xFFF59E0B).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: LinearProgressIndicator(
-                                  value: percentuale,
-                                  minHeight: 8,
-                                  backgroundColor: Colors.white10,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // 📊 RIGA VALORI (DOVUTO VS IN SALVADANAIO)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Dovuto Ateco: ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white54, fontSize: 10),
-                                  ),
-                                  Text(
-                                    'In Salvadanaio: ${riservaAccantonata.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-
-                              // 🛡️ BADGE BLU: CUSCINETTO DI SICUREZZA EXTRA (Se presente)
-                              if (cuscinettoExtraVal > 0) ...[
-                                const SizedBox(height: 10),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 13),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Cuscinetto di sicurezza extra: +${cuscinettoExtraVal.toStringAsFixed(2)} €',
-                                        style: const TextStyle(
-                                          color: Color(0xFF3B82F6),
+                                      child: Text(
+                                        '${percentualeText.toStringAsFixed(0)}% Coperto',
+                                        style: TextStyle(
+                                          color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: percentuale,
+                                    minHeight: 8,
+                                    backgroundColor: Colors.white10,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(height: 12),
+                                // 📊 RIGA VALORI (DOVUTO VS IN SALVADANAIO)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Dovuto Ateco: ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                      style: const TextStyle(color: Colors.white54, fontSize: 10),
+                                    ),
+                                    Text(
+                                      'In Salvadanaio: ${riservaAccantonata.toStringAsFixed(0)} €',
+                                      style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+
+                                // 🛡️ BADGE BLU: CUSCINETTO DI SICUREZZA EXTRA (Se presente)
+                                if (cuscinettoExtraVal > 0) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 13),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Cuscinetto di sicurezza extra: +${cuscinettoExtraVal.toStringAsFixed(2)} €',
+                                          style: const TextStyle(
+                                            color: Color(0xFF3B82F6),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         );
                       },
