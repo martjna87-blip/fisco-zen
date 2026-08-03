@@ -173,17 +173,25 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
 
+    // 🛡️ MISURA HARDWARE REALE PER NOTCH / OROLOGIO
+    final notchHeight = MediaQuery.of(context).viewPadding.top;
+    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 24.0;
+
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      child: SafeArea(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            width: double.infinity,
-            height: isKeyboardOpen ? screenSize.height * 0.88 : screenSize.height * 0.78,
-            color: const Color(0xFF18181B),
-            child: Stack(
+      insetPadding: EdgeInsets.only(
+        left: 10,
+        right: 10,
+        top: topMargin, // 🎯 Scheda spinta sotto l'orologio
+        bottom: isKeyboardOpen ? 10 : 20,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity, // 🎯 Altezza fluida ed uniforme
+          color: const Color(0xFF18181B),
+          child: Stack(
               children: [
                 Positioned.fill(
                   child: Image.network(
@@ -405,7 +413,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                 ),
               ],
             ),
-          ),
         ),
       ),
     );
