@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/app_popup_wrapper.dart'; // 👈 Importiamo il wrapper
 
 class RegistraFatturaSheet extends StatefulWidget {
   final Function(String cliente, double importo, String dataFormattata)? onFatturaSalvata;
@@ -169,94 +170,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   @override
   Widget build(BuildContext context) {
     final isPro = context.watch<WalletProvider>().isProUser;
-    final screenSize = MediaQuery.of(context).size;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final isKeyboardOpen = bottomInset > 0;
 
-    // 🛡️ MISURA HARDWARE REALE PER NOTCH / OROLOGIO
-    final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 24.0;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.only(
-        left: 10,
-        right: 10,
-        top: topMargin, // 🎯 Scheda spinta sotto l'orologio
-        bottom: isKeyboardOpen ? 10 : 20,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          width: double.infinity,
-          height: double.infinity, // 🎯 Altezza fluida ed uniforme
-          color: const Color(0xFF18181B),
-          child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withOpacity(0.75),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => Navigator.pop(context),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                ),
-                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'Registra Fattura',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(22),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF18181B).withOpacity(0.60),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: Colors.white.withOpacity(0.15)),
-                              ),
+    return AppPopupWrapper(
+      title: 'Registra Fattura',
                               child: SingleChildScrollView(
                                 physics: const BouncingScrollPhysics(),
                                 child: Column(
@@ -404,17 +320,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                   ],
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ),
-      ),
     );
   }
 
