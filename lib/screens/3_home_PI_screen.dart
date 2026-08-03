@@ -10,6 +10,7 @@ import '3_3_PI_tasse_accantonamento.dart';
 import '3_5_PI_dettaglio_fatture_sheet.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
@@ -121,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🛡️ DIALOG RAPIDO CON GOAL TRACKER & FEEDBACK PERCENTUALE (STESSO DEL WALLET)
+  // 🛡️ DIALOG ACCANTONAMENTO CON MATEMATICA CORRETTA UNIFICATA
   void _mostraDialogAccantonamentoTasse(BuildContext context) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
@@ -135,13 +136,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final double tasseTotaliCalcolate = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+    // 1. Soldi già messi al sicuro nel Salvadanaio
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    final double tasseScoperte = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
-    final double importoMancanteReale = tasseScoperte > 0.01 ? tasseScoperte : 0.0;
+    // 2. Tasse ancora in sospeso sul Conto Principale da spostare
+    final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
+
+    // 3. Totale Tasse Dovute = Già in Salvadanaio + Ancora da accantonare
+    final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
+
+    // 4. L'importo mancante reale da precompilare nel campo di testo
+    final double importoMancanteReale = tasseDaAccantonare > 0.01 ? tasseDaAccantonare : 0.0;
 
     final TextEditingController importoController = TextEditingController(
       text: importoMancanteReale > 0 ? importoMancanteReale.toStringAsFixed(2) : '',
@@ -162,7 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
-          
           final double nuovaRiservaTotale = riservaGiaAccantonata + importoInserito;
           
           final double percentualeText = tasseTotaliCalcolate > 0.01 
@@ -272,6 +278,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ElevatedButton(
                 onPressed: () {
                   if (importoInserito > 0) {
+                    if (contoConTasse.amount < importoInserito) {
+                      AppNotifications.mostraInAlto(
+                        context,
+                        'Saldo insufficiente su ${contoConTasse.title} per l\'accantonamento!',
+                        type: NotificationType.error,
+                      );
+                      return;
+                    }
+
                     walletProvider.eseguiGiroconto(
                       daAccountId: contoConTasse.id,
                       aAccountId: salvadanaioTasse.id,
@@ -496,67 +511,115 @@ class _HomeScreenState extends State<HomeScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${nettoReale.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              // 💳 1. NETTO REALE (Tap: Nessuna azione / LongPress: Info Pop-up)
+                                InkWell(
+                                  onTap: () {}, // 👈 Lasciato vuoto o disattivato così non apre nulla al tap rapido
+                                  onLongPress: () {
+                                    AppPopupWrapper.mostraInfo(
+                                      context: context,
+                                      icon: Icons.payments_rounded,
+                                      color: const Color(0xFF10B981),
+                                      titolo: 'Liquidità Reale Spendibile',
+                                      descrizione: 'Sono i tuoi veri soldi personali spendibili. Calcolati prendendo i saldi dei tuoi conti e togliendo le tasse stimate in sospeso.',
+                                      formula: 'Conti Liquidi − Tasse da Accantonare',
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${nettoReale.toStringAsFixed(0)} €',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
+                                ),
+                              const SizedBox(height: 4),
+
+                              // 🐷 2. STIMA TASSE & BADGE
                               Row(
                                 children: [
-                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  // Tasse: Tap -> Scheda Dettaglio | Long Press -> Info Pop-up
+                                  InkWell(
+                                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                                    onLongPress: () {
+                                      AppPopupWrapper.mostraInfo(
+                                        context: context,
+                                        icon: Icons.savings_rounded,
+                                        color: const Color(0xFF3B82F6),
+                                        titolo: 'Riserva Tasse Calcolata',
+                                        descrizione: 'È la quota totale delle tasse dovute sulle fatture incassate (Imposta Sostitutiva + INPS).',
+                                        formula: 'Stima Fiscale ATECO + Contributi',
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   
-                                  if (!isTasseCoperte) 
-                                    InkWell(
-                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
-                                        ),
-                                        child: const Text(
-                                          'Accantona',
-                                          style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                  // 🛡️ 3. BADGE (Accantona / Protette)
+                                  // Tap -> Apre Dialog Giroconto | Long Press -> Info Pop-up
+                                  InkWell(
+                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                    onLongPress: () {
+                                      AppPopupWrapper.mostraInfo(
+                                        context: context,
+                                        icon: isTasseCoperte ? Icons.shield_rounded : Icons.warning_amber_rounded,
+                                        color: isTasseCoperte ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+                                        titolo: isTasseCoperte ? 'Tasse 100% Protette! 🛡️' : 'Accantonamento Tasse',
+                                        descrizione: isTasseCoperte
+                                            ? 'Hai già trasferito la totalità delle tasse dovute nel Salvadanaio. La tua liquidità sul conto principale è al sicuro da spese accidentali!'
+                                            : 'Ci sono tasse stimate che risiedono ancora sul tuo conto principale. Tocca il pulsante per spostarle nel Salvadanaio e metterle al sicuro.',
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isTasseCoperte
+                                            ? const Color(0xFF10B981).withOpacity(0.15)
+                                            : const Color(0xFF3B82F6).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isTasseCoperte
+                                              ? const Color(0xFF10B981).withOpacity(0.4)
+                                              : const Color(0xFF3B82F6).withOpacity(0.5),
                                         ),
                                       ),
-                                    )
-                                  else
-                                    InkWell(
-                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                        ),
-                                        child: const Row(
-                                          children: [
-                                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                            SizedBox(width: 3),
-                                            Text(
-                                              'Protette',
-                                              style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                      child: isTasseCoperte
+                                          ? const Row(
+                                              children: [
+                                                Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Protette',
+                                                  style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            )
+                                          : const Text(
+                                              'Accantona',
+                                              style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
                                             ),
-                                          ],
-                                        ),
-                                      ),
                                     ),
+                                  ),
                                 ],
                               ),
                             ],

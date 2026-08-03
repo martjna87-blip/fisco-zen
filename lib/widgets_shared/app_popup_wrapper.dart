@@ -21,7 +21,7 @@ class AppPopupWrapper extends StatelessWidget {
     this.onClose,
   });
 
-/// 🛡️ METODO UNIVERSALE PER APRIRE QUALSIASI POP-UP
+  /// 🛡️ METODO UNIVERSALE PER APRIRE QUALSIASI POP-UP
   /// Garantisce la STESSA animazione di apertura, lo STESSO sfondo oscurato e la STESSA simmetria in tutta l'app!
   static Future<T?> mostra<T>({
     required BuildContext context,
@@ -35,7 +35,6 @@ class AppPopupWrapper extends StatelessWidget {
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (context, anim1, anim2) => child,
       transitionBuilder: (context, anim1, anim2, childWidget) {
-        // 🎯 ANIMAZIONE UNIVERSALE: Dissolvenza + Leggero zoom fluido (ScaleTransition)
         final curve = Curves.easeOutCubic;
         final tweenScale = Tween<double>(begin: 0.92, end: 1.0).animate(
           CurvedAnimation(parent: anim1, curve: curve),
@@ -54,19 +53,94 @@ class AppPopupWrapper extends StatelessWidget {
       },
     );
   }
-  
+
+  /// 💡 POP-UP INFORMATIVO UNIVERSALE (Spiegazioni Tap-to-Explore)
+  static Future<void> mostraInfo({
+    required BuildContext context,
+    required IconData icon,
+    required Color color,
+    required String titolo,
+    required String descrizione,
+    String? formula,
+  }) {
+    return mostra(
+      context: context,
+      child: Dialog(
+        backgroundColor: const Color(0xFF1C1C21),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                titolo,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                descrizione,
+                style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+              if (formula != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    formula,
+                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Ho Capito', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
 
-    // 🛡️ REGOLA UNICA HARDWARE: Calcola la notch e posiziona la scheda
     final notchHeight = MediaQuery.of(context).viewPadding.top;
     final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 22.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      // 🛡️ REGOLA UNICA MARGINI: Identica per TUTTI i pop-up dell'app
       insetPadding: EdgeInsets.only(
         left: 10,
         right: 10,
@@ -177,7 +251,7 @@ class AppPopupWrapper extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
 
-                      // CORPO PRINCIPALE (La scheda vera e propria passata da ogni screen)
+                      // CORPO PRINCIPALE
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(22),
@@ -191,7 +265,7 @@ class AppPopupWrapper extends StatelessWidget {
                                 border: Border.all(
                                     color: Colors.white.withOpacity(0.15)),
                               ),
-                              child: child, // 👈 Qui viene iniettato il contenuto specifico
+                              child: child,
                             ),
                           ),
                         ),
