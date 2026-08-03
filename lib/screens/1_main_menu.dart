@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/wallet_provider.dart';
+import '../data/notifications_provider.dart'; // 👈 1. NUOVO PROVIDER NOTIFICHE
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '1_onboarding_wizard.dart';
 import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
+import '4_notifications_screen.dart'; // 👈 2. NUOVA SCHERMATA CENTRO NOTIFICHE
 
 class MainMenu extends StatefulWidget {
   final bool hasPartitaIva;
@@ -41,12 +43,7 @@ class _MainMenuState extends State<MainMenu> {
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
       ),
       const SizedBox.shrink(),
-      const Center(
-        child: Text(
-          'Notifiche / Scadenze (In arrivo)',
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-      ),
+      const NotificationsScreen(), // 👈 ORA APRE LA VERA SCHERMATA NOTIFICHE!
       const ProfiloSandboxScreen(),
     ];
 
@@ -113,11 +110,28 @@ class _MainMenuState extends State<MainMenu> {
           color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(
-          icon,
-          color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
-          size: 22,
-        ),
+        child: index == 2
+            ? Builder(
+                builder: (context) {
+                  // 🔴 BADGE NOTIFICHE NON LETTE SULLA CAMPANELLA
+                  final int nonLette = context.watch<NotificationsProvider>().nonLetteCount;
+                  return Badge(
+                    isLabelVisible: nonLette > 0,
+                    label: Text('$nonLette'),
+                    backgroundColor: const Color(0xFFEF4444),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
+                      size: 22,
+                    ),
+                  );
+                },
+              )
+            : Icon(
+                icon,
+                color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
+                size: 22,
+              ),
       ),
     );
   }

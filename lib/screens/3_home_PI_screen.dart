@@ -11,6 +11,7 @@ import '3_5_PI_dettaglio_fatture_sheet.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../data/notifications_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
@@ -73,6 +74,41 @@ class _HomeScreenState extends State<HomeScreen> {
       (Match m) => '${m[1]}.',
     );
     return '$intero,${parti[1]} €';
+  }
+  // ⏳ CALCOLATORE GIORNI TRASCORSI DALL'EMISSIONE
+  int _calcolaGiorniTrascorsi(String? dataStr) {
+    if (dataStr == null || dataStr.isEmpty) return 0;
+    DateTime? parsedDate = DateTime.tryParse(dataStr);
+
+    if (parsedDate == null && dataStr.contains('/')) {
+      final parts = dataStr.split('/');
+      if (parts.length == 3) {
+        final g = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        final a = int.tryParse(parts[2]);
+        if (g != null && m != null && a != null) parsedDate = DateTime(a, m, g);
+      }
+    }
+
+    if (parsedDate == null) {
+      final List<String> mesi = [
+        'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+        'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'
+      ];
+      final parts = dataStr.toLowerCase().split(' ');
+      if (parts.length >= 3) {
+        final giorno = int.tryParse(parts[0]);
+        final meseIdx = mesi.indexOf(parts[1]);
+        final anno = int.tryParse(parts[2]);
+        if (giorno != null && meseIdx != -1 && anno != null) {
+          parsedDate = DateTime(anno, meseIdx + 1, giorno);
+        }
+      }
+    }
+
+    if (parsedDate == null) return 0;
+    final differenza = DateTime.now().difference(parsedDate).inDays;
+    return differenza > 0 ? differenza : 0;
   }
 
   void _mostraDialogIncassoFatture(WalletProvider walletProvider) {
@@ -374,6 +410,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final fattureDaIncassare = walletProvider.fattureDaIncassare;
     final fattureIncassate = walletProvider.fattureIncassate;
+    // 🤖 Avvia la scansione in background delle fatture >15 giorni
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationsProvider>().verificaFattureInRitardo(fattureDaIncassare);
+    });
 
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
     final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
@@ -477,38 +517,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // 5. CONTENUTO CENTRATO: DUAL METRICS P.IVA (Con Terminologia Fiscale Rigorosa)
+                // 5. CONTENUTO CENTRATO: FATTURATO LORDO IN EVIDENZA + TASSE DOVUTE SOTTO
                 Padding(
-                  padding: EdgeInsets.only(top: topPadding + 24, left: 16, right: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  padding: EdgeInsets.only(top: topPadding + 18),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 📊 1. FATTURATO LORDO INCASSATO
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => DettaglioFattureSheet(
-                                fattureIncassate: fattureIncassate,
-                                coefficienteRedditivita: _coefficienteRedditivita,
-                                aliquotaImposta: _aliquotaImposta,
-                                aliquotaInps: _aliquotaInps,
-                              ),
-                            );
-                          },
-                          onLongPress: () {
-                            AppPopupWrapper.mostraInfo(
-                              context: context,
-                              icon: Icons.receipt_long_rounded,
-                              color: const Color(0xFF2DD4BF),
-                              titolo: 'Fatturato Incassato',
-                              descrizione: 'Somma totale dei compensi realmente incassati nel periodo fiscale. È l\'importo su cui viene applicato il tuo Coefficiente di Redditività ATECO.',
-                              formula: 'Incassato Reale',
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(12),
+                      // 📊 1. FATTURATO LORDO (Centrato in grande - 44pt)
+                      InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => DettaglioFattureSheet(
+                              fattureIncassate: fattureIncassate,
+                              coefficienteRedditivita: _coefficienteRedditivita,
+                              aliquotaImposta: _aliquotaImposta,
+                              aliquotaInps: _aliquotaInps,
+                            ),
+                          );
+                        },
+                        onLongPress: () {
+                          AppPopupWrapper.mostraInfo(
+                            context: context,
+                            icon: Icons.receipt_long_rounded,
+                            color: const Color(0xFF2DD4BF),
+                            titolo: 'Fatturato Incassato (Criterio di Cassa)',
+                            descrizione: 'Somma totale dei compensi realmente incassati nel periodo fiscale. È l\'importo su cui viene applicato il tuo Coefficiente di Redditività ATECO.',
+                            formula: 'Incassato Reale × Coefficiente ATECO',
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -521,17 +561,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   letterSpacing: 1.5,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${fatturato.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -1,
-                                  ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${fatturato.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -1,
                                 ),
                               ),
                             ],
@@ -539,51 +576,49 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                      // Separatore visivo centrale discreto
-                      Container(
-                        height: 38,
-                        width: 1,
-                        color: Colors.white12,
-                      ),
+                      const SizedBox(height: 8),
 
-                      // 🛡️ 2. TASSE DOVUTE (Saldo Anno Corrente + Acconto Anno Successivo)
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                          onLongPress: () {
-                            AppPopupWrapper.mostraInfo(
-                              context: context,
-                              icon: Icons.shield_rounded,
-                              color: const Color(0xFF3B82F6),
-                              titolo: 'Stima Tasse Totali (Saldo + Acconti)',
-                              descrizione: 'Quota complessiva da accantonare per la dichiarazione dei redditi. Include sia il Saldo dell\'anno in corso che l\'Acconto per l\'anno successivo (Imposta Sostitutiva + INPS)',
-                              formula: 'Saldo Anno Corrente + Acconti Anno Successivo',
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Column(
+                      // 🛡️ 2. TASSE DOVUTE (Sotto il Fatturato, Font contenuto - 15pt in Badge)
+                      InkWell(
+                        onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                        onLongPress: () {
+                          AppPopupWrapper.mostraInfo(
+                            context: context,
+                            icon: Icons.shield_rounded,
+                            color: const Color(0xFF3B82F6),
+                            titolo: 'Stima Tasse Totali (Saldo + Acconti)',
+                            descrizione: 'Quota complessiva da accantonare per la dichiarazione dei redditi. Include sia il Saldo dell\'anno in corso che l\'Anticipo/Acconto per l\'anno successivo (Imposta Sostitutiva + INPS).',
+                            formula: 'Saldo Anno Corrente + Acconti Anno Successivo',
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                          ),
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 14),
+                              const SizedBox(width: 6),
                               const Text(
-                                'TASSE DOVUTE',
+                                'Tasse Dovute:',
                                 style: TextStyle(
-                                  color: Color(0xFF3B82F6),
-                                  fontSize: 10,
+                                  color: Colors.white70,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: 1.5,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${tasseTotaliCalcolate.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                                  style: const TextStyle(
-                                    color: Color(0xFF3B82F6),
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -1,
-                                  ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${tasseTotaliCalcolate.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                style: const TextStyle(
+                                  color: Color(0xFF3B82F6),
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -603,16 +638,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ SERBATOIO RISERVA TASSE (Tap -> Accantona su tutta la card | LongPress -> Info Pop-up)
+                  // 🛡️ SERBATOIO RISERVA TASSE (Tap disattivato in Home | LongPress per info attivo)
                   GestureDetector(
-                    onTap: () => _mostraDialogAccantonamentoTasse(context),
+                    // onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 DISATTIVATO TEMPORANEAMENTE
                     onLongPress: () {
                       AppPopupWrapper.mostraInfo(
                         context: context,
                         icon: Icons.shield_rounded,
                         color: const Color(0xFF3B82F6),
                         titolo: 'Serbatoio Riserva Tasse',
-                        descrizione: 'Mostra lo stato di copertura delle tue tasse stimate. Fai un tap per accantonare subito le tasse scoperte nel Salvadanaio.',
+                        descrizione: 'Mostra lo stato di copertura delle tue tasse stimate.',
                         formula: 'In Salvadanaio ÷ Dovuto ATECO',
                       );
                     },
@@ -621,53 +656,74 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 1. NUOVA FATTURA (+ Registra)
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.add_circle_outline_rounded,
-                            title: 'Nuova\nfattura',
-                            value: '+ Registra',
-                            onTap: _mostraDialogRegistraFattura,
-                          ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 1. NUOVA FATTURA (+ Registra)
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.add_circle_outline_rounded,
+                          title: 'Nuova\nfattura',
+                          value: '+ Registra',
+                          onTap: _mostraDialogRegistraFattura,
                         ),
-                        const SizedBox(width: 8),
+                      ),
+                      const SizedBox(width: 8),
 
-                        // 2. DA INCASSARE (Sostituisce Stima Tasse, apre la finestra incasso)
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.hourglass_top_rounded,
-                            title: 'Da\nincassare',
-                            value: '${fattureDaIncassare.length} (${totaleInSospeso.toStringAsFixed(0)} €)',
-                            onTap: () => _mostraDialogIncassoFatture(walletProvider),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
+                      // 2. DA INCASSARE
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final bool haFattureDaIncassare = fattureDaIncassare.isNotEmpty;
 
-                        // 3. DETTAGLIO FATTURE (Fatture già incassate)
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.analytics_outlined,
-                            title: 'Dettaglio\nfatture',
-                            value: '${fattureIncassate.length} incassate',
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => DettaglioFattureSheet(
-                                  fattureIncassate: fattureIncassate,
-                                  coefficienteRedditivita: _coefficienteRedditivita,
-                                  aliquotaImposta: _aliquotaImposta,
-                                  aliquotaInps: _aliquotaInps,
-                                ),
-                              );
-                            },
-                          ),
+                            final int fattureInRitardo = fattureDaIncassare
+                                .where((f) => _calcolaGiorniTrascorsi(f['data']?.toString()) >= 15)
+                                .length;
+                            final bool haRitardi = fattureInRitardo > 0;
+
+                            return _buildMiniCard(
+                              icon: haRitardi
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.hourglass_top_rounded,
+                              title: 'Da\nincassare',
+                              value: haRitardi
+                                  ? '⚠️ $fattureInRitardo (>15 gg)'
+                                  : (haFattureDaIncassare
+                                      ? '${fattureDaIncassare.length} (${totaleInSospeso.toStringAsFixed(0)} €)'
+                                      : 'Nessuna'),
+                              iconColor: haRitardi
+                                  ? const Color(0xFFEF4444)
+                                  : (haFattureDaIncassare ? const Color(0xFFF59E0B) : null),
+                              valueColor: haRitardi
+                                  ? const Color(0xFFEF4444)
+                                  : (haFattureDaIncassare ? const Color(0xFFF59E0B) : null),
+                              onTap: () => _mostraDialogIncassoFatture(walletProvider),
+                            );
+                          },
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // 3. DETTAGLIO FATTURE
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.analytics_outlined,
+                          title: 'Dettaglio\nfatture',
+                          value: '${fattureIncassate.length} incassate',
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => DettaglioFattureSheet(
+                                fattureIncassate: fattureIncassate,
+                                coefficienteRedditivita: _coefficienteRedditivita,
+                                aliquotaImposta: _aliquotaImposta,
+                                aliquotaInps: _aliquotaInps,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 120),
@@ -685,45 +741,55 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required String value,
     required VoidCallback onTap,
+    Color? iconColor,
+    Color? valueColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        height: 86, // 👈 ALTEZZA FISSA DEFINITIVA ANTI-OVERFLOW
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFF141417).withOpacity(0.92),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: iconColor != null 
+                ? iconColor.withOpacity(0.3) 
+                : Colors.white.withOpacity(0.08),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: Colors.white70, size: 22),
-            const SizedBox(height: 12),
+            Icon(icon, color: iconColor ?? Colors.white70, size: 20),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
                   style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 11,
+                    fontSize: 10,
                     height: 1.15,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: valueColor ?? Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

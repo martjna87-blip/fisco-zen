@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'screens/1_setup_screen.dart';       // La vecchia schermata
 import 'screens/1_onboarding_wizard.dart';
 import 'screens/1_main_menu.dart';
 import 'data/wallet_provider.dart';
+import 'data/notifications_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +30,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationsProvider()), // 👈 NUOVO!
       ],
       child: const FiscoZenApp(),
     ),
