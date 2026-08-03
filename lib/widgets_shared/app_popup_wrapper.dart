@@ -21,6 +21,40 @@ class AppPopupWrapper extends StatelessWidget {
     this.onClose,
   });
 
+/// 🛡️ METODO UNIVERSALE PER APRIRE QUALSIASI POP-UP
+  /// Garantisce la STESSA animazione di apertura, lo STESSO sfondo oscurato e la STESSA simmetria in tutta l'app!
+  static Future<T?> mostra<T>({
+    required BuildContext context,
+    required Widget child,
+  }) {
+    return showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Chiudi',
+      barrierColor: Colors.black.withOpacity(0.70), // Sfondo scuro elegante
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (context, anim1, anim2) => child,
+      transitionBuilder: (context, anim1, anim2, childWidget) {
+        // 🎯 ANIMAZIONE UNIVERSALE: Dissolvenza + Leggero zoom fluido (ScaleTransition)
+        final curve = Curves.easeOutCubic;
+        final tweenScale = Tween<double>(begin: 0.92, end: 1.0).animate(
+          CurvedAnimation(parent: anim1, curve: curve),
+        );
+        final tweenFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: anim1, curve: curve),
+        );
+
+        return FadeTransition(
+          opacity: tweenFade,
+          child: ScaleTransition(
+            scale: tweenScale,
+            child: childWidget,
+          ),
+        );
+      },
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;

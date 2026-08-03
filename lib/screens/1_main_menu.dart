@@ -1,7 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-// Test sincronizzazione Mac ok
-// Importiamo le TUE VERE schermate
+import '../widgets_shared/app_popup_wrapper.dart';
+
+// Import delle schermate
 import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
@@ -32,18 +33,14 @@ class _MainMenuState extends State<MainMenu> {
   void initState() {
     super.initState();
     _screens = [
-      // Indice 0: GESTISCE TUTTO (Swipe P.IVA oppure solo Wallet per Dipendente)
       MainDashboardWrapper(
         hasPartitaIva: widget.hasPartitaIva,
         codiceAtecoIniziale: widget.codiceAtecoIniziale,
         coefficienteIniziale: widget.coefficienteIniziale,
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
       ),
-      // Indice 1: Schermata "fantasma" (non verrà mai chiamata dal menù in basso)
       const SizedBox.shrink(), 
-      // Indice 2: Avvisi
       const Center(child: Text('Notifiche / Scadenze (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
-      // Indice 3: Profilo
       const Center(child: Text('Profilo & Impostazioni (In arrivo)', style: TextStyle(color: Colors.white, fontSize: 18))),
     ];
   }
@@ -52,12 +49,9 @@ class _MainMenuState extends State<MainMenu> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _currentIndex,
-          children: _screens,
-        ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
       ),
       extendBody: true, 
       bottomNavigationBar: _buildGlassBottomNav(),
@@ -96,19 +90,14 @@ class _MainMenuState extends State<MainMenu> {
   }
 
   Widget _buildNavItem({required IconData icon, required int index, required String label}) {
-    // Il tasto si illumina se è selezionato
     final isSelected = _currentIndex == index;
     
     return GestureDetector(
       onTap: () {
         setState(() {
           if (index == 0 || index == 1) {
-            // 🎯 NEUTRALIZZAZIONE: Sia cliccando su Home che su Wallet, 
-            // forziamo l'app a stare nell'indice 0 (MainDashboardWrapper).
-            // Lo swipe gestirà la vista tra le due schede.
             _currentIndex = 0;
           } else {
-            // Per Avvisi (2) e Profilo (3) navighiamo normalmente.
             _currentIndex = index;
           }
         });
@@ -133,11 +122,10 @@ class _MainMenuState extends State<MainMenu> {
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        showModalBottomSheet(
+        // 🎯 APERTURA UNIVERSALE UNIFORMATA
+        AppPopupWrapper.mostra(
           context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => const AddMovementSheet(initialTab: 'uscita'),
+          child: const AddMovementSheet(initialTab: 'uscita'),
         );
       },
       child: Container(
