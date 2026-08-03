@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class AccountDetailScreen extends StatelessWidget {
   final Map<String, dynamic> conto;
@@ -7,11 +8,11 @@ class AccountDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dati simulati di movimenti raggruppati per mese (senza il prefisso '+' nei numeri)
+    // Dati simulati di movimenti raggruppati per mese
     final List<Map<String, dynamic>> sezioniMesi = [
       {
         'mese': 'Luglio 2026',
-        'totaleMese': 2149.80, // 👈 Corretto qui!
+        'totaleMese': 2149.80,
         'movimenti': [
           {'titolo': 'Supermercato Esselunga', 'data': '18 Lug 2026', 'importo': -84.50, 'tipo': 'spesa', 'icona': Icons.shopping_cart_outlined},
           {'titolo': 'Stipendio Luglio', 'data': '15 Lug 2026', 'importo': 2400.00, 'tipo': 'entrata', 'icona': Icons.work_outline},
@@ -21,7 +22,7 @@ class AccountDetailScreen extends StatelessWidget {
       },
       {
         'mese': 'Giugno 2026',
-        'totaleMese': 1820.00, // 👈 Corretto qui!
+        'totaleMese': 1820.00,
         'movimenti': [
           {'titolo': 'Assicurazione Auto', 'data': '28 Giu 2026', 'importo': -450.00, 'tipo': 'spesa', 'icona': Icons.verified_user_outlined},
           {'titolo': 'Stipendio Giugno', 'data': '15 Giu 2026', 'importo': 2400.00, 'tipo': 'entrata', 'icona': Icons.work_outline},
@@ -37,39 +38,32 @@ class AccountDetailScreen extends StatelessWidget {
       },
     ];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF141417),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF141417),
-        elevation: 0,
-        title: Text(conto['nome'], style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
+    final Color coloreConto = conto['colore'] as Color? ?? const Color(0xFF2DD4BF);
+    final IconData iconaConto = conto['icona'] as IconData? ?? Icons.account_balance_outlined;
+
+    return AppPopupWrapper(
+      title: conto['nome']?.toString() ?? 'Dettaglio Conto',
+      child: Column(
         children: [
-          // CARD RIASSUNTIVA DEL CONTO
+          // 📌 CARD RIASSUNTIVA DEL CONTO
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(24),
+              color: Colors.black.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: (conto['colore'] as Color).withOpacity(0.15),
+                    color: coloreConto.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(conto['icona'], color: conto['colore'], size: 30),
+                  child: Icon(iconaConto, color: coloreConto, size: 26),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,14 +72,14 @@ class AccountDetailScreen extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '${(conto['saldo'] as double).toStringAsFixed(2)} €',
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                          '${((conto['saldo'] ?? 0.0) as double).toStringAsFixed(2)} €',
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         '${conto['tipo']} • Aperto il ${conto['dataCreazione']}',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: const TextStyle(color: Colors.white54, fontSize: 11),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -96,12 +90,12 @@ class AccountDetailScreen extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // LISTA RAGGRUPPATA PER MESE
+          // 📌 LISTA RAGGRUPPATA PER MESE
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              physics: const BouncingScrollPhysics(),
               itemCount: sezioniMesi.length,
               itemBuilder: (context, indexSezione) {
                 final sezione = sezioniMesi[indexSezione];
@@ -112,9 +106,9 @@ class AccountDetailScreen extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // INTESTAZIONE MESE + BILANCIO MENSILE (BLINDATO)
+                    // INTESTAZIONE MESE + BILANCIO MENSILE
                     Padding(
-                      padding: const EdgeInsets.only(top: 16, bottom: 10),
+                      padding: const EdgeInsets.only(top: 12, bottom: 8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -123,7 +117,7 @@ class AccountDetailScreen extends StatelessWidget {
                               sezione['mese'].toString().toUpperCase(),
                               style: const TextStyle(
                                 color: Colors.white54,
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.0,
                               ),
@@ -157,20 +151,21 @@ class AccountDetailScreen extends StatelessWidget {
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
+                          color: Colors.black.withOpacity(0.30),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
                         ),
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: isSpesa ? const Color(0xFFEF4444).withOpacity(0.1) : const Color(0xFF10B981).withOpacity(0.1),
+                                color: isSpesa ? const Color(0xFFEF4444).withOpacity(0.15) : const Color(0xFF10B981).withOpacity(0.15),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(m['icona'], color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 20),
+                              child: Icon(m['icona'] as IconData, color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981), size: 18),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -178,15 +173,15 @@ class AccountDetailScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    m['titolo'], 
-                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                    m['titolo'].toString(), 
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    m['data'], 
-                                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                    m['data'].toString(), 
+                                    style: const TextStyle(color: Colors.white38, fontSize: 10),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -198,7 +193,7 @@ class AccountDetailScreen extends StatelessWidget {
                               '${isSpesa ? '' : '+'}${(m['importo'] as double).toStringAsFixed(2)} €',
                               style: TextStyle(
                                 color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                                fontSize: 15,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -215,4 +210,3 @@ class AccountDetailScreen extends StatelessWidget {
       ),
     );
   }
-}

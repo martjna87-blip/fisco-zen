@@ -28,7 +28,7 @@ class AppPopupWrapper extends StatelessWidget {
 
     // 🛡️ REGOLA UNICA HARDWARE: Calcola la notch e posiziona la scheda
     final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 20.0;
+    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 102.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
