@@ -12,12 +12,17 @@ import 'data/wallet_provider.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🎨 CONFIGURAZIONE BARRA DI STATO EDGE-TO-EDGE
+  // 🎯 1. FORZA LA MODALITÀ EDGE-TO-EDGE SUL DISPOSITIVO
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // 🎨 2. CONFIGURAZIONE BARRA DI STATO E NAVIGAZIONE 100% TRASPARENTI
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent, // Rende lo sfondo trasparente
-      statusBarIconBrightness: Brightness.light, // Icone chiare su Android
-      statusBarBrightness: Brightness.dark, // iOS: Brightness.dark = scritte bianche (orologio/batteria)
+      statusBarColor: Colors.transparent, // Barra orologio/batteria trasparente
+      statusBarIconBrightness: Brightness.light, // Icone bianche su Android
+      statusBarBrightness: Brightness.dark, // iOS: scritte bianche (orologio/batteria)
+      systemNavigationBarColor: Colors.transparent, // Barra gesti in basso trasparente
+      systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
 

@@ -228,6 +228,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double topPadding = MediaQuery.of(context).padding.top; // 👈 Spazio hardware di orologio/notch
+    final double headerHeight = 220 + topPadding; // 👈 Altezza fluida che riempie il vetro in cima
+
     final walletProvider = context.watch<WalletProvider>();
     final patrimonioNetto = walletProvider.patrimonioNetto;
     final spesoBisogni = walletProvider.spesoBisogni;
@@ -266,27 +269,26 @@ class _WalletScreenState extends State<WalletScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO
+            // 🎯 HEADER PORTAFOGLIO IMMERSIVO (SFONDO SOTTO L'OROLOGIO)
             Stack(
               alignment: Alignment.center,
               children: [
+                // 1. Immagine che sale fino al bordo del vetro
                 Container(
-                  height: 220,
+                  height: headerHeight,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
                         'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=1000&auto=format&fit=crop',
-                      // altre immagini 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop'
-                      // altre immagini 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?q=80&w=1000&auto=format&fit=crop'
-                      // altre immagini 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop'
                       ),
                       fit: BoxFit.cover,
                       opacity: 0.45,
                     ),
                   ),
                 ),
+                // 2. Sfocatura/Sfumatura che sale in cima
                 Container(
-                  height: 220,
+                  height: headerHeight,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -300,136 +302,137 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
+                // 3. Pulsante Riepilogo (posizionato sotto la barra dell'orologio)
                 Positioned(
-                  top: 10,
+                  top: topPadding + 10,
                   right: 16,
-                  child: SafeArea(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AnnualSummarySheet(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
-                      label: const Text(
-                        'Riepilogo',
-                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AnnualSummarySheet(),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      );
+                    },
+                    icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                    label: const Text(
+                      'Riepilogo',
+                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                 ),
 
-                // 🎯 CONTENUTO CENTRATO
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 0),
-                    const Text(
-                      'PORTAFOGLIO PERSONALE',
-                      style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -1,
+                // 4. CONTENUTO CENTRATO E PROTETTO DALLA NOTCH
+                Padding(
+                  padding: EdgeInsets.only(top: topPadding + 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'PORTAFOGLIO PERSONALE',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w400),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 42,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -1,
+                            ),
                           ),
-                        ),
-                        
-                        if (widget.isPiva) ...[
-                          const SizedBox(width: 14),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${nettoReale.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  
-                                  if (!isTasseCoperte) 
-                                    InkWell(
-                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: coloreCard.withOpacity(0.92),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
-                                        ),
-                                        child: const Text(
-                                          'Accantona',
-                                          style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    InkWell(
-                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: coloreCard.withOpacity(0.92),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                        ),
-                                        child: const Row(
-                                          children: [
-                                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                            SizedBox(width: 3),
-                                            Text(
-                                              'Protette',
-                                              style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                          
+                          if (widget.isPiva) ...[
+                            const SizedBox(width: 14),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${nettoReale.toStringAsFixed(0)} €',
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    
+                                    if (!isTasseCoperte) 
+                                      InkWell(
+                                        onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: coloreCard.withOpacity(0.92),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                                          ),
+                                          child: const Text(
+                                            'Accantona',
+                                            style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      InkWell(
+                                        onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: coloreCard.withOpacity(0.92),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                                          ),
+                                          child: const Row(
+                                            children: [
+                                              Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                              SizedBox(width: 3),
+                                              Text(
+                                                'Protette',
+                                                style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

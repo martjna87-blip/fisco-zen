@@ -349,6 +349,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double topPadding = MediaQuery.of(context).padding.top; // 👈 Spazio hardware per orologio e notch
+    final double headerHeight = 220 + topPadding; // 👈 Altezza fluida edge-to-edge
+
     final walletProvider = context.watch<WalletProvider>();
 
     final double patrimonioNetto = walletProvider.patrimonioNetto;
@@ -387,12 +390,13 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER PORTAFOGLIO
+            // 🎯 HEADER P.IVA IMMERSIVO (SFONDO SOTTO L'OROLOGIO)
             Stack(
               alignment: Alignment.center,
               children: [
+                // 1. Immagine di sfondo che sale fino al bordo del vetro
                 Container(
-                  height: 220,
+                  height: headerHeight,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
@@ -403,8 +407,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+                // 2. Gradiente sfumato che parte dalla cima
                 Container(
-                  height: 220,
+                  height: headerHeight,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -418,133 +423,65 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
+                // 3. Pulsanti in alto a sinistra (sotto l'orologio)
                 Positioned(
-                  top: 10,
+                  top: topPadding + 10,
                   left: 16,
-                  child: SafeArea(
-                    child: Row(
-                      children: [
-                        // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE
-                        InkWell(
-                          onTap: () async {
-                            await walletProvider.resetSoloMovimentieFatture();
-                            if (!context.mounted) return;
-                            AppNotifications.mostraInAlto(
-                              context, 
-                              'Fatture e conti azzerati! Profilo ATECO conservato', 
-                              type: NotificationType.warning,
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.20),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
-                            ),
-                            child: const Icon(Icons.refresh_rounded, color: Color(0xFFEF4444), size: 16),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO
-                        InkWell(
-                          onTap: () async {
-                            await walletProvider.resetTuttiIDati();
-                            if (!context.mounted) return;
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const OnboardingWizard(),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.20),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.restart_alt_rounded, color: Color(0xFFF59E0B), size: 13),
-                                SizedBox(width: 4),
-                                Text(
-                                  'PRIMO AVVIO',
-                                  style: TextStyle(
-                                    color: Color(0xFFF59E0B),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // 3️⃣ TASTINO TEST MODE FREE / PRO
-                        InkWell(
-                          onTap: () {
-                            walletProvider.toggleProUser();
-                            
-                            AppNotifications.mostraInAlto(
-                              context, 
-                              walletProvider.isProUser
-                              ? '✨ Modalità PRO Attivata (Test)' 
-                              : '🔒 Modalità FREE Attivata (Test)',
-                              type: NotificationType.warning,
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: walletProvider.isProUser 
-                                  ? const Color(0xFFA855F7).withOpacity(0.2) 
-                                  : const Color(0xFFF59E0B).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: walletProvider.isProUser 
-                                    ? const Color(0xFFA855F7) 
-                                    : const Color(0xFFF59E0B),
-                              ),
-                            ),
-                            child: Text(
-                              walletProvider.isProUser ? '✨ PRO' : '🔒 FREE',
-                              style: TextStyle(
-                                color: walletProvider.isProUser 
-                                    ? const Color(0xFFA855F7) 
-                                    : const Color(0xFFF59E0B),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // 🏷️ 4️⃣ BADGE MOSTRA VERSIONE IN CORSO
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  child: Row(
+                    children: [
+                      // 1️⃣ TASTO ROSSO TONDO: RESET CONTI & FATTURE
+                      InkWell(
+                        onTap: () async {
+                          await walletProvider.resetSoloMovimentieFatture();
+                          if (!context.mounted) return;
+                          AppNotifications.mostraInAlto(
+                            context, 
+                            'Fatture e conti azzerati! Profilo ATECO conservato', 
+                            type: NotificationType.warning,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2DD4BF).withOpacity(0.2),
+                            color: const Color(0xFFEF4444).withOpacity(0.20),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                          ),
+                          child: const Icon(Icons.refresh_rounded, color: Color(0xFFEF4444), size: 16),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // 2️⃣ TASTO GIALLO: RESET TOTALE & PRIMO AVVIO
+                      InkWell(
+                        onTap: () async {
+                          await walletProvider.resetTuttiIDati();
+                          if (!context.mounted) return;
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const OnboardingWizard(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.20),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF2DD4BF)),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 12),
-                              SizedBox(width: 3),
+                              Icon(Icons.restart_alt_rounded, color: Color(0xFFF59E0B), size: 13),
+                              SizedBox(width: 4),
                               Text(
-                                'V2.5 Stabile', // 👈 Cambia questo testo in futuro per i tuoi test
+                                'PRIMO AVVIO',
                                 style: TextStyle(
-                                  color: Color(0xFF2DD4BF),
+                                  color: Color(0xFFF59E0B),
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -552,130 +489,198 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                      const SizedBox(width: 6),
 
-                Positioned(
-                  top: 10,
-                  right: 16,
-                  child: SafeArea(
-                    child: FilledButton.icon(
-                      onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                      icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
-                      label: Text(
-                        'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 🎯 CONTENUTO CENTRATO
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 0),
-                    const Text(
-                      'GESTIONE P.IVA',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                          style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, letterSpacing: -1),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${nettoReale.toStringAsFixed(0)} €',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ],
+                      // 3️⃣ TASTINO TEST MODE FREE / PRO
+                      InkWell(
+                        onTap: () {
+                          walletProvider.toggleProUser();
+                          
+                          AppNotifications.mostraInAlto(
+                            context, 
+                            walletProvider.isProUser
+                            ? '✨ Modalità PRO Attivata (Test)' 
+                            : '🔒 Modalità FREE Attivata (Test)',
+                            type: NotificationType.warning,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: walletProvider.isProUser 
+                                ? const Color(0xFFA855F7).withOpacity(0.2) 
+                                : const Color(0xFFF59E0B).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: walletProvider.isProUser 
+                                  ? const Color(0xFFA855F7) 
+                                  : const Color(0xFFF59E0B),
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(width: 8),
-                                
-                                if (!isTasseCoperte) 
-                                  InkWell(
-                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF3B82F6).withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
-                                      ),
-                                      child: const Text(
-                                        'Accantona',
-                                        style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  InkWell(
-                                    onTap: () => _mostraDialogAccantonamentoTasse(context),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
-                                      ),
-                                      child: const Row(
-                                        children: [
-                                          Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                          SizedBox(width: 3),
-                                          Text(
-                                            'Protette',
-                                            style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                          ),
+                          child: Text(
+                            walletProvider.isProUser ? '✨ PRO' : '🔒 FREE',
+                            style: TextStyle(
+                              color: walletProvider.isProUser 
+                                  ? const Color(0xFFA855F7) 
+                                  : const Color(0xFFF59E0B),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // 🏷️ 4️⃣ BADGE VERSIONE IN CORSO
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2DD4BF).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2DD4BF)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 12),
+                            SizedBox(width: 3),
+                            Text(
+                              'V3.0 Stabile',
+                              style: TextStyle(
+                                color: Color(0xFF2DD4BF),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 4. Pulsante ATECO in alto a destra
+                Positioned(
+                  top: topPadding + 10,
+                  right: 16,
+                  child: FilledButton.icon(
+                    onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                    icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                    label: Text(
+                      'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
-                  ],
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+
+                // 5. CONTENUTO CENTRATO E PROTETTO DALLA NOTCH
+                Padding(
+                  padding: EdgeInsets.only(top: topPadding + 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'GESTIONE P.IVA',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${patrimonioNetto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold, letterSpacing: -1),
+                          ),
+                          const SizedBox(width: 14),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${nettoReale.toStringAsFixed(0)} €',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 12),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  
+                                  if (!isTasseCoperte) 
+                                    InkWell(
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                                        ),
+                                        child: const Text(
+                                          'Accantona',
+                                          style: TextStyle(color: Color(0xFF3B82F6), fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    InkWell(
+                                      onTap: () => _mostraDialogAccantonamentoTasse(context),
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Protette',
+                                              style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
