@@ -239,11 +239,13 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   void _mostraDialogAggiungiSpesa() {
     final TextEditingController nomeCtrl = TextEditingController();
     final TextEditingController importoCtrl = TextEditingController();
+    final TextEditingController quotaManualeCtrl = TextEditingController();
 
     String categoriaSel = 'Bisogni (50%)';
     String sottoCatSel = _sottocategorieDisponibili.first;
-    String tipoSpesaSel = 'mensile';
-    String meseScadenzaSel = _nomiMesi[_meseSelezionato.month - 1]; // Mese corrente come default
+    String tipoSpesaSel = 'mensile'; // 'mensile' | 'annuale'
+    String modalitaAccantonamento = 'spalmata_12'; // 'spalmata_12' | 'addebito_unico' | 'manuale'
+    String meseScadenzaSel = _nomiMesi[_meseSelezionato.month - 1];
 
     AppSecondaryPopup.mostra(
       context: context,
@@ -253,18 +255,34 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       testoConferma: 'Aggiungi',
       onConferma: () {
         final nome = nomeCtrl.text.trim();
-        final importo = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
+        final importoTotale = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
+        final quotaManuale = double.tryParse(quotaManualeCtrl.text.replaceAll(',', '.')) ?? 0.0;
 
-        if (nome.isNotEmpty && importo > 0) {
+        if (nome.isNotEmpty && importoTotale > 0) {
+          double quotaMensileCalcolata = importoTotale;
+
+          if (tipoSpesaSel == 'annuale') {
+            if (modalitaAccantonamento == 'spalmata_12') {
+              quotaMensileCalcolata = importoTotale / 12;
+            } else if (modalitaAccantonamento == 'addebito_unico') {
+              // Se siamo nel mese di scadenza, grava al 100%, altrimenti 0 €
+              final bool eMeseDiScadenza = _nomiMesi[_meseSelezionato.month - 1] == meseScadenzaSel;
+              quotaMensileCalcolata = eMeseDiScadenza ? importoTotale : 0.0;
+            } else if (modalitaAccantonamento == 'manuale') {
+              quotaMensileCalcolata = quotaManuale;
+            }
+          }
+
           setState(() {
             _vociPianificate.add({
               'id': DateTime.now().millisecondsSinceEpoch.toString(),
               'nome': nome,
               'categoria': categoriaSel,
               'sottocategoria': sottoCatSel,
-              'previsto': tipoSpesaSel == 'annuale' ? importo / 12 : importo,
+              'previsto': quotaMensileCalcolata,
               'tipo': tipoSpesaSel == 'annuale' ? 'annuale_spalmata' : 'mensile',
-              if (tipoSpesaSel == 'annuale') 'totaleAnnuale': importo,
+              'modalitaAccantonamento': modalitaAccantonamento,
+              if (tipoSpesaSel == 'annuale') 'totaleAnnuale': importoTotale,
               if (tipoSpesaSel == 'annuale') 'meseScadenza': meseScadenzaSel,
             });
           });
@@ -278,12 +296,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           );
         }
       },
-      // 🚀 STATEFUL BUILDER FONDAMENTALE PER FAR CAMBIARE IL DIALOGO IN TEMPO REALE
       child: StatefulBuilder(
         builder: (context, setDialogState) {
           final bool isAnnuale = tipoSpesaSel == 'annuale';
-          final double importoInserito = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
-          final double quotaMensile = isAnnuale ? (importoInserito / 12) : importoInserito;
+          final double importoTotale = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
+          final double quotaManuale = double.tryParse(quotaManualeCtrl.text.replaceAll(',', '.')) ?? 0.0;
 
           return SingleChildScrollView(
             child: Column(
@@ -294,14 +311,14 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                   controller: nomeCtrl,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
-                    labelText: 'Nome spesa (es. Affitto, Assicurazione Auto)',
+                    labelText: 'Nome spesa (es. Assicurazione, TARI)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -327,12 +344,12 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 TextField(
                   controller: importoCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => setDialogState(() {}), // Ricalcola in tempo reale la quota mensile
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  onChanged: (_) => setDialogState(() {}),
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
                     labelText: isAnnuale ? 'Importo Totale Annuale (€)' : 'Costo Mensile (€)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -343,11 +360,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                   ),
                 ),
 
-                // 📌 SE È ANNUALE: MOSTRIAMO SELETTORE DEL MESE E CALCOLO QUOTA
+                // 📌 SEZIONE CONFIGURAZIONE ANNUALE
                 if (isAnnuale) ...[
-                  const SizedBox(height: 14),
-                  const Text('MESE DI SCADENZA (Quando dovrai pagare?)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
+                  const Text('MESE DI SCADENZA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: meseScadenzaSel,
                     dropdownColor: const Color(0xFF1C1C21),
@@ -361,34 +378,67 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     items: _nomiMesi.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                     onChanged: (val) => setDialogState(() => meseScadenzaSel = val!),
                   ),
-                  if (importoInserito > 0) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                  const SizedBox(height: 12),
+                  const Text('COME VUOI GESTIRLA NEL BUDGET?', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  
+                  // SELETTORE MODALITÀ
+                  Column(
+                    children: [
+                      RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeColor: const Color(0xFF2DD4BF),
+                        title: const Text('Spalma su 12 mesi', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: Text('Accantoni ${(importoTotale / 12).toStringAsFixed(0)} € al mese', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                        value: 'spalmata_12',
+                        groupValue: modalitaAccantonamento,
+                        onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline_rounded, color: Color(0xFF3B82F6), size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '💡 Impegno reale: accantonerai ${quotaMensile.toStringAsFixed(2)} € / mese per arrivare pronto a $meseScadenzaSel.',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.3),
-                            ),
-                          ),
-                        ],
+                      RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeColor: const Color(0xFF2DD4BF),
+                        title: const Text('Addebito Unico a Scadenza', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: Text('0 € nei mesi ordinari, ${importoTotale.toStringAsFixed(0)} € solo a $meseScadenzaSel', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                        value: 'addebito_unico',
+                        groupValue: modalitaAccantonamento,
+                        onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
+                      ),
+                      RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeColor: const Color(0xFF2DD4BF),
+                        title: const Text('Quota Mensile Personalizzata', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Decidi tu quanti euro mettere via al mese', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        value: 'manuale',
+                        groupValue: modalitaAccantonamento,
+                        onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
+                      ),
+                    ],
+                  ),
+
+                  if (modalitaAccantonamento == 'manuale') ...[
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: quotaManualeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setDialogState(() {}),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Quota Mensile da Accantonare (€)',
+                        labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
                   ],
                 ],
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 const Text('MACRO CATEGORIA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
                   value: categoriaSel,
                   dropdownColor: const Color(0xFF1C1C21),
