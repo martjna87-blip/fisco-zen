@@ -486,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   left: 20,
                   child: const FiscOnLogo(
                     fontSize: 22,
-                    sottotitolo: 'P.IVA',
+                    sottotitolo: 'Gestione P.IVA',
                   ),
                 ),
                 Positioned(
