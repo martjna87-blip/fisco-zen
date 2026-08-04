@@ -11,14 +11,15 @@ class SerbatoioTasseWidget extends StatelessWidget {
     this.cardColor = const Color(0xFF292524),
   });
 
-  void _mostraDialogAccantonamentoTasse(BuildContext context) {
+  // 🚀 METODO STATICO E PUBBLICO: UNICA FONTE DI VERITÀ PER IL POPUP
+  static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF292524)}) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
 
     if (accounts.length < 2) {
       AppNotifications.mostraInAlto(
-        context,
-        'Devi avere almeno due conti per gestire le tasse',
+        context, 
+        'Devi avere almeno due conti per gestire le tasse', 
         type: NotificationType.warning,
       );
       return;
@@ -33,10 +34,9 @@ class SerbatoioTasseWidget extends StatelessWidget {
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    // 🎯 3. IMPORTOMANCANTE PER IL 100%
+    // 🎯 3. IMPORTO MANCANTE PER IL 100%
     final double mancanteReale = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
 
-    // Conti di riferimento
     final contoPrincipale = accounts.firstWhere(
       (a) => !a.title.toLowerCase().contains('salvadanaio'),
       orElse: () => accounts[0],
@@ -47,7 +47,16 @@ class SerbatoioTasseWidget extends StatelessWidget {
       orElse: () => accounts.length > 1 ? accounts[1] : accounts[0],
     );
 
-    bool modalitaAccantona = true; // true = Metti al sicuro, false = Sblocca/Preleva
+    // 🎯 LISTA CONTI DISPONIBILI PER RICEVERE LO SBLOCCO (Tutti tranne il Salvadanaio Tasse)
+    final contiDisponibiliSblocco = accounts
+        .where((a) => a.id != salvadanaioTasse.id)
+        .toList();
+
+    String contoDestinazioneSbloccoId = contiDisponibiliSblocco.isNotEmpty
+        ? contiDisponibiliSblocco[0].id
+        : contoPrincipale.id;
+
+    bool modalitaAccantona = true;
 
     final TextEditingController importoController = TextEditingController(
       text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2) : '',
@@ -219,19 +228,50 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
+                  // 🏦 SELETTORE CONTO DESTINAZIONE (Visibile SOLO quando sei su "Sblocca")
+                  if (!modalitaAccantona) ...[
+                    DropdownButtonFormField<String>(
+                      value: contoDestinazioneSbloccoId,
+                      dropdownColor: cardColor,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        labelText: 'Versa la cifra su:',
+                        labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF59E0B), size: 18),
+                      ),
+                      items: contiDisponibiliSblocco.map((acc) {
+                        return DropdownMenuItem<String>(
+                          value: acc.id,
+                          child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            contoDestinazioneSbloccoId = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   TextField(
                     controller: importoController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
-                      labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare sul Conto (€)',
+                      labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare dal Salvadanaio (€)',
                       labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       prefixIcon: Icon(
-                        modalitaAccantona ? Icons.savings_rounded : Icons.account_balance_wallet_rounded, 
+                        modalitaAccantona ? Icons.savings_rounded : Icons.payments_rounded, 
                         color: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), 
                         size: 20
                       ),
@@ -250,7 +290,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
                   if (importoInserito <= 0) return;
 
                   if (modalitaAccantona) {
-                    // 🛡️ ACCANTONA: Conto Principale ➔ Salvadanaio Tasse
                     if (contoPrincipale.amount < importoInserito) {
                       AppNotifications.mostraInAlto(
                         context,
@@ -273,7 +312,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       type: NotificationType.success,
                     );
                   } else {
-                    // 🔓 SBLOCCA: Salvadanaio Tasse ➔ Conto Principale
                     if (salvadanaioTasse.amount < importoInserito) {
                       AppNotifications.mostraInAlto(
                         context,
@@ -283,16 +321,18 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       return;
                     }
 
+                    final contoDestinazione = accounts.firstWhere((a) => a.id == contoDestinazioneSbloccoId);
+
                     walletProvider.eseguiGiroconto(
                       daAccountId: salvadanaioTasse.id,
-                      aAccountId: contoPrincipale.id,
+                      aAccountId: contoDestinazioneSbloccoId,
                       importo: importoInserito,
                       isAccantonamentoTasse: false,
                     );
                     Navigator.pop(ctx);
                     AppNotifications.mostraInAlto(
                       context,
-                      'Sbloccati ${importoInserito.toStringAsFixed(2)} € dal Salvadanaio Tasse! 🔓',
+                      'Sbloccati ${importoInserito.toStringAsFixed(2)} € verso ${contoDestinazione.title}! 🔓',
                       type: NotificationType.warning,
                     );
                   }
@@ -353,7 +393,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 🛡️ HEADER: ICONA + TITOLO + BADGE PERCENTUALE
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -368,7 +407,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                 ],
               ),
               InkWell(
-                onTap: () => _mostraDialogAccantonamentoTasse(context),
+                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: cardColor),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -391,7 +430,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // ⭕ GRAFICO CIRCOLARE CON VALORE AL CENTRO
           Center(
             child: SizedBox(
               width: 120,
@@ -446,7 +484,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
             ),
           ),
 
-          // 🛡️ CUSCINETTO DI SICUREZZA EXTRA (Se presente)
           if (cuscinettoExtraVal > 0) ...[
             const SizedBox(height: 16),
             Container(
