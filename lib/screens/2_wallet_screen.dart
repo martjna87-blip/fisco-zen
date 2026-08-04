@@ -9,6 +9,7 @@ import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '2_4_wallet_budget_pilot_v2.dart';
+import '../widgets_shared/fiscon_logo.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -174,14 +175,9 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                 Positioned(
                   top: topPadding + 12,
                   left: 20,
-                  child: const Text(
-                    'Portafoglio Personale',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
+                  child: const FiscOnLogo(
+                    fontSize: 22,
+                    sottotitolo: 'Portafoglio Personale',
                   ),
                 ),
 

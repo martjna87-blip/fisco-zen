@@ -12,6 +12,7 @@ import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '../data/notifications_provider.dart';
+import '../widgets_shared/fiscon_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
@@ -483,14 +484,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Positioned(
                   top: topPadding + 12,
                   left: 20,
-                  child: const Text(
-                    'Gestione P.IVA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
+                  child: const FiscOnLogo(
+                    fontSize: 22,
+                    sottotitolo: 'P.IVA',
                   ),
                 ),
                 Positioned(

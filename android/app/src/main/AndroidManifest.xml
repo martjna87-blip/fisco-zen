@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="fisco_zen"
+        android:label="FiscON"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
