@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/app_secondary_popup.dart';
 
 class SerbatoioTasseWidget extends StatelessWidget {
   final Color cardColor;
@@ -11,7 +12,61 @@ class SerbatoioTasseWidget extends StatelessWidget {
     this.cardColor = const Color(0xFF292524),
   });
 
-  // 🚀 METODO STATICO E PUBBLICO: UNICA FONTE DI VERITÀ PER IL POPUP
+  // 🎨 WIDGET BARRA AVANZAMENTO PROPORZIONALE REALE PER IL POP-UP
+  static Widget _buildBarraAvanzamentoSmart(int percentualeInt) {
+    if (percentualeInt < 100) {
+      final int flexRiempito = percentualeInt.clamp(0, 100);
+      final int flexVuoto = 100 - flexRiempito;
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          height: 8,
+          color: Colors.white10,
+          child: Row(
+            children: [
+              if (flexRiempito > 0)
+                Expanded(
+                  flex: flexRiempito,
+                  child: Container(color: const Color(0xFFF59E0B)), // 🟠 Arancione
+                ),
+              if (flexVuoto > 0)
+                Expanded(
+                  flex: flexVuoto,
+                  child: const SizedBox(),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final int flexVerde = 100;
+    final int flexBlu = percentualeInt - 100;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        height: 8,
+        color: Colors.white10,
+        child: Row(
+          children: [
+            Expanded(
+              flex: flexVerde,
+              child: Container(color: const Color(0xFF10B981)), // 🟢 Verde
+            ),
+            if (flexBlu > 0)
+              Expanded(
+                flex: flexBlu,
+                child: Container(color: const Color(0xFF3B82F6)), // 🔵 Blu Cuscinetto
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🚀 UNICA FONTE DI VERITÀ UTILIZZANDO IL DESIGN SYSTEM STANDARDIZZATO
   static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF292524)}) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
@@ -25,16 +80,13 @@ class SerbatoioTasseWidget extends StatelessWidget {
       return;
     }
 
-    // 🎯 1. TOTALE TASSE DOVUTE REALI (Dalle fatture incassate ATECO)
     final double tasseTotaliCalcolate = walletProvider.fattureIncassate
         .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
 
-    // 🎯 2. RISERVA GIÀ IN SALVADANAIO
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    // 🎯 3. IMPORTO MANCANTE PER IL 100%
     final double mancanteReale = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
 
     final contoPrincipale = accounts.firstWhere(
@@ -47,13 +99,17 @@ class SerbatoioTasseWidget extends StatelessWidget {
       orElse: () => accounts.length > 1 ? accounts[1] : accounts[0],
     );
 
-    // 🎯 LISTA CONTI DISPONIBILI PER RICEVERE LO SBLOCCO (Tutti tranne il Salvadanaio Tasse)
-    final contiDisponibiliSblocco = accounts
+    // 🏦 CONTI SELEZIONABILI (Tutti tranne il Salvadanaio Tasse stesso)
+    final contiDisponibili = accounts
         .where((a) => a.id != salvadanaioTasse.id)
         .toList();
 
-    String contoDestinazioneSbloccoId = contiDisponibiliSblocco.isNotEmpty
-        ? contiDisponibiliSblocco[0].id
+    String contoSorgenteAccantonaId = contiDisponibili.isNotEmpty
+        ? contiDisponibili[0].id
+        : contoPrincipale.id;
+
+    String contoDestinazioneSbloccoId = contiDisponibili.isNotEmpty
+        ? contiDisponibili[0].id
         : contoPrincipale.id;
 
     bool modalitaAccantona = true;
@@ -71,41 +127,85 @@ class SerbatoioTasseWidget extends StatelessWidget {
           final double nuovaRiservaTotale = modalitaAccantona
               ? (riservaGiaAccantonata + importoInserito)
               : (riservaGiaAccantonata - importoInserito).clamp(0.0, double.infinity);
-          
-          final double percentualeText = tasseTotaliCalcolate > 0.01 
+
+          final double calcoloPercentualeGreggio = tasseTotaliCalcolate > 0.01 
               ? (nuovaRiservaTotale / tasseTotaliCalcolate * 100) 
               : (nuovaRiservaTotale > 0 ? 100.0 : 0.0);
               
-          final double percentualeBarra = tasseTotaliCalcolate > 0.01 
-              ? (nuovaRiservaTotale / tasseTotaliCalcolate).clamp(0.0, 1.0) 
-              : (nuovaRiservaTotale > 0 ? 1.0 : 0.0);
+          final int percentualeInt = (calcoloPercentualeGreggio - 100).abs() < 0.1 
+              ? 100 
+              : calcoloPercentualeGreggio.round();
               
           final double extraCuscinetto = nuovaRiservaTotale > tasseTotaliCalcolate 
               ? nuovaRiservaTotale - tasseTotaliCalcolate 
               : 0.0;
 
-          return AlertDialog(
-            backgroundColor: cardColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            title: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      modalitaAccantona ? Icons.shield_rounded : Icons.lock_open_rounded, 
-                      color: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), 
-                      size: 22
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse', 
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
+          final Color coloreAttuale = modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B);
 
-                // 🎛️ TAB ACCANTONA / SBLOCCA
+          return AppSecondaryPopup(
+            backgroundColor: cardColor,
+            icon: modalitaAccantona ? Icons.shield_rounded : Icons.lock_open_rounded,
+            iconColor: coloreAttuale,
+            titolo: modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse',
+            testoConferma: modalitaAccantona ? 'Metti al Sicuro' : 'Sblocca Cifra',
+            onConferma: () {
+              if (importoInserito <= 0) return;
+
+              if (modalitaAccantona) {
+                final contoSorgente = accounts.firstWhere((a) => a.id == contoSorgenteAccantonaId);
+
+                if (contoSorgente.amount < importoInserito) {
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Saldo insufficiente su ${contoSorgente.title}!',
+                    type: NotificationType.error,
+                  );
+                  return;
+                }
+
+                walletProvider.eseguiGiroconto(
+                  daAccountId: contoSorgenteAccantonaId,
+                  aAccountId: salvadanaioTasse.id,
+                  importo: importoInserito,
+                  isAccantonamentoTasse: true,
+                );
+                Navigator.pop(ctx);
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Messo al sicuro il capitale per le tasse da ${contoSorgente.title}! 🛡️',
+                  type: NotificationType.success,
+                );
+              } else {
+                if (salvadanaioTasse.amount < importoInserito) {
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Fondi insufficienti nel Salvadanaio Tasse!',
+                    type: NotificationType.error,
+                  );
+                  return;
+                }
+
+                final contoDestinazione = accounts.firstWhere((a) => a.id == contoDestinazioneSbloccoId);
+
+                walletProvider.eseguiGiroconto(
+                  daAccountId: salvadanaioTasse.id,
+                  aAccountId: contoDestinazioneSbloccoId,
+                  importo: importoInserito,
+                  isAccantonamentoTasse: false,
+                );
+                Navigator.pop(ctx);
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Sbloccati ${importoInserito.toStringAsFixed(2)} € verso ${contoDestinazione.title}! 🔓',
+                  type: NotificationType.warning,
+                );
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // TAB SELETTORE ACCANTONA / SBLOCCA
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
@@ -165,189 +265,133 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                      Text('${tasseTotaliCalcolate.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                      Text('${riservaGiaAccantonata.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
 
-                  // BARRA AVANZAMENTO
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Copertura: ${percentualeText.toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (extraCuscinetto > 0)
-                            Text(
-                              '+${extraCuscinetto.toStringAsFixed(0)} € Cuscinetto',
-                              style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: percentualeBarra,
-                          minHeight: 8,
-                          backgroundColor: Colors.white10,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                const SizedBox(height: 16),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    Text('${tasseTotaliCalcolate.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    Text('${riservaGiaAccantonata.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Copertura: $percentualeInt%',
+                          style: TextStyle(
+                            color: percentualeInt >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 🏦 SELETTORE CONTO DESTINAZIONE (Visibile SOLO quando sei su "Sblocca")
-                  if (!modalitaAccantona) ...[
-                    DropdownButtonFormField<String>(
-                      value: contoDestinazioneSbloccoId,
-                      dropdownColor: cardColor,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Versa la cifra su:',
-                        labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF59E0B), size: 18),
-                      ),
-                      items: contiDisponibiliSblocco.map((acc) {
-                        return DropdownMenuItem<String>(
-                          value: acc.id,
-                          child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            contoDestinazioneSbloccoId = val;
-                          });
-                        }
-                      },
+                        if (extraCuscinetto > 0)
+                          Text(
+                            '+${extraCuscinetto.toStringAsFixed(0)} € Cuscinetto',
+                            style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
+                    _buildBarraAvanzamentoSmart(percentualeInt),
                   ],
+                ),
 
-                  TextField(
-                    controller: importoController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    onChanged: (_) => setDialogState(() {}),
+                const SizedBox(height: 16),
+
+                // 🏦 MENU TENDINA CONTO SORGENTE / DESTINAZIONE SIMMETRICO
+                if (modalitaAccantona) ...[
+                  DropdownButtonFormField<String>(
+                    value: contoSorgenteAccantonaId,
+                    dropdownColor: cardColor,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
-                      labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare dal Salvadanaio (€)',
+                      labelText: 'Preleva la cifra da:',
                       labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: Icon(
-                        modalitaAccantona ? Icons.savings_rounded : Icons.payments_rounded, 
-                        color: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), 
-                        size: 20
-                      ),
+                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF3B82F6), size: 18),
+                    ),
+                    items: contiDisponibili.map((acc) {
+                      return DropdownMenuItem<String>(
+                        value: acc.id,
+                        child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          contoSorgenteAccantonaId = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  DropdownButtonFormField<String>(
+                    value: contoDestinazioneSbloccoId,
+                    dropdownColor: cardColor,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: 'Versa la cifra su:',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF59E0B), size: 18),
+                    ),
+                    items: contiDisponibili.map((acc) {
+                      return DropdownMenuItem<String>(
+                        value: acc.id,
+                        child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          contoDestinazioneSbloccoId = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                TextField(
+                  controller: importoController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare dal Salvadanaio (€)',
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    prefixIcon: Icon(
+                      modalitaAccantona ? Icons.savings_rounded : Icons.payments_rounded, 
+                      color: coloreAttuale, 
+                      size: 20
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (importoInserito <= 0) return;
-
-                  if (modalitaAccantona) {
-                    if (contoPrincipale.amount < importoInserito) {
-                      AppNotifications.mostraInAlto(
-                        context,
-                        'Saldo insufficiente su ${contoPrincipale.title}!',
-                        type: NotificationType.error,
-                      );
-                      return;
-                    }
-
-                    walletProvider.eseguiGiroconto(
-                      daAccountId: contoPrincipale.id,
-                      aAccountId: salvadanaioTasse.id,
-                      importo: importoInserito,
-                      isAccantonamentoTasse: true,
-                    );
-                    Navigator.pop(ctx);
-                    AppNotifications.mostraInAlto(
-                      context,
-                      'Messo al sicuro il capitale per le tasse! 🛡️',
-                      type: NotificationType.success,
-                    );
-                  } else {
-                    if (salvadanaioTasse.amount < importoInserito) {
-                      AppNotifications.mostraInAlto(
-                        context,
-                        'Fondi insufficienti nel Salvadanaio Tasse!',
-                        type: NotificationType.error,
-                      );
-                      return;
-                    }
-
-                    final contoDestinazione = accounts.firstWhere((a) => a.id == contoDestinazioneSbloccoId);
-
-                    walletProvider.eseguiGiroconto(
-                      daAccountId: salvadanaioTasse.id,
-                      aAccountId: contoDestinazioneSbloccoId,
-                      importo: importoInserito,
-                      isAccantonamentoTasse: false,
-                    );
-                    Navigator.pop(ctx);
-                    AppNotifications.mostraInAlto(
-                      context,
-                      'Sbloccati ${importoInserito.toStringAsFixed(2)} € verso ${contoDestinazione.title}! 🔓',
-                      type: NotificationType.warning,
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  modalitaAccantona ? 'Metti al Sicuro' : 'Sblocca Cifra', 
-                  style: const TextStyle(fontWeight: FontWeight.bold)
-                ),
-              ),
-            ],
           );
         },
       ),
@@ -370,17 +414,25 @@ class SerbatoioTasseWidget extends StatelessWidget {
         ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
         : (riservaAccantonata > 0 ? 1.0 : 0.0);
 
-    final double percentualeText = tasseTotaliCalcolate > 0.01
-        ? (riservaAccantonata / tasseTotaliCalcolate * 100)
+    final double calcoloPercentualeGreggio = tasseTotaliCalcolate > 0.01 
+        ? (riservaAccantonata / tasseTotaliCalcolate * 100) 
         : (riservaAccantonata > 0 ? 100.0 : 0.0);
+
+    final int percentualeTextInt = (calcoloPercentualeGreggio - 100).abs() < 0.1 
+        ? 100 
+        : calcoloPercentualeGreggio.round();
 
     final double cuscinettoExtraVal = riservaAccantonata > tasseTotaliCalcolate
         ? (riservaAccantonata - tasseTotaliCalcolate)
         : 0.0;
 
-    final Color statusColor = percentualeText >= 100 
+    final Color statusColor = percentualeTextInt >= 100 
         ? const Color(0xFF10B981) 
         : const Color(0xFFF59E0B);
+
+    final double avanzamentoBluExtra = percentualeTextInt > 100
+        ? ((percentualeTextInt - 100) / 100).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -416,7 +468,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${percentualeText.toStringAsFixed(0)}% Coperto',
+                    '$percentualeTextInt% Coperto',
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 10,
@@ -432,8 +484,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
           Center(
             child: SizedBox(
-              width: 120,
-              height: 120,
+              width: 125,
+              height: 125,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -442,20 +494,34 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     height: 120,
                     child: CircularProgressIndicator(
                       value: 1.0,
-                      strokeWidth: 9,
+                      strokeWidth: 8,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.08)),
                     ),
                   ),
+
                   SizedBox(
                     width: 120,
                     height: 120,
                     child: CircularProgressIndicator(
                       value: percentuale,
-                      strokeWidth: 9,
+                      strokeWidth: 8,
                       strokeCap: StrokeCap.round,
                       valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
                   ),
+
+                  if (avanzamentoBluExtra > 0)
+                    SizedBox(
+                      width: 98,
+                      height: 98,
+                      child: CircularProgressIndicator(
+                        value: avanzamentoBluExtra,
+                        strokeWidth: 6,
+                        strokeCap: StrokeCap.round,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+                      ),
+                    ),
+
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
