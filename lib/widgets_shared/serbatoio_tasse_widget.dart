@@ -18,26 +18,27 @@ class SerbatoioTasseWidget extends StatelessWidget {
     if (accounts.length < 2) {
       AppNotifications.mostraInAlto(
         context,
-        'Devi avere almeno due conti per accantonare le tasse',
+        'Devi avere almeno due conti per gestire le tasse',
         type: NotificationType.warning,
       );
       return;
     }
 
+    // 🎯 1. TOTALE TASSE DOVUTE REALI (Dalle fatture incassate ATECO)
+    final double tasseTotaliCalcolate = walletProvider.fattureIncassate
+        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+
+    // 🎯 2. RISERVA GIÀ IN SALVADANAIO
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
-    final double importoMancanteReale = tasseDaAccantonare > 0.01 ? tasseDaAccantonare : 0.0;
+    // 🎯 3. IMPORTOMANCANTE PER IL 100%
+    final double mancanteReale = (tasseTotaliCalcolate - riservaGiaAccantonata).clamp(0.0, double.infinity);
 
-    final TextEditingController importoController = TextEditingController(
-      text: importoMancanteReale > 0 ? importoMancanteReale.toStringAsFixed(2) : '',
-    );
-
-    final contoConTasse = accounts.firstWhere(
-      (a) => a.virtualTaxAmount > 0 && !a.title.toLowerCase().contains('salvadanaio'),
+    // Conti di riferimento
+    final contoPrincipale = accounts.firstWhere(
+      (a) => !a.title.toLowerCase().contains('salvadanaio'),
       orElse: () => accounts[0],
     );
 
@@ -46,12 +47,21 @@ class SerbatoioTasseWidget extends StatelessWidget {
       orElse: () => accounts.length > 1 ? accounts[1] : accounts[0],
     );
 
+    bool modalitaAccantona = true; // true = Metti al sicuro, false = Sblocca/Preleva
+
+    final TextEditingController importoController = TextEditingController(
+      text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2) : '',
+    );
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
-          final double nuovaRiservaTotale = riservaGiaAccantonata + importoInserito;
+          
+          final double nuovaRiservaTotale = modalitaAccantona
+              ? (riservaGiaAccantonata + importoInserito)
+              : (riservaGiaAccantonata - importoInserito).clamp(0.0, double.infinity);
           
           final double percentualeText = tasseTotaliCalcolate > 0.01 
               ? (nuovaRiservaTotale / tasseTotaliCalcolate * 100) 
@@ -67,12 +77,85 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
           return AlertDialog(
             backgroundColor: cardColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Column(
               children: [
-                Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 22),
-                SizedBox(width: 8),
-                Text('Accantona Tasse', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Icon(
+                      modalitaAccantona ? Icons.shield_rounded : Icons.lock_open_rounded, 
+                      color: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), 
+                      size: 22
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse', 
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // 🎛️ TAB ACCANTONA / SBLOCCA
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              modalitaAccantona = true;
+                              importoController.text = mancanteReale > 0 ? mancanteReale.toStringAsFixed(2) : '';
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: modalitaAccantona ? const Color(0xFF3B82F6) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '🛡️ Accantona',
+                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              modalitaAccantona = false;
+                              importoController.text = '';
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: !modalitaAccantona ? const Color(0xFFF59E0B) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '🔓 Sblocca',
+                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             content: SingleChildScrollView(
@@ -96,6 +179,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
+
+                  // BARRA AVANZAMENTO
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -103,7 +188,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Copertura Totale: ${percentualeText.toStringAsFixed(0)}%',
+                            'Copertura: ${percentualeText.toStringAsFixed(0)}%',
                             style: TextStyle(
                               color: percentualeText >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                               fontSize: 11,
@@ -131,19 +216,25 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 16),
+
                   TextField(
                     controller: importoController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
-                      labelText: 'Importo da aggiungere (€)',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                      labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare sul Conto (€)',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 20),
+                      prefixIcon: Icon(
+                        modalitaAccantona ? Icons.savings_rounded : Icons.account_balance_wallet_rounded, 
+                        color: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), 
+                        size: 20
+                      ),
                     ),
                   ),
                 ],
@@ -156,18 +247,21 @@ class SerbatoioTasseWidget extends StatelessWidget {
               ),
               ElevatedButton(
                 onPressed: () {
-                  if (importoInserito > 0) {
-                    if (contoConTasse.amount < importoInserito) {
+                  if (importoInserito <= 0) return;
+
+                  if (modalitaAccantona) {
+                    // 🛡️ ACCANTONA: Conto Principale ➔ Salvadanaio Tasse
+                    if (contoPrincipale.amount < importoInserito) {
                       AppNotifications.mostraInAlto(
                         context,
-                        'Saldo insufficiente su ${contoConTasse.title} per l\'accantonamento!',
+                        'Saldo insufficiente su ${contoPrincipale.title}!',
                         type: NotificationType.error,
                       );
                       return;
                     }
 
                     walletProvider.eseguiGiroconto(
-                      daAccountId: contoConTasse.id,
+                      daAccountId: contoPrincipale.id,
                       aAccountId: salvadanaioTasse.id,
                       importo: importoInserito,
                       isAccantonamentoTasse: true,
@@ -175,18 +269,43 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     Navigator.pop(ctx);
                     AppNotifications.mostraInAlto(
                       context,
-                      extraCuscinetto > 0
-                          ? 'Messo al sicuro il 100% delle tasse + ${extraCuscinetto.toStringAsFixed(0)} € di cuscinetto! 🛡️'
-                          : 'Hai messo al sicuro ${importoInserito.toStringAsFixed(2)} €! 🎉',
+                      'Messo al sicuro il capitale per le tasse! 🛡️',
+                      type: NotificationType.success,
+                    );
+                  } else {
+                    // 🔓 SBLOCCA: Salvadanaio Tasse ➔ Conto Principale
+                    if (salvadanaioTasse.amount < importoInserito) {
+                      AppNotifications.mostraInAlto(
+                        context,
+                        'Fondi insufficienti nel Salvadanaio Tasse!',
+                        type: NotificationType.error,
+                      );
+                      return;
+                    }
+
+                    walletProvider.eseguiGiroconto(
+                      daAccountId: salvadanaioTasse.id,
+                      aAccountId: contoPrincipale.id,
+                      importo: importoInserito,
+                      isAccantonamentoTasse: false,
+                    );
+                    Navigator.pop(ctx);
+                    AppNotifications.mostraInAlto(
+                      context,
+                      'Sbloccati ${importoInserito.toStringAsFixed(2)} € dal Salvadanaio Tasse! 🔓',
+                      type: NotificationType.warning,
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
+                  backgroundColor: modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Metti al Sicuro', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  modalitaAccantona ? 'Metti al Sicuro' : 'Sblocca Cifra', 
+                  style: const TextStyle(fontWeight: FontWeight.bold)
+                ),
               ),
             ],
           );
@@ -280,7 +399,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Anello di Sfondo (Traccia opaca)
                   SizedBox(
                     width: 120,
                     height: 120,
@@ -290,7 +408,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.08)),
                     ),
                   ),
-                  // Anello Avanzamento Reale
                   SizedBox(
                     width: 120,
                     height: 120,
@@ -301,7 +418,6 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
                   ),
-                  // Testo al centro (Label + Importo)
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
