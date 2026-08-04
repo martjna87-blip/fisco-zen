@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
-import '../widgets_shared/app_popup_wrapper.dart'; // 👈 Importiamo il wrapper
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class RegistraFatturaSheet extends StatefulWidget {
   final Function(String cliente, double importo, String dataFormattata)? onFatturaSalvata;
@@ -21,13 +21,81 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   final _numeroController = TextEditingController();
   final _clienteController = TextEditingController();
   final _importoController = TextEditingController();
+  final _searchAtecoController = TextEditingController();
+
   DateTime _dataSelezionata = DateTime.now();
+
+  // 🔒 ATECO PREDEFINITO (Fisso dall'Onboarding)
+  String _defaultAtecoCodice = '74.10.21';
+  double _defaultAtecoCoef = 0.78;
+
+  // 🗂️ ATECO TEMPORANEO (Selezionato per questa specifica fattura)
+  late double _atecoCoef;
+  late String _atecoCodice;
+  late String _atecoNome;
+  
+  bool _initializedAteco = false;
+  bool _calcolaAncheAccontoF24 = true;
+
+  final List<Map<String, dynamic>> _databaseAteco = [
+    {'codice': '74.10.21', 'descrizione': 'Graphic design, Web design, UI/UX', 'coef': 0.78},
+    {'codice': '62.01.00', 'descrizione': 'Sviluppo software e programmazione', 'coef': 0.78},
+    {'codice': '70.22.09', 'descrizione': 'Consulenza imprenditoriale e gestionale', 'coef': 0.78},
+    {'codice': '73.11.02', 'descrizione': 'Marketing, Social Media e Advertising', 'coef': 0.78},
+    {'codice': '85.52.09', 'descrizione': 'Formazione culturale e corsi', 'coef': 0.78},
+    {'codice': '47.91.10', 'descrizione': 'Commercio al dettaglio (E-commerce)', 'coef': 0.67},
+    {'codice': '56.10.11', 'descrizione': 'Ristoranti, Pizzerie, Bar', 'coef': 0.40},
+    {'codice': '96.02.01', 'descrizione': 'Servizi dei saloni e personal care', 'coef': 0.40},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _importoController.addListener(_aggiornaCalcoli);
+  }
+
+  void _aggiornaCalcoli() {
+    setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedAteco) {
+      final wallet = Provider.of<WalletProvider>(context, listen: false);
+      
+      // 1. Leggiamo il codice ATECO salvato nel provider (fallback sicuro)
+      try {
+        _defaultAtecoCodice = wallet.codiceAteco.split(' ').first.trim();
+      } catch (_) {
+        _defaultAtecoCodice = '74.10.21';
+      }
+
+      if (wallet.coeffRedditivita > 0) {
+        _defaultAtecoCoef = wallet.coeffRedditivita;
+      }
+
+      // 2. Impostiamo l'ATECO iniziale della fattura uguale al predefinito
+      _atecoCoef = _defaultAtecoCoef;
+      _atecoCodice = _defaultAtecoCodice;
+      
+      final matchIniziale = _databaseAteco.firstWhere(
+        (item) => item['codice'] == _atecoCodice,
+        orElse: () => {'descrizione': 'Consulenza & Digital'},
+      );
+      _atecoNome = '$_atecoCodice - ${matchIniziale['descrizione']} (${(_atecoCoef * 100).toInt()}%)';
+
+      _initializedAteco = true;
+    }
+  }
 
   @override
   void dispose() {
+    _importoController.removeListener(_aggiornaCalcoli);
     _numeroController.dispose();
     _clienteController.dispose();
     _importoController.dispose();
+    _searchAtecoController.dispose();
     super.dispose();
   }
 
@@ -65,59 +133,124 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     return '$giorno/$mese/${dt.year}';
   }
 
-  void _mostraPaywallPro(String funzionalita) {
+  // 🔍 MODALE SELEZIONE ATECO (TAG PREDEFINITO BLOCATO SUL PROFILO)
+  void _apriSelettoreAteco() {
+    _searchAtecoController.clear();
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Color(0xFF18181B),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFA855F7).withOpacity(0.15),
-                shape: BoxShape.circle,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF18181B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final query = _searchAtecoController.text.toLowerCase().replaceAll('.', '').trim();
+            final atecoFiltrati = _databaseAteco.where((item) {
+              return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) || 
+                     item['descrizione'].toString().toLowerCase().contains(query);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Seleziona ATECO Fattura', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  
+                  // CAMPO DI RICERCA
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: TextField(
+                      controller: _searchAtecoController,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      onChanged: (v) => setModalState(() {}),
+                      decoration: const InputDecoration(
+                        hintText: 'Cerca per codice o professione...',
+                        hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
+                        icon: Icon(Icons.search_rounded, color: Color(0xFF2DD4BF), size: 18),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // LISTA RISULTATI (IL TAG PREDEFINITO RIMANE FISSO SULL'ATECO ONBOARDING)
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: atecoFiltrati.length,
+                      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1),
+                      itemBuilder: (context, index) {
+                        final item = atecoFiltrati[index];
+                        final double coef = (item['coef'] as num).toDouble();
+                        final String codice = item['codice'].toString();
+                        
+                        // 📌 IL TAG RIGUARDA ESCLUSIVAMENTE IL CODICE PREDEFINITO DELL'ONBOARDING
+                        final bool isDefaultAteco = (codice == _defaultAtecoCodice);
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          onTap: () {
+                            setState(() {
+                              _atecoCoef = coef;
+                              _atecoCodice = codice;
+                              _atecoNome = '$codice - ${item['descrizione']} (${(coef * 100).toInt()}%)';
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          title: Row(
+                            children: [
+                              Text(item['codice'], style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
+                                child: Text('${(coef * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                              if (isDefaultAteco) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                                  ),
+                                  child: const Text(
+                                    'PREDEFINITO',
+                                    style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Text(item['descrizione'], style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFA855F7), size: 36),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sblocca $funzionalita',
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Importa le fatture in 2 secondi senza digitare nulla a mano grazie all\'Intelligenza Artificiale.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                AppNotifications.mostraInAlto(
-                  context, 
-                  'Usa il tasto PRO/FREE nell\'Header della Home per provare la modalità IA!', 
-                  type: NotificationType.warning,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFA855F7),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: const Text('Passa a PRO (7 Giorni Gratis)', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -128,10 +261,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     if (cliente.isEmpty || importoText.isEmpty) {
       AppNotifications.mostraInAlto(
-  context, 
-  'Inserisci nome cliente e importo valido', 
-  type: NotificationType.warning,
-);
+        context, 
+        'Inserisci nome cliente e importo valido', 
+        type: NotificationType.warning,
+      );
       return;
     }
 
@@ -141,17 +274,32 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         context, 
         'Importo non valido', 
         type: NotificationType.error
-        );
+      );
       return;
     }
 
+    // 🧮 CALCOLO ESATTO DELLE TASSE CON L'ATECO SCELTO PER QUESTA FATTURA
+    final double imponibile = importo * _atecoCoef;
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
+    final double aliquotaTasse = wallet.aliquotaImposta > 0 ? wallet.aliquotaImposta : 0.05;
+    const double aliquotaInps = 0.2607;
+    
+    final double saldoImposta = imponibile * aliquotaTasse;
+    final double saldoInps = imponibile * aliquotaInps;
+    final double totaleSaldo = saldoImposta + saldoInps;
+    final double totaleAcconto = (saldoImposta * 1.00) + (saldoInps * 0.80);
+    final double totaleF24 = _calcolaAncheAccontoF24 ? (totaleSaldo + totaleAcconto) : totaleSaldo;
+
     final dataFormattata = _formattaData(_dataSelezionata);
 
+    // 💾 SALVIAMO INSIEME ALLA FATTURA ANCHE IL SUO ATECO E LE SUE TASSE ESATTE
     Provider.of<WalletProvider>(context, listen: false).addFatturaPiva(
       cliente: cliente,
       importo: importo,
       data: dataFormattata,
       numero: numero.isNotEmpty ? numero : null,
+      coefAteco: _atecoCoef,          // 👈 ATECO DELLA FATTURA
+      importoTasseStimate: totaleF24, // 👈 TASSE CALCOLATE
     );
 
     if (widget.onFatturaSalvata != null) {
@@ -164,241 +312,274 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     AppNotifications.mostraInAlto(
       context, 'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉'
-      );
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isPro = context.watch<WalletProvider>().isProUser;
+    // Verifichiamo se l'ATECO attualmente selezionato per la fattura è quello predefinito
+    final bool isCurrentSelectedDefault = (_atecoCodice == _defaultAtecoCodice);
 
     return AppPopupWrapper(
       title: 'Registra Fattura',
       badgeText: 'P.IVA',
       badgeColor: const Color(0xFF2DD4BF),
-      child: Padding(
-        padding: const EdgeInsets.all(4.0),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                                    const Text(
-                                      'ACQUISIZIONE RAPIDA IA',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildProCard(
-                                            icon: Icons.camera_alt_outlined,
-                                            title: 'Fotocamera',
-                                            subtitle: 'Scan OCR',
-                                            isPro: isPro,
-                                            onTap: () {
-                                              if (isPro) {
-                                                AppNotifications.mostraInAlto(
-                                                  context, 
-                                                  'Apertura fotocamera OCR...', 
-                                                  type: NotificationType.warning,
-                                                );
-                                              } else {
-                                                _mostraPaywallPro('Scansione OCR');
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: _buildProCard(
-                                            icon: Icons.note_add_outlined,
-                                            title: 'Carica File',
-                                            subtitle: 'PDF / XML',
-                                            isPro: isPro,
-                                            onTap: () {
-                                              if (isPro) {
-                                                AppNotifications.mostraInAlto(
-                                                  context, 
-                                                  'Apertura selettore file...', 
-                                                  type: NotificationType.warning,
-                                                );
-                                              } else {
-                                                _mostraPaywallPro('Importazione PDF/XML');
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Divider(color: Colors.white12, height: 1),
-                                    const SizedBox(height: 14),
-                                    const Text(
-                                      'INSERIMENTO MANUALE',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: TextField(
-                                            controller: _numeroController,
-                                            style: const TextStyle(color: Colors.white, fontSize: 13),
-                                            decoration: _buildInputDecoration('N° Fattura', Icons.tag_rounded),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: InkWell(
-                                            onTap: () => _selezionaData(context),
-                                            borderRadius: BorderRadius.circular(12),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withOpacity(0.4),
-                                                borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 16),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Text(
-                                                      _formattaData(_dataSelezionata),
-                                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    TextField(
-                                      controller: _clienteController,
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                                      decoration: _buildInputDecoration('Nome Cliente / Azienda', Icons.person_outline),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    TextField(
-                                      controller: _importoController,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 18, fontWeight: FontWeight.bold),
-                                      decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 46,
-                                      child: ElevatedButton(
-                                        onPressed: _salvaFattura,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF2DD4BF),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          elevation: 0,
-                                        ),
-                                        child: const Text(
-                                          'Registra e Salva Fattura',
-                                          style: TextStyle(
-                                            color: Colors.black,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ), // 👈 1. Chiude Column
-                              ), // 👈 2. Chiude SingleChildScrollView
-                            ), // 👈 3. Chiude Padding (Aggiunta!)
-    ); // 👈 4. Chiude AppPopupWrapper
-  }
-
-  Widget _buildProCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isPro,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.35),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isPro ? const Color(0xFFA855F7).withOpacity(0.5) : Colors.white.withOpacity(0.08),
-          ),
-        ),
-        child: Row(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: isPro ? const Color(0xFFA855F7).withOpacity(0.15) : Colors.white10,
-                shape: BoxShape.circle,
+            const Text(
+              'INSERIMENTO MANUALE',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
               ),
-              child: Icon(icon, color: isPro ? const Color(0xFFA855F7) : const Color(0xFFF59E0B), size: 16),
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          title,
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _numeroController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: _buildInputDecoration('N° Fattura', Icons.tag_rounded),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selezionaData(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _formattaData(_dataSelezionata),
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _clienteController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: _buildInputDecoration('Nome Cliente / Azienda', Icons.person_outline),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _importoController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 18, fontWeight: FontWeight.bold),
+              decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
+            ),
+            
+            // 🏷️ SELETTORE ATECO FATTURA (MOSTRIAMO IL BADGE SOLO SE CORRISPONDE AL PREDEFINITO)
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: _apriSelettoreAteco,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.category_rounded, color: Color(0xFF2DD4BF), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _atecoNome,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isCurrentSelectedDefault) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                        ),
+                        child: const Text(
+                          'PREDEFINITO',
+                          style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 8, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      if (!isPro) ...[
-                        const SizedBox(width: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('PRO', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 7, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
                     ],
+                    const Icon(Icons.search_rounded, color: Color(0xFF2DD4BF), size: 16),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🧮 CARD RIPARTIZIONE CON DETTAGLIO SALDO + ACCONTO F24
+            _buildRipartizionePreviewCard(context),
+
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: _salvaFattura,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2DD4BF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Registra e Salva Fattura',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Colors.white54, fontSize: 9),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // 📊 CALCOLO RIPARTIZIONE INTELLIGENTE CON REGOLE FISCALI ITALIANE (100% TASSE / 80% INPS)
+  Widget _buildRipartizionePreviewCard(BuildContext context) {
+    final wallet = Provider.of<WalletProvider>(context);
+    final double importoLordo = double.tryParse(_importoController.text.replaceAll(',', '.')) ?? 0.0;
+
+    if (importoLordo <= 0) return const SizedBox.shrink();
+
+    // 1. Calcolo Imponibile e Saldo Anno Corrente
+    final double imponibile = importoLordo * _atecoCoef;
+    final double aliquotaTasse = wallet.aliquotaImposta > 0 ? wallet.aliquotaImposta : 0.05;
+    const double aliquotaInps = 0.2607; // Gestione Separata INPS
+    
+    final double saldoImposta = imponibile * aliquotaTasse;
+    final double saldoInps = imponibile * aliquotaInps;
+    final double totaleSaldo = saldoImposta + saldoInps;
+    
+    // 2. Calcolo Acconti Anno Successivo: (100% Imposta Sostitutiva / 80% INPS)
+    final double accontoImposta = saldoImposta * 1.00;
+    final double accontoInps = saldoInps * 0.80;
+    final double totaleAcconto = accontoImposta + accontoInps;
+
+    // Totale F24 da accantonare
+    final double totaleF24 = _calcolaAncheAccontoF24 ? (totaleSaldo + totaleAcconto) : totaleSaldo;
+
+    // Il Netto della singola fattura (togliendo il saldo reale di competenza)
+    final double nettoTotaleFattura = importoLordo - totaleSaldo;
+
+    // 3. Cuscinetto Mesi No-Lavoro (Ferie) - Predefinito 10 Mesi Lavorativi
+    const int mesiAttivi = 10; 
+    final double percentualeFondoFerie = (12 - mesiAttivi) / 12;
+    final double quotaFondoFerie = nettoTotaleFattura * percentualeFondoFerie;
+
+    // 4. Netto Spendibile Subito
+    final double nettoSpendibileSubito = nettoTotaleFattura - quotaFondoFerie;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'RIPARTIZIONE F24 & CUSCINETTO',
+                style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _calcolaAncheAccontoF24 = !_calcolaAncheAccontoF24),
+                child: Text(
+                  _calcolaAncheAccontoF24 ? 'Incl. Acconti (100% Tasse / 80% INPS)' : 'Solo Saldo Anno Corrente',
+                  style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          
+          _buildSalvaDanaioRow(
+            icon: Icons.shield_rounded,
+            color: const Color(0xFFF59E0B),
+            title: _calcolaAncheAccontoF24 ? 'Accantonamento F24 (Saldo + Acconti)' : 'Accantonamento F24 (Solo Saldo)',
+            value: '${totaleF24.toStringAsFixed(2)} €',
+          ),
+          const Divider(color: Colors.white12, height: 12),
+
+          _buildSalvaDanaioRow(
+            icon: Icons.beach_access_rounded,
+            color: const Color(0xFF3B82F6),
+            title: 'Cuscinetto Mesi No-Lavoro (10 Mesi)',
+            value: '${quotaFondoFerie.toStringAsFixed(2)} €',
+          ),
+          const Divider(color: Colors.white12, height: 12),
+
+          _buildSalvaDanaioRow(
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFF2DD4BF),
+            title: 'Netto Spendibile Subito',
+            value: '${nettoSpendibileSubito.toStringAsFixed(2)} €',
+            isBold: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalvaDanaioRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String value,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(color: isBold ? Colors.white : Colors.white70, fontSize: 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 

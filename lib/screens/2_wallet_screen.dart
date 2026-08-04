@@ -845,8 +845,8 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 86,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        height: 102,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: coloreCard.withOpacity(0.92),
           borderRadius: BorderRadius.circular(18),
@@ -860,7 +860,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: iconColor ?? Colors.white70, size: 20),
+            Icon(icon, color: iconColor ?? Colors.white70, size: 24),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -869,7 +869,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                   title,
                   style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 10,
+                    fontSize: 12,
                     height: 1.15,
                   ),
                   maxLines: 2,
@@ -883,7 +883,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                     value,
                     style: TextStyle(
                       color: valueColor ?? Colors.white,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,

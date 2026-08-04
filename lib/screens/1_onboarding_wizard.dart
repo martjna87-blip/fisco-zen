@@ -13,7 +13,6 @@ class OnboardingWizard extends StatefulWidget {
 }
 
 class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerProviderStateMixin {
-  // 🕹️ CONTROLLER DI NAVIGAZIONE
   final PageController _pageController = PageController();
   int _currentPage = 0;
   final int _totalPages = 4;
@@ -21,24 +20,30 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
   late AnimationController _waveController;
   final ScrollController _scrollController = ScrollController();
 
-  // 🗂️ VARIABILI STEP 1: PROFILO & ATECO
+  // 🗂️ STEP 1: PROFILO & ATECO
   String? tipoProfilo; // 'piva' o 'dipendente'
-  String? aliquotaTasse;
+  String? aliquotaTasse; // '5%' o '15%'
+  int? annoAperturaPiva; // 👈 Nuova variabile
   double? coefficienteRedditivita;
   String? codiceAtecoSelezionato;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // 🗂️ VARIABILI STEP 2: CONTRIBUTI & ACCONTI
+  // 🗂️ STEP 2: CONTRIBUTI & ACCONTI
   String? tipoLavoroDipendente; // 'nessuno', 'full', 'part_over50', 'part_under50'
   final TextEditingController _accontiController = TextEditingController();
 
-  // 🗂️ VARIABILI STEP 3: OBIETTIVO NETTO
+  // 🗂️ STEP 3: OBIETTIVO NETTO
   final TextEditingController _nettoTargetController = TextEditingController(text: '2000');
 
-  // 🗂️ VARIABILI STEP 4: PROIEZIONE & STAGIONALITÀ
+  // 🗂️ STEP 4: PROIEZIONE, MESI & VERDETTO
   final TextEditingController _fatturatoController = TextEditingController(text: '35000');
-  int _mesiAttivi = 10;
+  
+  // Lista dei 12 mesi (tutti attivi di default)
+  final List<String> _nomiMesi = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+  final List<bool> _mesiAttiviState = List.generate(12, (_) => true);
+
+  int get _mesiAttiviConteggio => _mesiAttiviState.where((m) => m).length;
 
   final List<Map<String, dynamic>> _databaseAteco = [
     {'codice': '85.52.09', 'descrizione': 'Altra formazione culturale', 'coef': 0.78},
@@ -85,7 +90,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
   }
 
   void _nextPage() {
-    // Se è dipendente, salta tutto e vai alla fine
+    FocusScope.of(context).unfocus();
     if (tipoProfilo == 'dipendente' || _currentPage == _totalPages - 1) {
       _concludiOnboarding();
     } else {
@@ -94,6 +99,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
   }
 
   void _prevPage() {
+    FocusScope.of(context).unfocus();
     if (_currentPage > 0) {
       _pageController.previousPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
     }
@@ -108,15 +114,17 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     } else {
       wallet.setPartitaIVA(true);
       
-      // 💾 SALVIAMO SU DISCO TUTTI I DATI INSERITI NEI 4 STEP:
+      // 📌 ESTRAIAMO SOLO IL CODICE NUMERICO PULITO (es. "74.10.21")
+      final String codicePulito = (codiceAtecoSelezionato ?? '74.10.21').split(' ').first.trim();
+
       wallet.salvaProfiloFiscale(
-        codiceAteco: codiceAtecoSelezionato ?? '74.10.21',
+        codiceAteco: codicePulito,
         coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
         aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
         accontiVersati: double.tryParse(_accontiController.text) ?? 0.0,
         nettoTarget: double.tryParse(_nettoTargetController.text) ?? 2000.0,
         fatturatoStimato: double.tryParse(_fatturatoController.text) ?? 35000.0,
-        mesiAttivi: _mesiAttivi,
+        mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
       );
       
       Navigator.pushReplacement(
@@ -124,7 +132,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
         MaterialPageRoute(
           builder: (context) => MainMenu(
             hasPartitaIva: true,
-            codiceAtecoIniziale: codiceAtecoSelezionato ?? '74.10.21',
+            codiceAtecoIniziale: codicePulito,
             coefficienteIniziale: coefficienteRedditivita ?? 0.78,
             aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15,
           ),
@@ -133,156 +141,191 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     }
   }
 
+  // 🧮 CALCOLO VERDETTO & SUGGERIMENTI
+  Map<String, double> _calcolaVerdetto() {
+    final double fatturato = double.tryParse(_fatturatoController.text) ?? 0.0;
+    final double nettoTargetMese = double.tryParse(_nettoTargetController.text) ?? 0.0;
+    final double coeff = coefficienteRedditivita ?? 0.78;
+    final double aliquota = (aliquotaTasse == '5%') ? 0.05 : 0.15;
+    
+    // Esenzione o riduzione INPS se dipendente Full-Time o Part-Time > 50%
+    final double aliquotaInps = (tipoLavoroDipendente == 'full' || tipoLavoroDipendente == 'part_over50') ? 0.0 : 0.2607;
+
+    final double imponibile = fatturato * coeff;
+    final double tasseAnno = imponibile * aliquota;
+    final double inpsAnno = imponibile * aliquotaInps;
+    final double nettoAnno = fatturato - tasseAnno - inpsAnno;
+    final double nettoMeseReale = nettoAnno / 12;
+
+    final double gapMese = nettoTargetMese - nettoMeseReale;
+    
+    double extraFatturatoAnno = 0.0;
+    if (gapMese > 0) {
+      final double fattoreNetto = 1 - (coeff * (aliquota + aliquotaInps));
+      extraFatturatoAnno = (gapMese * 12) / (fattoreNetto > 0 ? fattoreNetto : 1.0);
+    }
+
+    return {
+      'nettoMese': nettoMeseReale,
+      'gapMese': gapMese,
+      'extraFatturatoAnno': extraFatturatoAnno,
+      'extraFatturatoMese': _mesiAttiviConteggio > 0 ? extraFatturatoAnno / _mesiAttiviConteggio : 0.0,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF080B0C),
-      resizeToAvoidBottomInset: false, // 👈 Impedisce alla tastiera di schiacciare lo schermo
-      body: Stack(
-        children: [
-          // 🌊 SFONDO 3D FLUIDO (Mantenuto identico!)
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _waveController,
-              builder: (context, child) {
-                return CustomPaint(painter: FluidWavePainter(animationValue: _waveController.value));
-              },
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF080B0C),
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _waveController,
+                builder: (context, child) {
+                  return CustomPaint(painter: FluidWavePainter(animationValue: _waveController.value));
+                },
+              ),
             ),
-          ),
-          
-          SafeArea(
-            child: Column(
-              children: [
-                // 📊 HEADER & PROGRESS BAR
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(color: const Color(0xFF0D9488), borderRadius: BorderRadius.circular(8)),
-                            child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
-                          ),
-                          const SizedBox(width: 8),
-                          const FiscOnLogo(
-                            fontSize: 26, // Una taglia bella grande per il benvenuto
-                          ),                        ],
-                      ),
-                      if (tipoProfilo == 'piva')
-                        Text('Step ${_currentPage + 1} di $_totalPages', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-                
-                if (tipoProfilo == 'piva')
+            
+            SafeArea(
+              child: Column(
+                children: [
+                  // HEADER & PROGRESS BAR
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: (_currentPage + 1) / _totalPages,
-                        backgroundColor: Colors.white.withOpacity(0.1),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
-                        minHeight: 4,
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(color: const Color(0xFF0D9488), borderRadius: BorderRadius.circular(8)),
+                              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            const FiscOnLogo(fontSize: 26),
+                          ],
+                        ),
+                        if (tipoProfilo == 'piva')
+                          Text('Step ${_currentPage + 1} di $_totalPages', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  
+                  if (tipoProfilo == 'piva')
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: (_currentPage + 1) / _totalPages,
+                          backgroundColor: Colors.white.withOpacity(0.1),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
+                          minHeight: 4,
+                        ),
                       ),
                     ),
-                  ),
 
-                // 🔀 IL MOTORE DELLE SCHERMATE
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    onPageChanged: (int page) => setState(() => _currentPage = page),
-                    children: [
-                      _buildStep1(),
-                      _buildStep2(),
-                      _buildStep3(),
-                      _buildStep4(),
-                    ],
-                  ),
-                ),
-
-                // 🕹️ BOTTOM BAR (TASTI AVANTI/INDIETRO)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [const Color(0xFF080B0C), const Color(0xFF080B0C).withOpacity(0.0)],
+                  // SCHERMATE PAGEVIEW
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (int page) => setState(() => _currentPage = page),
+                      children: [
+                        _buildStep1(),
+                        _buildStep2(),
+                        _buildStep3(),
+                        _buildStep4(),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      if (_currentPage > 0 && tipoProfilo == 'piva')
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12.0),
-                          child: InkWell(
-                            onTap: _prevPage,
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              height: 54,
-                              width: 54,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: const Color(0xFF1F2937)),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      
-                      Expanded(
-                        child: SizedBox(
-                          height: 54,
-                          child: ElevatedButton(
-                            onPressed: (tipoProfilo == null || (tipoProfilo == 'piva' && coefficienteRedditivita == null && _currentPage == 0)) ? null : _nextPage,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2DD4BF),
-                              foregroundColor: Colors.black,
-                              disabledBackgroundColor: const Color(0xFF1F2937),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  tipoProfilo == 'dipendente' ? 'Home Dipendente' 
-                                  : (_currentPage == _totalPages - 1 ? 'Scopri il tuo Netto' : 'Avanti'),
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+
+                  // BOTTOM BAR CON TASTI
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [const Color(0xFF080B0C), const Color(0xFF080B0C).withOpacity(0.0)],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        if (_currentPage > 0 && tipoProfilo == 'piva')
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: InkWell(
+                              onTap: _prevPage,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                height: 54,
+                                width: 54,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFF1F2937)),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                const SizedBox(width: 8),
-                                Icon(tipoProfilo == 'dipendente' || _currentPage == _totalPages - 1 ? Icons.check_circle : Icons.arrow_forward_rounded, size: 18),
-                              ],
+                                child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        
+                        Expanded(
+                          child: SizedBox(
+                            height: 54,
+                            child: ElevatedButton(
+                              onPressed: (tipoProfilo == null || (tipoProfilo == 'piva' && coefficienteRedditivita == null && _currentPage == 0)) ? null : _nextPage,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2DD4BF),
+                                foregroundColor: Colors.black,
+                                disabledBackgroundColor: const Color(0xFF1F2937),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    tipoProfilo == 'dipendente' ? 'Home Dipendente' 
+                                    : (_currentPage == _totalPages - 1 ? 'Scopri il tuo Verdetto' : 'Avanti'),
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(tipoProfilo == 'dipendente' || _currentPage == _totalPages - 1 ? Icons.check_circle : Icons.arrow_forward_rounded, size: 18),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ==========================================
-  // 🟢 STEP 1: PROFILO & ATECO (Tuo codice originale adattato)
-  // ==========================================
+  // STEP 1: PROFILO & ATECO
   Widget _buildStep1() {
     final atecoFiltrati = _databaseAteco.where((item) {
       final query = _searchQuery.toLowerCase().replaceAll('.', '').trim();
       return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) || 
              item['descrizione'].toString().toLowerCase().contains(query);
     }).toList();
+
+    // Generiamo gli anni selezionabili (ultimi 5 anni + opzione "> 5 anni fa")
+    final int annoCorrente = DateTime.now().year;
+    final List<int> anniApertura = List.generate(5, (index) => annoCorrente - index);
 
     return SingleChildScrollView(
       controller: _scrollController,
@@ -301,20 +344,118 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
           ),
           
           if (tipoProfilo == 'piva') ...[
-            const SizedBox(height: 32),
-            const Text('Da quanto tempo hai aperto la Partita IVA?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            const SizedBox(height: 28),
+            const Text('IN CHE ANNO HAI APERTO LA PARTITA IVA?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+            const SizedBox(height: 12),
+            
+            // CHIP SELEZIONE ANNO DI APERTURA
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                _buildHeaderQuickAction(icon: Icons.eco, label: 'Startup (5%)', subtitle: 'Meno di 5 anni', isSelected: aliquotaTasse == '5%', onTap: () => setState(() => aliquotaTasse = '5%')),
-                _buildHeaderQuickAction(icon: Icons.work_outline_rounded, label: 'Standard (15%)', subtitle: 'Più di 5 anni', isSelected: aliquotaTasse == '15%', onTap: () => setState(() => aliquotaTasse = '15%')),
+                ...anniApertura.map((anno) {
+                  final isSelected = annoAperturaPiva == anno;
+                  return ChoiceChip(
+                    label: Text(
+                      anno == annoCorrente ? '$anno (Quest\'anno)' : '$anno',
+                      style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+                    ),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF2DD4BF),
+                    backgroundColor: const Color(0xFF101618),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937)),
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        annoAperturaPiva = anno;
+                        aliquotaTasse = '5%'; // Entro i 5 anni -> default 5%
+                      });
+                      _scrollToBottom();
+                    },
+                  );
+                }),
+                ChoiceChip(
+                label: Text(
+                  '${annoCorrente - 5} o prima (> 5 anni)',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                selected: annoAperturaPiva != null && annoAperturaPiva! <= (annoCorrente - 5),
+                selectedColor: const Color(0xFF3B82F6),
+                backgroundColor: const Color(0xFF101618),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: (annoAperturaPiva != null && annoAperturaPiva! <= (annoCorrente - 5)) ? const Color(0xFF3B82F6) : const Color(0xFF1F2937)),
+                ),
+                onSelected: (selected) {
+                  setState(() {
+                    annoAperturaPiva = annoCorrente - 5;
+                    aliquotaTasse = '15%';
+                  });
+                  _scrollToBottom();
+                },
+              ),
               ],
             ),
+
+            // BOX INFO ALIQUOTA AUTOMATICA
+            if (annoAperturaPiva != null) ...[
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF101618),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF1F2937)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          aliquotaTasse == '5%' ? Icons.eco_rounded : Icons.work_outline_rounded,
+                          color: aliquotaTasse == '5%' ? const Color(0xFF2DD4BF) : const Color(0xFF3B82F6),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          aliquotaTasse == '5%' ? 'Aliquota Agevolata Startup (5%)' : 'Aliquota Standard (15%)',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      annoAperturaPiva == 2021
+                          ? 'Avendo aperto da oltre 5 anni, la tua imposta sostitutiva è passata alla misura standard del 15%.'
+                          : 'Sei nei primi 5 anni di attività: hai diritto al 5% (a meno che tu non abbia aperto senza requisiti startup; in tal caso seleziona 15% qui sotto).',
+                      style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                    ),
+                    if (annoAperturaPiva != 2021) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => setState(() => aliquotaTasse = (aliquotaTasse == '5%' ? '15%' : '5%')),
+                            child: Text(
+                              aliquotaTasse == '5%' ? 'Non ho requisiti startup -> Passa al 15%' : 'Torna al 5% Startup',
+                              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             
             if (aliquotaTasse != null) ...[
               const SizedBox(height: 32),
-              const Text('CERCA O SELEZIONA CODICE ATECO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              const Text('CERCA O SELEZIONA CODICE ATECO PRINCIPALE', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
               const SizedBox(height: 12),
               _buildCustomTextField(
                 controller: _searchController,
@@ -333,25 +474,60 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                         separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFF1F2937), indent: 16),
                         itemBuilder: (context, index) {
                           final item = atecoFiltrati[index];
-                          final isSelected = codiceAtecoSelezionato == item['codice'];
+                          
+                          // 📌 CORRETTO: controlla se il codice selezionato INIZIA con il codice della riga
+                          final isSelected = codiceAtecoSelezionato != null && 
+                                             codiceAtecoSelezionato!.startsWith(item['codice'].toString());
+                          
                           final double coef = (item['coef'] as num).toDouble();
-                          return ListTile(
-                            onTap: () {
-                              setState(() {
-                                coefficienteRedditivita = coef;
-                                codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
-                              });
-                              _scrollToBottom();
-                            },
-                            title: Row(
-                              children: [
-                                Text(item['codice'], style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 13)),
-                                const SizedBox(width: 8),
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(6)), child: Text('${(coef * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
-                              ],
+
+                          return Container(
+                            color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
+                            child: ListTile(
+                              onTap: () {
+                                // 1. Chiude la tastiera per farti vedere bene la selezione e il tasto Avanti
+                                FocusScope.of(context).unfocus();
+                                
+                                // 2. Salva la selezione
+                                setState(() {
+                                  coefficienteRedditivita = coef;
+                                  codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
+                                });
+                                _scrollToBottom();
+                              },
+                              title: Row(
+                                children: [
+                                  Text(
+                                    item['codice'], 
+                                    style: TextStyle(
+                                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.white, 
+                                      fontWeight: FontWeight.bold, 
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF1F2937), 
+                                      borderRadius: BorderRadius.circular(6),
+                                    ), 
+                                    child: Text(
+                                      '${(coef * 100).toInt()}%', 
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                item['descrizione'], 
+                                style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12),
+                              ),
+                              // 📌 MOSTRA LA SPUNTA VERDE BELLA VISIBILE QUANDO SELEZIONATA
+                              trailing: isSelected 
+                                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 22) 
+                                  : const Icon(Icons.circle_outlined, color: Colors.white24, size: 20),
                             ),
-                            subtitle: Text(item['descrizione'], style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 20) : null,
                           );
                         })
                     : Column(
@@ -379,9 +555,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     _scrollToBottom();
   }
 
-  // ==========================================
-  // 🟡 STEP 2: CONTRIBUTI & ACCONTI F24
-  // ==========================================
+  // STEP 2: CONTRIBUTI & ACCONTI F24
   Widget _buildStep2() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
@@ -395,9 +569,9 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
           
           _buildRevolutListTile(icon: Icons.close_rounded, title: 'No, solo Partita IVA', subtitle: 'Lavoro in proprio al 100%', isSelected: tipoLavoroDipendente == 'nessuno', onTap: () => setState(() => tipoLavoroDipendente = 'nessuno')),
           const SizedBox(height: 8),
-          _buildRevolutListTile(icon: Icons.work, title: 'Sì, Full-Time', subtitle: '36-40 ore a settimana', isSelected: tipoLavoroDipendente == 'full', onTap: () => setState(() => tipoLavoroDipendente = 'full')),
+          _buildRevolutListTile(icon: Icons.work, title: 'Sì, Full-Time', subtitle: 'Esenzione contributi INPS P.IVA', isSelected: tipoLavoroDipendente == 'full', onTap: () => setState(() => tipoLavoroDipendente = 'full')),
           const SizedBox(height: 8),
-          _buildRevolutListTile(icon: Icons.timelapse_rounded, title: 'Sì, Part-Time', subtitle: 'Meno di 36 ore a settimana', isSelected: tipoLavoroDipendente == 'part_over50' || tipoLavoroDipendente == 'part_under50', onTap: () => setState(() => tipoLavoroDipendente = 'part_over50')),
+          _buildRevolutListTile(icon: Icons.timelapse_rounded, title: 'Sì, Part-Time', subtitle: 'Riduzione contributi INPS', isSelected: tipoLavoroDipendente == 'part_over50' || tipoLavoroDipendente == 'part_under50', onTap: () => setState(() => tipoLavoroDipendente = 'part_over50')),
           
           if (tipoLavoroDipendente == 'part_over50' || tipoLavoroDipendente == 'part_under50') ...[
             const SizedBox(height: 20),
@@ -411,9 +585,9 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildProfileCard(id: 'part_over50', icon: Icons.keyboard_double_arrow_up_rounded, title: 'Più del 50%', subtitle: 'Es. 24h su 40h', activeColor: const Color(0xFF0D9488), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
+                      Expanded(child: _buildProfileCard(id: 'part_over50', icon: Icons.keyboard_double_arrow_up_rounded, title: 'Più del 50%', subtitle: 'Es. > 20h', activeColor: const Color(0xFF0D9488), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildProfileCard(id: 'part_under50', icon: Icons.keyboard_double_arrow_down_rounded, title: 'Fino al 50%', subtitle: 'Es. 20h su 40h', activeColor: const Color(0xFF3B82F6), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
+                      Expanded(child: _buildProfileCard(id: 'part_under50', icon: Icons.keyboard_double_arrow_down_rounded, title: 'Fino al 50%', subtitle: 'Es. <= 20h', activeColor: const Color(0xFF3B82F6), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
                     ],
                   ),
                 ],
@@ -435,9 +609,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     );
   }
 
-  // ==========================================
-  // 🔵 STEP 3: OBIETTIVO NETTO
-  // ==========================================
+  // STEP 3: OBIETTIVO NETTO
   Widget _buildStep3() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
@@ -446,7 +618,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
         children: [
           const Text('Obiettivo di Vita', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Qual è lo stipendio netto mensile di cui hai bisogno per vivere sereno e pagare le tue spese?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+          const Text('Qual è lo stipendio netto mensile di cui hai bisogno per vivere sereno?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
           const SizedBox(height: 32),
           
           Center(
@@ -478,66 +650,158 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 40),
-          const Center(child: Text('L\'app utilizzerà questo valore per capire se\nil tuo fatturato è sufficiente a sostenerti.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF6B7280), fontSize: 13))),
+          const Center(child: Text('L\'app utilizzerà questo valore per calcolare\nla sostenibilità delle tue entrate.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF6B7280), fontSize: 13))),
         ],
       ),
     );
   }
 
-  // ==========================================
-  // 🟣 STEP 4: PROIEZIONE & STAGIONALITÀ
-  // ==========================================
+  // STEP 4: PROIEZIONE, MESI ATTIVI & VERDETTO INTELLIGENTE
   Widget _buildStep4() {
+    final verdetto = _calcolaVerdetto();
+    final double nettoMese = verdetto['nettoMese']!;
+    final double gapMese = verdetto['gapMese']!;
+    final double extraFatturatoAnno = verdetto['extraFatturatoAnno']!;
+    final double extraFatturatoMese = verdetto['extraFatturatoMese']!;
+    final double nettoTargetMese = double.tryParse(_nettoTargetController.text) ?? 2000.0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Proiezione Annuale', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const Text('Proiezione & Verdetto', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Ultimo passo: stima i tuoi incassi lordi per scoprire il tuo Verdetto di Sostenibilità.', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-          const SizedBox(height: 32),
+          const Text('Stima gli incassi lordi da P.IVA e seleziona i mesi di lavoro.', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+          const SizedBox(height: 24),
           
-          const Text('FATTURATO LORDO STIMATO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-          const SizedBox(height: 12),
+          const Text('FATTURATO LORDO P.IVA STIMATO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+          const SizedBox(height: 4),
+          const Text('Inserisci solo il lordo P.IVA (escludi lo stipendio da dipendente)', style: TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
+          const SizedBox(height: 8),
           _buildCustomTextField(
             controller: _fatturatoController,
             hintText: 'Es. 35000',
             icon: Icons.trending_up_rounded,
             keyboardType: TextInputType.number,
+            onChanged: (v) => setState(() {}),
           ),
           
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('MESI DI ATTIVITÀ / INCASSO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              Text('$_mesiAttiviConteggio / 12 Mesi', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(12, (index) {
+              final isSelected = _mesiAttiviState[index];
+              return ChoiceChip(
+                label: Text(_nomiMesi[index], style: TextStyle(color: isSelected ? Colors.black : Colors.white70, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                selected: isSelected,
+                selectedColor: const Color(0xFF2DD4BF),
+                backgroundColor: const Color(0xFF101618),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937),
+                  ),
+                ),                onSelected: (bool selected) {
+                  setState(() {
+                    _mesiAttiviState[index] = selected;
+                  });
+                },
+              );
+            }),
+          ),
+
           const SizedBox(height: 32),
-          const Text('MESI ATTIVI DI LAVORO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-          const SizedBox(height: 12),
           
+          // CARD VERDETTO FINALE
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(color: const Color(0xFF101618).withOpacity(0.85), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1F2937))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF101618),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Lavoro e incasso per:', style: TextStyle(color: Colors.white, fontSize: 14)),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF2DD4BF)), onPressed: () => setState(() { if (_mesiAttivi > 1) _mesiAttivi--; })),
-                    Text('$_mesiAttivi mesi', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFF2DD4BF)), onPressed: () => setState(() { if (_mesiAttivi < 12) _mesiAttivi++; })),
+                    Text(
+                      gapMese <= 0 ? '🎉 Sostenibile!' : '⚠️ Attenzione al Target',
+                      style: TextStyle(color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    Icon(gapMese <= 0 ? Icons.check_circle_rounded : Icons.warning_amber_rounded, color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B)),
                   ],
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Netto Mensile Stimato:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    Text('${nettoMese.toStringAsFixed(0)} € / mese', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Divider(height: 20, color: Color(0xFF1F2937)),
+                
+                if (gapMese <= 0)
+                  Text(
+                    'Il tuo fatturato stimato ti permette di superare il tuo obiettivo netto mensile di ${nettoTargetMese.toStringAsFixed(0)} €!',
+                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                  )
+                else ...[
+                  Text(
+                    'Ti mancano circa ${gapMese.toStringAsFixed(0)} € netti al mese per raggiungere il tuo obiettivo di ${nettoTargetMese.toStringAsFixed(0)} €.',
+                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('SUGGERIMENTI DI INTEGRATIVI:', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.add_chart_rounded, color: Color(0xFF2DD4BF), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Incrementa il Fatturato P.IVA di +${extraFatturatoAnno.toStringAsFixed(0)} €/anno (+${extraFatturatoMese.toStringAsFixed(0)} € nei ${_mesiAttiviConteggio} mesi attivi)',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.work_outline_rounded, color: Color(0xFF3B82F6), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Oppure integra +${gapMese.toStringAsFixed(0)} € netti/mese da un lavoro Dipendente',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Text('Se ti fermi ad Agosto e Dicembre, seleziona 10 mesi. L\'app creerà un cuscinetto per pagarti lo stipendio nei mesi di pausa.', style: TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // ==========================================
-  // 🛠️ COMPONENTI GRAFICI RIUTILIZZABILI (Tuo Stile)
-  // ==========================================
+  // COMPONENTI GRAFICI RIUTILIZZABILI
   Widget _buildCustomTextField({required TextEditingController controller, required String hintText, required IconData icon, Function(String)? onChanged, TextInputType? keyboardType}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),

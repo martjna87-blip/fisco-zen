@@ -9,6 +9,8 @@ class TasseAccantonamentoSheet extends StatefulWidget {
   final double aliquotaInps;
   final double totaleFatturatoIncassato;
   final double totaleFatturatoInSospeso;
+  final List<Map<String, dynamic>>? fattureIncassate;
+  final List<Map<String, dynamic>>? fattureDaIncassare;
   final Function(String nuovoAteco, double nuovoCoeff) onAtecoCambiato;
 
   const TasseAccantonamentoSheet({
@@ -19,6 +21,8 @@ class TasseAccantonamentoSheet extends StatefulWidget {
     required this.aliquotaInps,
     required this.totaleFatturatoIncassato,
     this.totaleFatturatoInSospeso = 0.0,
+    this.fattureIncassate,
+    this.fattureDaIncassare,
     required this.onAtecoCambiato,
   });
 
@@ -55,30 +59,59 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
     super.dispose();
   }
 
-  Map<String, double> _calcolaFiscalita(double lordo) {
-    final double imponibile = lordo * _coeffSelezionato;
+  Map<String, double> _calcolaFiscalita(List<Map<String, dynamic>> listaFatture, double lordoFallback) {
+    if (listaFatture.isEmpty && lordoFallback > 0) {
+      final double imponibile = lordoFallback * _coeffSelezionato;
+      final double inpsY = imponibile * widget.aliquotaInps;
+      final double impostaY = imponibile * widget.aliquotaImposta;
+      final double saldoY = inpsY + impostaY;
+      final double accontiY1 = (inpsY * 0.80) + (impostaY * 1.00);
+      final double totaleTasse = saldoY + accontiY1;
+      return {
+        'lordo': lordoFallback,
+        'imponibile': imponibile,
+        'inpsY': inpsY,
+        'impostaY': impostaY,
+        'saldoY': saldoY,
+        'accontiY1': accontiY1,
+        'totaleTasse': totaleTasse,
+        'nettoSpendibile': lordoFallback - totaleTasse,
+      };
+    }
 
-    final double inpsY = imponibile * widget.aliquotaInps;
-    final double impostaY = imponibile * widget.aliquotaImposta;
-    final double saldoY = inpsY + impostaY;
+    double imponibileTotale = 0.0;
+    double inpsYTotale = 0.0;
+    double impostaYTotale = 0.0;
+    double accontiTotali = 0.0;
+    double lordoTotale = 0.0;
 
-    final double accontoInpsY1 = inpsY * 0.80;
-    final double accontoImpostaY1 = impostaY * 1.00;
-    final double accontiY1 = accontoInpsY1 + accontoImpostaY1;
+    for (var f in listaFatture) {
+      final double lordo = (f['importo'] as num?)?.toDouble() ?? 0.0;
+      final double coef = (f['coefAteco'] as num?)?.toDouble() ?? _coeffSelezionato;
+      
+      final double imponibile = lordo * coef;
+      final double inpsY = imponibile * widget.aliquotaInps;
+      final double impostaY = imponibile * widget.aliquotaImposta;
 
-    final double totaleTasse = saldoY + accontiY1;
-    final double nettoSpendibile = lordo - totaleTasse;
+      lordoTotale += lordo;
+      imponibileTotale += imponibile;
+      inpsYTotale += inpsY;
+      impostaYTotale += impostaY;
+      accontiTotali += ((inpsY * 0.80) + (impostaY * 1.00));
+    }
+
+    final double saldoTotale = inpsYTotale + impostaYTotale;
+    final double totaleTasse = saldoTotale + accontiTotali;
 
     return {
-      'imponibile': imponibile,
-      'inpsY': inpsY,
-      'impostaY': impostaY,
-      'saldoY': saldoY,
-      'accontoInpsY1': accontoInpsY1,
-      'accontoImpostaY1': accontoImpostaY1,
-      'accontiY1': accontiY1,
+      'lordo': lordoTotale,
+      'imponibile': imponibileTotale,
+      'inpsY': inpsYTotale,
+      'impostaY': impostaYTotale,
+      'saldoY': saldoTotale,
+      'accontiY1': accontiTotali,
       'totaleTasse': totaleTasse,
-      'nettoSpendibile': nettoSpendibile,
+      'nettoSpendibile': lordoTotale - totaleTasse,
     };
   }
 
@@ -137,8 +170,14 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final fiscaliIncassato = _calcolaFiscalita(widget.totaleFatturatoIncassato);
-    final fiscaliSospeso = _calcolaFiscalita(widget.totaleFatturatoInSospeso);
+    final fiscaliIncassato = _calcolaFiscalita(
+      widget.fattureIncassate ?? [], 
+      widget.totaleFatturatoIncassato,
+    );
+    final fiscaliSospeso = _calcolaFiscalita(
+      widget.fattureDaIncassare ?? [], 
+      widget.totaleFatturatoInSospeso,
+    );
 
     return AppPopupWrapper(
       title: 'Stima Tasse P.IVA',
@@ -341,7 +380,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                   const SizedBox(height: 8),
                   _buildRow(
                     'Fatturato Incassato:',
-                    '${widget.totaleFatturatoIncassato.toStringAsFixed(2)} €',
+                    '${fiscaliIncassato['lordo']!.toStringAsFixed(2)} €',
                     color: const Color(0xFF10B981),
                     isBold: true,
                   ),
@@ -354,7 +393,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                     onInfoTap: () => _mostraInfoTasse(
                       context,
                       'Saldo Tasse Anno Corrente',
-                      'Rappresenta le tasse reali sul fatturato incassato sull\'Imponibile Fiscale (${(_coeffSelezionato * 100).toInt()}%):\n\n'
+                      'Rappresenta le tasse reali sul fatturato incassato applicando il coefficiente ATECO di ciascuna fattura:\n\n'
                       '• INPS: ${(widget.aliquotaInps * 100).toStringAsFixed(2)}%\n'
                       '• Imposta Sostitutiva: ${(widget.aliquotaImposta * 100).toInt()}%\n\n'
                       'Totale Saldo = ${((widget.aliquotaInps + widget.aliquotaImposta) * 100).toStringAsFixed(2)}% sull\'Imponibile.',
@@ -379,7 +418,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                 ],
               ),
             ),
-            if (widget.totaleFatturatoInSospeso > 0) ...[
+            if ((fiscaliSospeso['lordo'] ?? 0) > 0) ...[
               const SizedBox(height: 10),
               Container(
                 width: double.infinity,
@@ -408,7 +447,7 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _buildRow('Non ancora incassate:', '${widget.totaleFatturatoInSospeso.toStringAsFixed(2)} €', color: Colors.white),
+                    _buildRow('Non ancora incassate:', '${fiscaliSospeso['lordo']!.toStringAsFixed(2)} €', color: Colors.white),
                     _buildRow('Saldo Tasse Stimato (Y):', '-${fiscaliSospeso['saldoY']!.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
                     _buildRow('Acconti Stimati (Y+1):', '-${fiscaliSospeso['accontiY1']!.toStringAsFixed(2)} €', color: const Color(0xFFF97316)),
                     Divider(color: Colors.white.withOpacity(0.12), height: 10),

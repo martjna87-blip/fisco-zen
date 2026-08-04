@@ -140,6 +140,7 @@ class WalletProvider extends ChangeNotifier {
 
   // PROFILO ONBOARDING & MOTORE FISCALE
   String _codiceAteco = '62.02.00';
+  String get codiceAteco => _codiceAteco; // 👈 RIGA AGGIUNTA QUI!
   double _coefficienteRedditivita = 0.78;
   String _tipoCassa = 'gestioneSeparata';
   bool _isStartup = true;
@@ -596,6 +597,8 @@ class WalletProvider extends ChangeNotifier {
     required double importo,
     String? data,
     String? numero,
+    double? coefAteco,
+    double? importoTasseStimate,
   }) {
     final String numCalcolato = (numero != null && numero.trim().isNotEmpty)
         ? numero.trim()
@@ -607,6 +610,8 @@ class WalletProvider extends ChangeNotifier {
       'importo': importo,
       'data': data ?? DateTime.now().toString(),
       'numero': numCalcolato,
+      'coefAteco': coefAteco ?? coeffRedditivita,
+      'importoTasseStimate': importoTasseStimate ?? (importo * aliquotaFiscaleReale),
     });
 
     _salvaDatiInLocalStorage();

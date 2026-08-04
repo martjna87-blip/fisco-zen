@@ -52,20 +52,22 @@ class _HomeScreenState extends State<HomeScreen> {
     _aliquotaImposta = widget.aliquotaImpostaIniziale ?? 0.05;
   }
 
-  double _calcolaTasseComplete(double lordo) {
-    if (lordo <= 0) return 0.0;
-    
-    final double imponibile = lordo * _coefficienteRedditivita;
-
-    final double inpsY = imponibile * _aliquotaInps;
-    final double impostaY = imponibile * _aliquotaImposta;
-    final double saldoY = inpsY + impostaY;
-
-    final double accontoInpsY1 = inpsY * 0.80;
-    final double accontoImpostaY1 = impostaY * 1.00;
-    final double accontiY1 = accontoInpsY1 + accontoImpostaY1;
-
-    return saldoY + accontiY1;
+  double _calcolaTasseComplete(List<Map<String, dynamic>> listaFatture) {
+    double totaleTasse = 0.0;
+    for (var f in listaFatture) {
+      final double lordo = (f['importo'] as num?)?.toDouble() ?? 0.0;
+      // 📌 Legge l'ATECO della singola fattura (fallback su quello principale)
+      final double coef = (f['coefAteco'] as num?)?.toDouble() ?? _coefficienteRedditivita;
+      
+      final double imponibile = lordo * coef;
+      final double inpsY = imponibile * _aliquotaInps;
+      final double impostaY = imponibile * _aliquotaImposta;
+      final double saldoY = inpsY + impostaY;
+      final double accontiY1 = (inpsY * 0.80) + (impostaY * 1.00);
+      
+      totaleTasse += (saldoY + accontiY1);
+    }
+    return totaleTasse;
   }
 
   String _formattaValuta(double importo) {
@@ -140,6 +142,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogDettaglioTasse(double totaleInSospeso, double totaleIncassatoReale) {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    
     AppPopupWrapper.mostra(
       context: context,
       child: TasseAccantonamentoSheet(
@@ -149,6 +153,8 @@ class _HomeScreenState extends State<HomeScreen> {
         aliquotaInps: _aliquotaInps,
         totaleFatturatoIncassato: totaleIncassatoReale,
         totaleFatturatoInSospeso: totaleInSospeso,
+        fattureIncassate: walletProvider.fattureIncassate,    // 👈 Passa le fatture incassate
+        fattureDaIncassare: walletProvider.fattureDaIncassare,// 👈 Passa le fatture in sospeso
         onAtecoCambiato: (nuovoAteco, nuovoCoeff) {
           setState(() {
             _codiceAteco = nuovoAteco;
@@ -423,9 +429,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
-    final double tasseStimateInSospeso = _calcolaTasseComplete(totaleInSospeso);
+    // 📌 PASSIAMO LA LISTA DELLE FATTURE IN SOSPESO PER LEGGERE I LORO ATECO REALI
+    final double tasseStimateInSospeso = _calcolaTasseComplete(fattureDaIncassare);
     final double nettoStimatoInSospeso = totaleInSospeso - tasseStimateInSospeso;
-    final double tasseFatturatoIncassato = _calcolaTasseComplete(fatturato);
+    // 📌 PASSIAMO LA LISTA DELLE FATTURE INCASSATE PER LEGGERE I LORO ATECO REALI
+    final double tasseFatturatoIncassato = _calcolaTasseComplete(fattureIncassate);
     final double stimaTasseTotaleComplessivo = tasseStimateInSospeso + tasseFatturatoIncassato;
 
     final double tasseRealiFatture = walletProvider.fattureIncassate
@@ -648,6 +656,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Builder(
                           builder: (context) {
                             final bool haFattureDaIncassare = fattureDaIncassare.isNotEmpty;
+                            final int totaleFatture = fattureDaIncassare.length;
 
                             final int fattureInRitardo = fattureDaIncassare
                                 .where((f) => _calcolaGiorniTrascorsi(f['data']?.toString()) >= 15)
@@ -660,9 +669,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   : Icons.hourglass_top_rounded,
                               title: 'Da\nincassare',
                               value: haRitardi
-                                  ? '⚠️ $fattureInRitardo (>15 gg)'
+                                  ? '⚠️ $fattureInRitardo su $totaleFatture in ritardo'
                                   : (haFattureDaIncassare
-                                      ? '${fattureDaIncassare.length} (${totaleInSospeso.toStringAsFixed(0)} €)'
+                                      ? '$totaleFatture (${totaleInSospeso.toStringAsFixed(0)} €)'
                                       : 'Nessuna'),
                               iconColor: haRitardi
                                   ? const Color(0xFFEF4444)
@@ -708,8 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 86,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        height: 102,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF141417).withOpacity(0.92),
           borderRadius: BorderRadius.circular(18),
@@ -723,7 +732,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: iconColor ?? Colors.white70, size: 20),
+            Icon(icon, color: iconColor ?? Colors.white70, size: 24),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -732,7 +741,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title,
                   style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 10,
+                    fontSize: 12,
                     height: 1.15,
                   ),
                   maxLines: 2,
@@ -746,7 +755,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     value,
                     style: TextStyle(
                       color: valueColor ?? Colors.white,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,

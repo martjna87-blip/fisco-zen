@@ -165,7 +165,12 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                   final double lordo = (f['importo'] as num).toDouble();
                   final String nomeCliente = f['cliente'] as String;
 
-                  final double imponibile = lordo * widget.coefficienteRedditivita;
+                  // 📌 1. LEGGIAMO IL COEFFICIENTE ATECO SALVATO NELLA SPECIFICA FATTURA
+                  // (Se per qualsiasi motivo non c'è, usa come scorta quello principale)
+                  final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+
+                  // 📌 2. CALCOLIAMO L'IMPONIBILE USANDO IL SUO ATECO CORRETTO
+                  final double imponibile = lordo * coefFattura;
                   final double inpsY = imponibile * widget.aliquotaInps;
                   final double impostaY = imponibile * widget.aliquotaImposta;
                   final double totaleSaldoY = inpsY + impostaY;
