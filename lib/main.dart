@@ -32,13 +32,13 @@ void main() {
         ChangeNotifierProvider(create: (_) => WalletProvider()),
         ChangeNotifierProvider(create: (_) => NotificationsProvider()), // 👈 NUOVO!
       ],
-      child: const FiscoZenApp(),
+      child: const FiscOnApp(),
     ),
   );
 }
 
-class FiscoZenApp extends StatelessWidget {
-  const FiscoZenApp({super.key});
+class FiscOnApp extends StatelessWidget {
+  const FiscOnApp({super.key});
 
   @override
   Widget build(BuildContext context) {

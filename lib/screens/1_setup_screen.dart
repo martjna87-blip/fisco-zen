@@ -128,7 +128,7 @@ class _SetupScreenState extends State<SetupScreen> with SingleTickerProviderStat
                         ),
                         const SizedBox(width: 12),
                         const Text(
-                          'Fisco Zen',
+                          'FiscOn',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 28,

@@ -98,7 +98,7 @@ class ProUpgradeSheet extends StatelessWidget {
                                   const SizedBox(height: 10),
 
                                   const Text(
-                                    'Sblocca Fisco Zen PRO',
+                                    'Sblocca FiscOn PRO',
                                     style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                   ),
 

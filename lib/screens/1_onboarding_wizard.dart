@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '1_main_menu.dart';
+import '../widgets_shared/fiscon_logo.dart';
 
 class OnboardingWizard extends StatefulWidget {
   const OnboardingWizard({super.key});
@@ -166,8 +167,9 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                             child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
                           ),
                           const SizedBox(width: 8),
-                          const Text('Fisco Zen', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        ],
+                          const FiscOnLogo(
+                            fontSize: 26, // Una taglia bella grande per il benvenuto
+                          ),                        ],
                       ),
                       if (tipoProfilo == 'piva')
                         Text('Step ${_currentPage + 1} di $_totalPages', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),

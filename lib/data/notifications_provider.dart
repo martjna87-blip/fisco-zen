@@ -27,7 +27,7 @@ class NotificationsProvider extends ChangeNotifier {
   final List<AppNotificationItem> _notifiche = [
     AppNotificationItem(
       id: 'welcome_1',
-      titolo: 'Benvenuto in FiscoZen! 🎉',
+      titolo: 'Benvenuto in FiscOn! 🎉',
       messaggio: 'Il tuo centro notifiche è attivo. Qui troverai avvisi su tasse, scadenze e fatture in ritardo.',
       data: DateTime.now().subtract(const Duration(minutes: 5)),
       type: AppNotificationType.info,

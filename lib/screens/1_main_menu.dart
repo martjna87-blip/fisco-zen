@@ -344,7 +344,7 @@ class ProfiloSandboxScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  walletProvider.isProUser ? 'Piano Attivo: Fisco Zen PRO ✨' : 'Piano Attivo: Fisco Zen FREE 🔒', 
+                                  walletProvider.isProUser ? 'Piano Attivo: FiscOn PRO ✨' : 'Piano Attivo: FiscOn FREE 🔒', 
                                   style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                 ),
                                 const Text('Tocca per passare da Free a Pro per i tuoi test', style: TextStyle(color: Colors.white54, fontSize: 10)),
