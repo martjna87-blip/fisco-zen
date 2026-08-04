@@ -139,9 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogDettaglioTasse(double totaleInSospeso, double totaleIncassatoReale) {
-    showDialog(
+    AppPopupWrapper.mostra(
       context: context,
-      builder: (context) => TasseAccantonamentoSheet(
+      child: TasseAccantonamentoSheet(
         codiceAteco: _codiceAteco,
         coefficienteRedditivita: _coefficienteRedditivita,
         aliquotaImposta: _aliquotaImposta,
