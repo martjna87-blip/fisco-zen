@@ -145,10 +145,10 @@ class _MainMenuState extends State<MainMenu> {
         AppSpeedDialMenu.mostra(
           context: context,
           onNuovaFattura: () {
-            // 📄 APRE SUBITO IL DIALOG DI REGISTRAZIONE FATTURA P.IVA
-            showDialog(
+            // 📄 APRE SUBITO IL DIALOG DI REGISTRAZIONE FATTURA P.IVA (ALLINEATO A MOVIMENTI)
+            AppPopupWrapper.mostra(
               context: context,
-              builder: (ctx) => RegistraFatturaSheet(
+              child: RegistraFatturaSheet(
                 onFatturaSalvata: (cliente, importo, dataFormattata) {
                   AppNotifications.mostraInAlto(
                     context,
@@ -374,7 +374,7 @@ class ProfiloSandboxScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 14),
                       SizedBox(width: 6),
-                      Text('Versione V1.0 Stabile', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text('Versione V3.0 Stabile', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
