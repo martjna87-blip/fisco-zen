@@ -142,7 +142,7 @@ class AppPopupWrapper extends StatelessWidget {
 
     // 🎯 ALTEZZA DALL'ALTO MASTER (Standard Registra Fattura)
     final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 65.0; //Posizione dall'alto
+    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 55.0; //Posizione dall'alto
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -157,10 +157,11 @@ class AppPopupWrapper extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: MediaQuery.of(context).size.height * 0.76, //Altezza totale
+          height: MediaQuery.of(context).size.height * 0.76, // Altezza totale
           child: Container(
             color: const Color(0xFF18181B),
             child: Stack(
+              fit: StackFit.expand, // 👈 AGGIUNGI QUESTA RIGA: Forza lo Stack ad occupare SEMPRE il 76% di altezza
               children: [
                 Positioned.fill(
                   child: Image.network(

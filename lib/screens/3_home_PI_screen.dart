@@ -128,9 +128,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogRegistraFattura() {
-    showDialog(
+    AppPopupWrapper.mostra(
       context: context,
-      builder: (context) => RegistraFatturaSheet(
+      child: RegistraFatturaSheet(
         onFatturaSalvata: (cliente, importo, dataFormattata) {
           _mostraFeedback('Fattura di ${importo.toStringAsFixed(2)}€ registrata per $cliente!');
         },
