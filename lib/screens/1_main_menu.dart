@@ -374,7 +374,7 @@ class ProfiloSandboxScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.verified_outlined, color: Color(0xFF2DD4BF), size: 14),
                       SizedBox(width: 6),
-                      Text('Versione V3.0 Stabile', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text('Versione V4.0 Stabile', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),

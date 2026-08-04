@@ -135,28 +135,30 @@ class AppPopupWrapper extends StatelessWidget {
     );
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
 
+    // 🎯 ALTEZZA DALL'ALTO MASTER (Standard Registra Fattura)
     final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) +22.0;
+    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 65.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      alignment: Alignment.topCenter, // 👈 FORZA IL POP-UP A RIMANERE ANCORATO IN ALTO
+      alignment: Alignment.topCenter,
       insetPadding: EdgeInsets.only(
-        left: 10,
-        right: 10,
+        left: 14,
+        right: 14,
         top: topMargin,
-        bottom: isKeyboardOpen ? 10 : 20,
+        bottom: isKeyboardOpen ? 10 : 30,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: MediaQuery.of(context).size.height * 0.80,          child: Container(
+          height: MediaQuery.of(context).size.height * 0.76,
+          child: Container(
             color: const Color(0xFF18181B),
             child: Stack(
               children: [
