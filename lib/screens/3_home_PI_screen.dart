@@ -620,6 +620,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const SizedBox(height: 12),
                   GestureDetector(
+                    // 👈 AGGIUNTO: Apre il pop-up di accantonamento al tocco
+                    onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF141417)),
                     onLongPress: () {
                       AppPopupWrapper.mostraInfo(
                         context: context,
