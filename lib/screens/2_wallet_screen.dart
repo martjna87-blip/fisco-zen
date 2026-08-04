@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '2_1_wallet_add_movement.dart';
 import '2_2_wallet_manage_accounts.dart';
-import '2_4_wallet_budget_pilot.dart';
+//import '2_4_wallet_budget_pilot.dart';
 import '2_5_wallet_annual_summary.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';

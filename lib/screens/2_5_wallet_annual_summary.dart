@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+
 
 class AnnualSummarySheet extends StatefulWidget {
   const AnnualSummarySheet({super.key});
@@ -141,12 +141,22 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     final currentAnno = _anniData[_selectedYearIndex];
     final List<Map<String, dynamic>> storicoMesiInUso = List<Map<String, dynamic>>.from(currentAnno['storicoMesi']);
 
-    return AppPopupWrapper(
-      title: 'Il meglio per il tuo anno',
-      badgeText: 'WALLET',
-      badgeColor: const Color(0xFF3B82F6),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0C),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0A0C),
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'Il meglio per il tuo anno',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
