@@ -173,11 +173,15 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     return AppPopupWrapper(
       title: 'Registra Fattura',
-                              child: SingleChildScrollView(
-                                physics: const BouncingScrollPhysics(),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+      badgeText: 'P.IVA',
+      badgeColor: const Color(0xFF2DD4BF),
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                                     const Text(
                                       'ACQUISIZIONE RAPIDA IA',
                                       style: TextStyle(
@@ -318,9 +322,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                       ),
                                     ),
                                   ],
-                                ),
-                              ),
-    );
+                                ), // 👈 1. Chiude Column
+                              ), // 👈 2. Chiude SingleChildScrollView
+                            ), // 👈 3. Chiude Padding (Aggiunta!)
+    ); // 👈 4. Chiude AppPopupWrapper
   }
 
   Widget _buildProCard({
