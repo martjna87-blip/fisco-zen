@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_secondary_popup.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
   final bool? isPiva;
@@ -50,7 +51,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       return Icons.account_balance_outlined;
     }
   }
-  
+
+  // 1. 🗑️ POP-UP CONFERMA ELIMINAZIONE CONTO
   void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
     if (account.role == AccountRole.principal || account.role == AccountRole.taxReserve) {
       AppNotifications.mostraInAlto(
@@ -61,148 +63,116 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       return;
     }
 
-    showDialog(
+    AppSecondaryPopup.mostra(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141417),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
-            SizedBox(width: 8),
-            Text('Elimina Conto', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
+      icon: Icons.warning_amber_rounded,
+      iconColor: const Color(0xFFEF4444),
+      titolo: 'Elimina Conto',
+      testoConferma: 'Elimina',
+      onConferma: () {
+        try {
+          context.read<WalletProvider>().deleteAccount(account.id);
+          Navigator.pop(context);
+          setState(() {
+            _contoEspansoIndex = null;
+          });
+          AppNotifications.mostraInAlto(
+            context,
+            'Conto "${account.title}" eliminato! 🎉',
+          );
+        } catch (e) {
+          Navigator.pop(context);
+          AppNotifications.mostraInAlto(
+            context,
+            '$e'.replaceAll('Exception: ', ''),
+            type: NotificationType.error,
+          );
+        }
+      },
+      child: SingleChildScrollView(
+        child: Text(
           'Vuoi davvero eliminare il conto "${account.title}"?\nQuesta azione non potrà essere annullata.',
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              try {
-                context.read<WalletProvider>().deleteAccount(account.id);
-                Navigator.pop(ctx);
-                setState(() {
-                  _contoEspansoIndex = null;
-                });
-                AppNotifications.mostraInAlto(
-                  context, 
-                  'Conto "${account.title}" eliminato! 🎉',
-                );
-              } catch (e) {
-                Navigator.pop(ctx);
-                AppNotifications.mostraInAlto(
-                  context,
-                  '$e'.replaceAll('Exception: ', ''),
-                  type: NotificationType.error,
-                );
-              }
-            },
-            child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
 
+  // 2. ✏️ POP-UP MODIFICA CONTO
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
       text: account.amount.toStringAsFixed(2),
     );
 
-    showDialog(
+    AppSecondaryPopup.mostra(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C21),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomeController,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Nome Conto',
-                  labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  labelText: 'Nuovo Saldo (€)',
-                  labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final nuovoNome = nomeController.text.trim();
-              final nuovoSaldo = double.tryParse(controller.text.replaceAll(',', '.')) ?? account.amount;
+      icon: Icons.edit_rounded,
+      iconColor: const Color(0xFF2DD4BF),
+      titolo: 'Modifica Conto',
+      testoConferma: 'Salva',
+      onConferma: () {
+        final nuovoNome = nomeController.text.trim();
+        final nuovoSaldo = double.tryParse(controller.text.replaceAll(',', '.')) ?? account.amount;
 
-              if (nuovoNome.isNotEmpty) {
-                context.read<WalletProvider>().updateAccountDetails(
-                      accountId: account.id,
-                      newTitle: nuovoNome,
-                      newAmount: nuovoSaldo,
-                    );
-                Navigator.pop(ctx);
-                setState(() {
-                  _contoEspansoIndex = null;
-                });
-                AppNotifications.mostraInAlto(
-                  context, 'Conto "$nuovoNome" aggiornato! 🎉'
-                  );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2DD4BF),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        if (nuovoNome.isNotEmpty) {
+          context.read<WalletProvider>().updateAccountDetails(
+                accountId: account.id,
+                newTitle: nuovoNome,
+                newAmount: nuovoSaldo,
+              );
+          Navigator.pop(context);
+          setState(() {
+            _contoEspansoIndex = null;
+          });
+          AppNotifications.mostraInAlto(context, 'Conto "$nuovoNome" aggiornato! 🎉');
+        }
+      },
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nomeController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Nome Conto',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
             ),
-            child: const Text('Salva', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: 'Nuovo Saldo (€)',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  // 3. 📜 POP-UP DETTAGLIO MOVIMENTI CONTO
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
 
-    final movimentiConto = transactions.where((t) =>
-      t.accountId == account.id ||
-      t.title.contains(account.title) ||
-      account.title.contains(t.title)
-    ).toList();
+    final movimentiConto = transactions
+        .where((t) =>
+            t.accountId == account.id ||
+            t.title.contains(account.title) ||
+            account.title.contains(t.title))
+        .toList();
 
     movimentiConto.sort((a, b) => b.date.compareTo(a.date));
 
@@ -248,58 +218,36 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       elementiLista.add(_buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome));
     }
 
-    showDialog(
+    AppSecondaryPopup.mostra(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141417),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.account_balance_wallet_outlined, color: account.color, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Movimenti: ${account.title}',
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(color: Colors.white12, height: 1),
-              const SizedBox(height: 8),
-              elementiLista.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'Nessun movimento registrato su questo conto.',
-                        style: TextStyle(color: Colors.white38, fontSize: 12),
-                      ),
-                    )
-                  : ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.45,
-                      ),
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          children: elementiLista,
-                        ),
-                      ),
+      icon: Icons.account_balance_wallet_outlined,
+      iconColor: account.color,
+      titolo: 'Movimenti: ${account.title}',
+      testoAnnulla: 'Chiudi',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 8),
+          elementiLista.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'Nessun movimento registrato su questo conto.',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                )
+              : ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.45,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: elementiLista,
                     ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Chiudi', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold)),
-          ),
+                  ),
+                ),
         ],
       ),
     );
@@ -333,6 +281,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
+  // 4. ➕ POP-UP NUOVO CONTO
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeController = TextEditingController();
     final TextEditingController dettaglioController = TextEditingController();
@@ -350,11 +299,53 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1C1C21),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Crea Nuovo Conto', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
+        builder: (context, setDialogState) => AppSecondaryPopup(
+          icon: Icons.account_balance_wallet_rounded,
+          iconColor: const Color(0xFF2DD4BF),
+          titolo: 'Crea Nuovo Conto',
+          testoConferma: 'Crea Conto',
+          onConferma: () {
+            final nome = nomeController.text.trim();
+            final dettaglioText = dettaglioController.text.trim();
+            final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
+
+            if (nome.isEmpty) {
+              AppNotifications.mostraInAlto(
+                context,
+                'Attenzione: inserire il nome del conto',
+                type: NotificationType.warning,
+              );
+              return;
+            }
+
+            try {
+              final provider = context.read<WalletProvider>();
+              final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
+              final coloreConto = _getAccountTypeColor(tipoSelezionato);
+
+              provider.addAccount(
+                title: nome,
+                subtitle: sottotitoloFinale,
+                initialAmount: saldo,
+                color: coloreConto,
+              );
+
+              if (saldo > 0) {
+                provider.addTransaction(
+                  title: 'Saldo Iniziale: $nome',
+                  amount: saldo,
+                  isIncome: true,
+                  category: 'Risparmi',
+                );
+              }
+
+              Navigator.pop(context);
+              AppNotifications.mostraInAlto(context, 'Conto "$nome" creato con successo! 🎉');
+            } catch (e) {
+              AppNotifications.mostraInAlto(context, 'Errore creazione conto: $e', type: NotificationType.error);
+            }
+          },
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,72 +405,12 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final nome = nomeController.text.trim();
-                final dettaglioText = dettaglioController.text.trim();
-                final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
-
-                if (nome.isEmpty) {
-                  AppNotifications.mostraInAlto(
-                    context, 
-                    'Attenzione: inserire il nome del conto', 
-                    type: NotificationType.warning,
-                  );
-                  return;
-                }
-
-                try {
-                  final provider = context.read<WalletProvider>();
-                  final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
-                  final coloreConto = _getAccountTypeColor(tipoSelezionato);
-
-                  provider.addAccount(
-                    title: nome,
-                    subtitle: sottotitoloFinale,
-                    initialAmount: saldo,
-                    color: coloreConto,
-                  );
-
-                  if (saldo > 0) {
-                    provider.addTransaction(
-                      title: 'Saldo Iniziale: $nome',
-                      amount: saldo,
-                      isIncome: true,
-                      category: 'Risparmi',
-                    );
-                  }
-
-                  Navigator.pop(context);
-                  AppNotifications.mostraInAlto(
-                    context, 'Conto "$nome" creato con successo! 🎉'
-                  );
-                } catch (e) {
-                  AppNotifications.mostraInAlto(
-                    context, 
-                    'Errore creazione conto: $e', 
-                    type: NotificationType.error
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2DD4BF),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Crea Conto', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
         ),
       ),
     );
   }
 
+  // 5. 🔄 POP-UP GIROCONTO TRA CONTI
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
 
@@ -495,18 +426,74 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1C1C21),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Giroconto Tra Conti', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            content: SingleChildScrollView(
+          return AppSecondaryPopup(
+            icon: Icons.sync_alt_rounded,
+            iconColor: const Color(0xFF2DD4BF),
+            titolo: 'Giroconto Tra Conti',
+            testoConferma: 'Esegui Giroconto',
+            onConferma: () {
+              final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+              
+              if (importo <= 0) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Inserisci un importo valido maggiore di 0 €',
+                  type: NotificationType.warning,
+                );
+                return;
+              }
+
+              if (daConto == aConto) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Seleziona due conti differenti per il trasferimento',
+                  type: NotificationType.warning,
+                );
+                return;
+              }
+
+              final accDa = accounts.firstWhere((a) => a.title == daConto);
+              final accA = accounts.firstWhere((a) => a.title == aConto);
+
+              // 🛡️ CONTROLLO SALDO INSUFFICIENTE ESPLICITO
+              if (accDa.amount < importo) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${accDa.amount.toStringAsFixed(2)} €)',
+                  type: NotificationType.error,
+                );
+                return; // 👈 BLOCCA L'ESECUZIONE E NON CHIUDE IL POP-UP
+              }
+
+              try {
+                final provider = context.read<WalletProvider>();
+                provider.eseguiGiroconto(
+                  daAccountId: accDa.id,
+                  aAccountId: accA.id,
+                  importo: importo,
+                  isAccantonamentoTasse: false,
+                );
+
+                Navigator.pop(context);
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo! 🎉',
+                );
+              } catch (e) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Errore durante il giroconto: $e',
+                  type: NotificationType.error,
+                );
+              }
+            },
+            child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('DA CONTO (ADDEBITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-
                   _buildDialogInlineSelector(
                     selectedValue: daConto,
                     isExpanded: isDaContoEspanso,
@@ -522,11 +509,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 12),
                   const Text('A CONTO (ACCREDITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-
                   _buildDialogInlineSelector(
                     selectedValue: aConto,
                     isExpanded: isAContoEspanso,
@@ -542,7 +527,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 12),
                   TextField(
                     controller: importoController,
@@ -560,41 +544,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
-                  if (daConto != aConto && importo > 0) {
-                    final provider = context.read<WalletProvider>();
-                    
-                    final accDa = accounts.firstWhere((a) => a.title == daConto);
-                    final accA = accounts.firstWhere((a) => a.title == aConto);
-
-                    provider.eseguiGiroconto(
-                      daAccountId: accDa.id,
-                      aAccountId: accA.id,
-                      importo: importo,
-                      isAccantonamentoTasse: false,
-                    );
-
-                    Navigator.pop(context);
-                    AppNotifications.mostraInAlto(
-                      context, 'Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo! 🎉'
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DD4BF),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Esegui Giroconto', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
           );
         },
       ),
