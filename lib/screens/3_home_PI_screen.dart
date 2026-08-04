@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     return '$intero,${parti[1]} €';
   }
-  // ⏳ CALCOLATORE GIORNI TRASCORSI DALL'EMISSIONE
+
   int _calcolaGiorniTrascorsi(String? dataStr) {
     if (dataStr == null || dataStr.isEmpty) return 0;
     DateTime? parsedDate = DateTime.tryParse(dataStr);
@@ -158,7 +158,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 🛡️ DIALOG ACCANTONAMENTO CON MATEMATICA CORRETTA UNIFICATA
+  // 👈 MODIFICA 1 UNIFICATA: Helper per Dettaglio Fatture tramite AppPopupWrapper
+  void _mostraDialogDettaglioFatture(List<Map<String, dynamic>> fattureIncassate) {
+    AppPopupWrapper.mostra(
+      context: context,
+      child: DettaglioFattureSheet(
+        fattureIncassate: fattureIncassate,
+        coefficienteRedditivita: _coefficienteRedditivita,
+        aliquotaImposta: _aliquotaImposta,
+        aliquotaInps: _aliquotaInps,
+      ),
+    );
+  }
+
   void _mostraDialogAccantonamentoTasse(BuildContext context) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
@@ -172,18 +184,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 1. Soldi già messi al sicuro nel Salvadanaio
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
-    // 2. Tasse ancora in sospeso sul Conto Principale da spostare
     final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-
-    // 3. Totale Tasse Dovute = Già in Salvadanaio + Ancora da accantonare
     final double tasseTotaliCalcolate = riservaGiaAccantonata + tasseDaAccantonare;
-
-    // 4. L'importo mancante reale da precompilare nel campo di testo
     final double importoMancanteReale = tasseDaAccantonare > 0.01 ? tasseDaAccantonare : 0.0;
 
     final TextEditingController importoController = TextEditingController(
@@ -400,8 +406,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double topPadding = MediaQuery.of(context).padding.top; // 👈 Spazio hardware per orologio e notch
-    final double headerHeight = 220 + topPadding; // 👈 Altezza fluida edge-to-edge
+    final double topPadding = MediaQuery.of(context).padding.top;
+    final double headerHeight = 220 + topPadding;
 
     final walletProvider = context.watch<WalletProvider>();
 
@@ -410,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final fattureDaIncassare = walletProvider.fattureDaIncassare;
     final fattureIncassate = walletProvider.fattureIncassate;
-    // 🤖 Avvia la scansione in background delle fatture >15 giorni
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationsProvider>().verificaFattureInRitardo(fattureDaIncassare);
     });
@@ -445,11 +451,9 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER P.IVA IMMERSIVO & NATIVO (Stile iOS/Android)
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. Immagine di sfondo Edge-to-Edge
                 Container(
                   height: headerHeight,
                   decoration: const BoxDecoration(
@@ -462,7 +466,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                // 2. Gradiente sfumato
                 Container(
                   height: headerHeight,
                   decoration: BoxDecoration(
@@ -477,8 +480,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
-                // 3. 🎯 TITOLO DI PAGINA IN ALTO A SINISTRA (Stile H1 Nativo)
                 Positioned(
                   top: topPadding + 12,
                   left: 20,
@@ -492,8 +493,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
-                // 4. Pulsante ATECO in alto a destra
                 Positioned(
                   top: topPadding + 10,
                   right: 16,
@@ -516,26 +515,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
-                // 5. CONTENUTO CENTRATO: FATTURATO LORDO IN EVIDENZA + TASSE DOVUTE SOTTO
                 Padding(
                   padding: EdgeInsets.only(top: topPadding + 18),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 📊 1. FATTURATO LORDO (Centrato in grande - 44pt)
+                      // 📊 1. FATTURATO LORDO (Aggiornato con _mostraDialogDettaglioFatture)
                       InkWell(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => DettaglioFattureSheet(
-                              fattureIncassate: fattureIncassate,
-                              coefficienteRedditivita: _coefficienteRedditivita,
-                              aliquotaImposta: _aliquotaImposta,
-                              aliquotaInps: _aliquotaInps,
-                            ),
-                          );
-                        },
+                        onTap: () => _mostraDialogDettaglioFatture(fattureIncassate),
                         onLongPress: () {
                           AppPopupWrapper.mostraInfo(
                             context: context,
@@ -575,10 +562,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // 🛡️ 2. TASSE DOVUTE (Sotto il Fatturato, Font contenuto - 15pt in Badge)
                       InkWell(
                         onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                         onLongPress: () {
@@ -630,17 +614,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-
-            // CONTENUTO SCROLLABILE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
                   const SizedBox(height: 12),
-
-                  // 🛡️ SERBATOIO RISERVA TASSE (Tap disattivato in Home | LongPress per info attivo)
                   GestureDetector(
-                    // onTap: () => _mostraDialogAccantonamentoTasse(context), // 👈 DISATTIVATO TEMPORANEAMENTE
                     onLongPress: () {
                       AppPopupWrapper.mostraInfo(
                         context: context,
@@ -655,11 +634,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       cardColor: Color(0xFF141417),
                     ),
                   ),
-
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // 1. NUOVA FATTURA (+ Registra)
                       Expanded(
                         child: _buildMiniCard(
                           icon: Icons.add_circle_outline_rounded,
@@ -669,8 +646,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
-                      // 2. DA INCASSARE
                       Expanded(
                         child: Builder(
                           builder: (context) {
@@ -703,29 +678,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
-                      // 3. DETTAGLIO FATTURE
+                      // 3. DETTAGLIO FATTURE (Aggiornato con _mostraDialogDettaglioFatture)
                       Expanded(
                         child: _buildMiniCard(
                           icon: Icons.analytics_outlined,
                           title: 'Dettaglio\nfatture',
                           value: '${fattureIncassate.length} incassate',
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => DettaglioFattureSheet(
-                                fattureIncassate: fattureIncassate,
-                                coefficienteRedditivita: _coefficienteRedditivita,
-                                aliquotaImposta: _aliquotaImposta,
-                                aliquotaInps: _aliquotaInps,
-                              ),
-                            );
-                          },
+                          onTap: () => _mostraDialogDettaglioFatture(fattureIncassate),
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 120),
                 ],
               ),
@@ -747,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 86, // 👈 ALTEZZA FISSA DEFINITIVA ANTI-OVERFLOW
+        height: 86,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFF141417).withOpacity(0.92),
