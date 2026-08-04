@@ -353,39 +353,36 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 🛡️ 1. SERBATOIO RISERVA TASSE (Identico alla Home PI con Grafico Circolare + Tap Attivo)
+                  // 🛡️ 1. SERBATOIO RISERVA TASSE (Allineato a 12px esatti come in Home P.IVA)
                   if (mostraPiva) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: GestureDetector(
-                        onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
-                        onLongPress: () {
-                          AppPopupWrapper.mostraInfo(
-                            context: context,
-                            icon: Icons.shield_rounded,
-                            color: const Color(0xFF3B82F6),
-                            titolo: 'Serbatoio Riserva Tasse',
-                            descrizione: 'Mostra lo stato di copertura delle tue tasse stimate. Fai un tap per accantonare subito le tasse scoperte nel Salvadanaio.',
-                            formula: 'In Salvadanaio ÷ Dovuto ATECO',
-                          );
-                        },
-                        child: SerbatoioTasseWidget(
-                          cardColor: coloreCard,
-                        ),
+                    GestureDetector(
+                      onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
+                      onLongPress: () {
+                        AppPopupWrapper.mostraInfo(
+                          context: context,
+                          icon: Icons.shield_rounded,
+                          color: const Color(0xFF3B82F6),
+                          titolo: 'Serbatoio Riserva Tasse',
+                          descrizione: 'Mostra lo stato di copertura delle tue tasse stimate. Fai un tap per accantonare subito le tasse scoperte nel Salvadanaio.',
+                          formula: 'In Salvadanaio ÷ Dovuto ATECO',
+                        );
+                      },
+                      child: SerbatoioTasseWidget(
+                        cardColor: coloreCard,
                       ),
                     ),
                   ],
 
-                  // 2. 3 QUADRANTI AZIONE
+                  // 2. 3 QUADRANTI AZIONE (Allineati a 86px esattamente come Home P.IVA)
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
-                        child: _buildActionSquareCard(
+                        child: _buildMiniCard(
                           icon: Icons.add_circle_outline_rounded,
                           title: 'Movimenti',
                           value: 'Entrata / Uscita',
                           onTap: () {
-                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
                             AppPopupWrapper.mostra(
                               context: context,
                               child: const AddMovementSheet(initialTab: 'riepilogo'),
@@ -393,14 +390,13 @@ class _WalletScreenState extends State<WalletScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: _buildActionSquareCard(
+                        child: _buildMiniCard(
                           icon: Icons.account_balance_wallet_outlined,
                           title: 'Gestione\nConti',
                           value: '3 Attivi',
                           onTap: () {
-                            // 🎯 PRIMA ERA: showModalBottomSheet(...)
                             AppPopupWrapper.mostra(
                               context: context,
                               child: ManageAccountsSheet(isPiva: widget.isPiva),
@@ -408,16 +404,16 @@ class _WalletScreenState extends State<WalletScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: _buildActionSquareCard(
+                        child: _buildMiniCard(
                           icon: Icons.pie_chart_outline_rounded,
                           title: 'Pilotaggio\nBudget',
                           value: 'Pianificazione',
                           onTap: () {
                             AppPopupWrapper.mostra(
                               context: context,
-                              child: const PianoSpesaSheet(), // 👈 V2 Attivata!
+                              child: const PianoSpesaSheet(),
                             );
                           },
                         ),
@@ -563,42 +559,60 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildActionSquareCard({
+  Widget _buildMiniCard({
     required IconData icon,
     required String title,
     required String value,
     required VoidCallback onTap,
+    Color? iconColor,
+    Color? valueColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        height: 86, // 👈 ALTEZZA FISSA 86px IDENTICA A HOME P.IVA
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: coloreCard.withOpacity(0.92),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: iconColor != null 
+                ? iconColor.withOpacity(0.3) 
+                : Colors.white.withOpacity(0.08),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: Colors.white70, size: 22),
-            const SizedBox(height: 12),
+            Icon(icon, color: iconColor ?? Colors.white70, size: 20),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.15),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    height: 1.15,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: valueColor ?? Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                  ),
                 ),
               ],
             ),

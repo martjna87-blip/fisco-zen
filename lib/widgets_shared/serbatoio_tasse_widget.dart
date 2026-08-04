@@ -435,7 +435,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
         : 0.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cardColor.withOpacity(0.92),
