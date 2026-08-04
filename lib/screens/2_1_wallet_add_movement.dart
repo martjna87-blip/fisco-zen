@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_secondary_popup.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -385,158 +386,135 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
+  // 1. 🗑️ POP-UP CONFERMA ELIMINAZIONE MOVIMENTO
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
-            SizedBox(width: 8),
-            Text('Gestisci Movimento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          isRecurrent 
-            ? 'Questa è una spesa/entrata ricorrente.\nScegli esattamente come vuoi procedere:'
-            : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actionsAlignment: isRecurrent ? MainAxisAlignment.center : MainAxisAlignment.end,
-        actions: isRecurrent
-            ? [
-                Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFEF4444)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          context.read<WalletProvider>().stopRecurrence(id);
-                          Navigator.pop(ctx);
-                          setState(() {});
-
-                          AppNotifications.mostraInAlto(
-                            context, 
-                            'Ricorrenza interrotta! Le spese future sono state cancellate', 
-                            type: NotificationType.warning,
-                          );
-                        },
-                        child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
+      builder: (ctx) => AppSecondaryPopup(
+        icon: Icons.warning_amber_rounded,
+        iconColor: const Color(0xFFEF4444),
+        titolo: 'Gestisci Movimento',
+        testoAnnulla: 'Annulla',
+        testoConferma: isRecurrent ? null : 'Elimina',
+        onConferma: isRecurrent
+            ? null
+            : () {
+                context.read<WalletProvider>().deleteTransaction(id);
+                Navigator.pop(ctx);
+                setState(() {});
+                AppNotifications.mostraInAlto(context, 'Movimento "$desc" eliminato 🎉');
+              },
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isRecurrent
+                    ? 'Questa è una spesa/entrata ricorrente.\nScegli esattamente come vuoi procedere:'
+                    : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              if (isRecurrent) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFEF4444)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          context.read<WalletProvider>().deleteButKeepRecurrence(id);
-                          Navigator.pop(ctx);
-                          setState(() {});
-                          
-                          AppNotifications.mostraInAlto(
-                            context, 'Movimento eliminato solo per questo mese! 🎉'
-                          );
-                        },
-                        child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          context.read<WalletProvider>().deleteTransaction(id);
-                          Navigator.pop(ctx);
-                          setState(() {});
-
-                          AppNotifications.mostraInAlto(
-                            context, 'Movimento "$desc" e futuri eliminati! 🎉'
-                          );
-                        },
-                        child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-                    ),
-                  ],
-                )
-              ]
-            : [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    onPressed: () {
+                      context.read<WalletProvider>().stopRecurrence(id);
+                      Navigator.pop(ctx);
+                      setState(() {});
+                      AppNotifications.mostraInAlto(
+                        context,
+                        'Ricorrenza interrotta! Le spese future sono state cancellate',
+                        type: NotificationType.warning,
+                      );
+                    },
+                    child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11)),
                   ),
-                  onPressed: () {
-                    context.read<WalletProvider>().deleteTransaction(id);
-                    Navigator.pop(ctx);
-                    setState(() {});
-                    
-                    AppNotifications.mostraInAlto(
-                      context, 'Movimento "$desc" eliminato 🎉'
-                    );
-                  },
-                  child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: () {
+                      context.read<WalletProvider>().deleteButKeepRecurrence(id);
+                      Navigator.pop(ctx);
+                      setState(() {});
+                      AppNotifications.mostraInAlto(
+                        context, 'Movimento eliminato solo per questo mese! 🎉',
+                      );
+                    },
+                    child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: () {
+                      context.read<WalletProvider>().deleteTransaction(id);
+                      Navigator.pop(ctx);
+                      setState(() {});
+                      AppNotifications.mostraInAlto(
+                        context, 'Movimento "$desc" e futuri eliminati! 🎉',
+                      );
+                    },
+                    child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
                 ),
               ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
+  // 2. 🔁 POP-UP CONFERMA ELIMINAZIONE MOVIMENTO FUTURO
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.event_repeat_rounded, color: Color(0xFF2DD4BF), size: 22),
-            SizedBox(width: 8),
-            Text('Gestisci Ricorrenza Futura', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          'Stai modificando la previsione per "$desc".\nLo storico dei mesi passati non verrà toccato. Scegli cosa fare:',
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          Column(
+      builder: (ctx) => AppSecondaryPopup(
+        icon: Icons.event_repeat_rounded,
+        iconColor: const Color(0xFF2DD4BF),
+        titolo: 'Gestisci Ricorrenza Futura',
+        testoAnnulla: 'Annulla',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'Stai modificando la previsione per "$desc".\nLo storico dei mesi passati non verrà toccato. Scegli cosa fare:',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF2DD4BF)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onPressed: () {
                     final provider = Provider.of<WalletProvider>(context, listen: false);
-                    
                     try {
                       provider.skipPrediction(parentId, meseRiferimento);
                     } catch (_) {}
@@ -548,12 +526,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     Navigator.pop(ctx);
 
                     AppNotifications.mostraInAlto(
-                      context, 
-                      'Previsione eliminata solo per questo mese', 
+                      context,
+                      'Previsione eliminata solo per questo mese',
                       type: NotificationType.warning,
                     );
                   },
-                  child: const Text('Elimina solo quella di questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: const Text('Elimina solo quella di questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -563,7 +541,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onPressed: () {
                     final provider = Provider.of<WalletProvider>(context, listen: false);
@@ -572,21 +550,17 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     setState(() {});
 
                     AppNotifications.mostraInAlto(
-                      context, 
-                      'Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.', 
+                      context,
+                      'Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.',
                       type: NotificationType.warning,
                     );
                   },
-                  child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -662,17 +636,30 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     });
   }
 
+  // 3. 💳 POP-UP NUOVO CONTO
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeContoController = TextEditingController();
     final TextEditingController saldoInizialeController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C21),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Crea Nuovo Conto', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        content: Column(
+      builder: (context) => AppSecondaryPopup(
+        icon: Icons.account_balance_wallet_rounded,
+        iconColor: const Color(0xFF2DD4BF),
+        titolo: 'Crea Nuovo Conto',
+        testoConferma: 'Crea e Seleziona',
+        onConferma: () {
+          final nome = nomeContoController.text.trim();
+          if (nome.isNotEmpty) {
+            setState(() {
+              _contiDisponibili.add(nome);
+              _contoSelezionato = nome;
+              _isContoEspanso = false;
+            });
+            Navigator.pop(context);
+          }
+        },
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -703,43 +690,20 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final nome = nomeContoController.text.trim();
-              if (nome.isNotEmpty) {
-                setState(() {
-                  _contiDisponibili.add(nome);
-                  _contoSelezionato = nome;
-                  _isContoEspanso = false;
-                });
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2DD4BF),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Crea e Seleziona', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
 
+  // 4. 🎨 POP-UP SELETTORE PITTOGRAMMA
   void _mostraSelettoreIcone() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C21),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Scegli Pittogramma', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        content: SizedBox(
+      builder: (context) => AppSecondaryPopup(
+        icon: Icons.grid_view_rounded,
+        iconColor: const Color(0xFF2DD4BF),
+        titolo: 'Scegli Pittogramma',
+        testoAnnulla: 'Chiudi',
+        child: SizedBox(
           width: 280,
           child: GridView.builder(
             shrinkWrap: true,
@@ -768,53 +732,39 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             },
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Chiudi', style: TextStyle(color: Colors.white54)),
-          ),
-        ],
       ),
     );
   }
 
+  // 5. 🗑️ POP-UP CONFERMA ELIMINAZIONE PREFERITO
   void _confermaEliminazionePreferito(int index, bool isExpense) {
     final lista = isExpense ? _speseFrequenti : _entrateFrequenti;
     final voceDaEliminare = lista[index]['label'];
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C21),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Elimina voce', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        content: Text('Vuoi davvero rimuovere "$voceDaEliminare" dai preferiti?', style: const TextStyle(color: Colors.white70, fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                if (_noteController.text == voceDaEliminare) {
-                  _noteController.clear();
-                }
-                lista.removeAt(index);
-              });
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Elimina', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+      builder: (context) => AppSecondaryPopup(
+        icon: Icons.delete_outline_rounded,
+        iconColor: const Color(0xFFEF4444),
+        titolo: 'Elimina Voce',
+        testoConferma: 'Elimina',
+        onConferma: () {
+          setState(() {
+            if (_noteController.text == voceDaEliminare) {
+              _noteController.clear();
+            }
+            lista.removeAt(index);
+          });
+          Navigator.pop(context);
+        },
+        child: Text(
+          'Vuoi davvero rimuovere "$voceDaEliminare" dai preferiti?',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
       ),
     );
   }
 
+  // 6. ➕ POP-UP NUOVO PREFERITO
   void _mostraDialogNuovoPreferito(bool isExpense) {
     final TextEditingController nameController = TextEditingController();
     IconData iconaNuova = _iconeDisponibili.first;
@@ -825,11 +775,34 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1C1C21),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(isExpense ? 'Crea Uscita Frequente' : 'Crea Entrata Frequente', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            content: SingleChildScrollView(
+          return AppSecondaryPopup(
+            icon: isExpense ? Icons.shopping_bag_outlined : Icons.add_chart_outlined,
+            iconColor: const Color(0xFF2DD4BF),
+            titolo: isExpense ? 'Crea Uscita Frequente' : 'Crea Entrata Frequente',
+            testoConferma: 'Aggiungi',
+            onConferma: () {
+              if (nameController.text.trim().isNotEmpty) {
+                setState(() {
+                  if (isExpense) {
+                    _speseFrequenti.add({
+                      'label': nameController.text.trim(),
+                      'icon': iconaNuova,
+                      'cat': categoriaNuova,
+                      'sottoCat': sottoCatNuova,
+                    });
+                    _selezionaSpesaFrequente(nameController.text.trim(), iconaNuova, categoriaNuova, sottoCatNuova);
+                  } else {
+                    _entrateFrequenti.add({
+                      'label': nameController.text.trim(),
+                      'icon': iconaNuova,
+                    });
+                    _selezionaEntrataFrequente(nameController.text.trim(), iconaNuova);
+                  }
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -845,23 +818,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
+                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: _iconeDisponibili.map((icon) {
                       final isSelected = iconaNuova == icon;
                       return GestureDetector(
                         onTap: () => setDialogState(() => iconaNuova = icon),
                         child: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.05),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 20),
+                          child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 18),
                         ),
                       );
                     }).toList(),
@@ -869,42 +842,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    setState(() {
-                      if (isExpense) {
-                        _speseFrequenti.add({
-                          'label': nameController.text.trim(),
-                          'icon': iconaNuova,
-                          'cat': categoriaNuova,
-                          'sottoCat': sottoCatNuova,
-                        });
-                        _selezionaSpesaFrequente(nameController.text.trim(), iconaNuova, categoriaNuova, sottoCatNuova);
-                      } else {
-                        _entrateFrequenti.add({
-                          'label': nameController.text.trim(),
-                          'icon': iconaNuova,
-                        });
-                        _selezionaEntrataFrequente(nameController.text.trim(), iconaNuova);
-                      }
-                    });
-                    Navigator.pop(context);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DD4BF),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Aggiungi', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
           );
         },
       ),
