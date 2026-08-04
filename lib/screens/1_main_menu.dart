@@ -11,6 +11,8 @@ import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
 import '4_notifications_screen.dart'; // 👈 2. NUOVA SCHERMATA CENTRO NOTIFICHE
+import '../widgets_shared/app_speed_dial_menu.dart'; // 👈 3. NUOVO SPEED DIAL ANIMATO
+import '3_2_PI_registra_fattura.dart'; // 👈 4. FORM REGISTRAZIONE FATTURA RAPIDA
 
 class MainMenu extends StatefulWidget {
   final bool hasPartitaIva;
@@ -139,9 +141,37 @@ class _MainMenuState extends State<MainMenu> {
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        AppPopupWrapper.mostra(
+        // 🚀 APRE IL NUOVO MENU VELOCE SPEED DIAL AD AVVENTAGLIO
+        AppSpeedDialMenu.mostra(
           context: context,
-          child: const AddMovementSheet(initialTab: 'uscita'),
+          onNuovaFattura: () {
+            // 📄 APRE SUBITO IL DIALOG DI REGISTRAZIONE FATTURA P.IVA
+            showDialog(
+              context: context,
+              builder: (ctx) => RegistraFatturaSheet(
+                onFatturaSalvata: (cliente, importo, dataFormattata) {
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Fattura di ${importo.toStringAsFixed(2)} € registrata per $cliente!',
+                  );
+                },
+              ),
+            );
+          },
+          onNuovaEntrata: () {
+            // 💰 APRE I MOVIMENTI SELEZIONANDO LA SCHEDA "ENTRATA"
+            AppPopupWrapper.mostra(
+              context: context,
+              child: const AddMovementSheet(initialTab: 'entrata'),
+            );
+          },
+          onNuovaUscita: () {
+            // 💸 APRE I MOVIMENTI SELEZIONANDO LA SCHEDA "USCITA"
+            AppPopupWrapper.mostra(
+              context: context,
+              child: const AddMovementSheet(initialTab: 'uscita'),
+            );
+          },
         );
       },
       child: Container(
