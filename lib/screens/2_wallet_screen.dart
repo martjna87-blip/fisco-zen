@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -21,7 +20,7 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti | '8_2026' = Agosto 2026, ecc.
+  String _filtroMeseMovimenti = 'ultimi_5';
 
   // 🎨 REGOLATORE COMANDO COLORI
   final Color coloreSfondo = const Color(0xFF1C1917);
@@ -93,7 +92,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
       } else if (cat.contains('20') || cat.contains('risparm') || cat.contains('invest')) {
         spesoRealeRisparmio += tx.amount;
       } else {
-        spesoRealeBisogni += tx.amount; // Bisogni fissi di default
+        spesoRealeBisogni += tx.amount;
       }
     }
 
@@ -118,7 +117,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
     final double targetSvago = entrateRiferimento * 0.30;
     final double targetRisparmio = entrateRiferimento * 0.20;
 
-// 🔍 LOGICA FILTRAGGIO MOVIMENTI
+    // 🔍 LOGICA FILTRAGGIO MOVIMENTI
     final List<dynamic> movimentiFiltrati = (() {
       final lista = List.from(movimenti);
       lista.sort((a, b) => b.date.compareTo(a.date));
@@ -193,7 +192,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                     },
                     icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
                     label: const Text(
-                      'Riepilogo',
+                      'RIEPILOGO',
                       style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                     style: FilledButton.styleFrom(
@@ -391,16 +390,21 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                 children: [
                   const SizedBox(height: 12),
 
-                  if (mostraPiva) ...[
-                    GestureDetector(
-                      onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
-                      child: SerbatoioTasseWidget(
-                        cardColor: coloreCard,
-                      ),
-                    ),
-                  ],
+                  // 1. 📊 SCHEDA BUSSOLA SPESE (Ora posizionata in alto)
+                  _buildRipartizioneSpeseCard(
+                    spesoBisogni: spesoRealeBisogni,
+                    spesoSvago: spesoRealeSvago,
+                    spesoRisparmio: spesoRealeRisparmio,
+                    totaleSpeseReali: totaleSpeseReali,
+                    targetBisogni: targetBisogni,
+                    targetSvago: targetSvago,
+                    targetRisparmio: targetRisparmio,
+                    entrateRiferimento: entrateRiferimento,
+                  ),
 
-                  // 2. 3 QUADRANTI AZIONE
+                  const SizedBox(height: 16),
+
+                  // 2. 3 QUADRANTI AZIONE (Interposti al centro)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -450,21 +454,18 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
 
                   const SizedBox(height: 16),
 
-                  const SizedBox(height: 16),
+                  // 3. SERBATOIO RISERVA TASSE (Sotto i 3 quadranti)
+                  if (mostraPiva) ...[
+                    GestureDetector(
+                      onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
+                      child: SerbatoioTasseWidget(
+                        cardColor: coloreCard,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
-                  // 3. 📊 SCHEDA RIPARTIZIONE SPESE REALI
-                  _buildRipartizioneSpeseCard(
-                    spesoBisogni: spesoRealeBisogni,
-                    spesoSvago: spesoRealeSvago,
-                    spesoRisparmio: spesoRealeRisparmio,
-                    totaleSpeseReali: totaleSpeseReali,
-                    targetBisogni: targetBisogni,
-                    targetSvago: targetSvago,
-                    targetRisparmio: targetRisparmio,
-                    entrateRiferimento: entrateRiferimento,
-                  ),
-
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
 
                   const Text(
                     'CONTI & CARTE',
@@ -493,7 +494,6 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                         'MOVIMENTI',
                         style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
                       ),
-                      // TENDINA COMPATTA GLASSMORPHISM
                       Container(
                         height: 30,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -562,7 +562,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
     );
   }
 
-  // 📊 SCHEDA RIPARTIZIONE SPESE REALI
+  // 📊 SCHEDA BUSSOLA SPESE (UX Flusso di Cassa: Margine Residuo Reale)
   Widget _buildRipartizioneSpeseCard({
     required double spesoBisogni,
     required double spesoSvago,
@@ -577,16 +577,69 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
         ? '${_dataFiltroRipartizione.year}'
         : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}';
 
+    // 🧠 CALCOLO DEL MARGINE RESIDUO REALE (Entrate - Spese di Consumo)
+    final double speseConsumoTotali = spesoBisogni + spesoSvago;
+    final double margineRisparmioReale = (entrateRiferimento - speseConsumoTotali).clamp(0.0, entrateRiferimento);
+
+    final bool sforatoBisogni = spesoBisogni > targetBisogni && targetBisogni > 0;
+    final bool sforatoSvago = spesoSvago > targetSvago && targetSvago > 0;
+    final bool risparmioEroso = margineRisparmioReale < targetRisparmio && entrateRiferimento > 0;
+    final bool haSforamenti = sforatoBisogni || sforatoSvago || risparmioEroso;
+
+    final String testoBadgeHeader = haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio';
+    final Color coloreBadgeHeader = haSforamenti ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+
+    final double margineSvago = targetSvago - spesoSvago;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: coloreCard.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(24),
+        color: coloreCard.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 📌 1. HEADER
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.explore_rounded, color: Color(0xFF2DD4BF), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Bussola Spese (50/30/20)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: coloreBadgeHeader.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  testoBadgeHeader,
+                  style: TextStyle(
+                    color: coloreBadgeHeader,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // 📌 2. SELETTORE PERIODO
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -594,24 +647,24 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                 children: [
                   InkWell(
                     onTap: () => _cambiaPeriodoRipartizione(-1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF), size: 22),
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF), size: 18),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     etichettaPeriodo,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 4),
                   InkWell(
                     onTap: () => _cambiaPeriodoRipartizione(1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF), size: 22),
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF), size: 18),
                     ),
                   ),
                 ],
@@ -620,25 +673,25 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Row(
                   children: [
                     InkWell(
                       onTap: () => setState(() => _isVistaAnnuale = false),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: !_isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Mese',
                           style: TextStyle(
                             color: !_isVistaAnnuale ? Colors.black : Colors.white54,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -646,18 +699,18 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                     ),
                     InkWell(
                       onTap: () => setState(() => _isVistaAnnuale = true),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: _isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Anno',
                           style: TextStyle(
                             color: _isVistaAnnuale ? Colors.black : Colors.white54,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -668,28 +721,31 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 12),
+
+          // 📌 3. BARRA GLOBALE (100% Entrate = Verde + Arancio + Blu Residuo)
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4),
             child: Container(
-              height: 8,
+              height: 6,
               color: Colors.white10,
-              child: totaleSpeseReali > 0
+              child: entrateRiferimento > 0
                   ? Row(
                       children: [
                         if (spesoBisogni > 0)
                           Expanded(
-                            flex: (spesoBisogni / totaleSpeseReali * 1000).toInt(),
+                            flex: (spesoBisogni / entrateRiferimento * 1000).toInt().clamp(1, 1000),
                             child: Container(color: const Color(0xFF2DD4BF)),
                           ),
                         if (spesoSvago > 0)
                           Expanded(
-                            flex: (spesoSvago / totaleSpeseReali * 1000).toInt(),
+                            flex: (spesoSvago / entrateRiferimento * 1000).toInt().clamp(1, 1000),
                             child: Container(color: const Color(0xFFF59E0B)),
                           ),
-                        if (spesoRisparmio > 0)
+                        if (margineRisparmioReale > 0)
                           Expanded(
-                            flex: (spesoRisparmio / totaleSpeseReali * 1000).toInt(),
+                            flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt().clamp(1, 1000),
                             child: Container(color: const Color(0xFF3B82F6)),
                           ),
                       ],
@@ -697,121 +753,63 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                   : const SizedBox.shrink(),
             ),
           ),
+
           const SizedBox(height: 14),
+
+          // 📌 4. LE 3 RIGHE AGGIORNATE
           _buildRigaConfrontoRealeTarget(
             titolo: 'Bisogni Fissi',
             targetPct: 50,
-            spesoReale: spesoBisogni,
-            targetMax: targetBisogni,
+            valoreReale: spesoBisogni,
+            valoreRiferimento: targetBisogni,
             colore: const Color(0xFF2DD4BF),
-            entrateTotali: entrateRiferimento,
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Divider(color: Colors.white10, height: 1),
-          ),
+          const SizedBox(height: 8),
           _buildRigaConfrontoRealeTarget(
-            titolo: 'Svago & Tempo Libero',
+            titolo: 'Spese Variabili & Libero',
             targetPct: 30,
-            spesoReale: spesoSvago,
-            targetMax: targetSvago,
+            valoreReale: spesoSvago,
+            valoreRiferimento: targetSvago,
             colore: const Color(0xFFF59E0B),
-            entrateTotali: entrateRiferimento,
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Divider(color: Colors.white10, height: 1),
-          ),
+          const SizedBox(height: 8),
           _buildRigaConfrontoRealeTarget(
-            titolo: 'Risparmi & Futuro',
+            titolo: 'Margine & Risparmio', // 👈 NUOVA LOGICA: MARGINE RESIDUO
             targetPct: 20,
-            spesoReale: spesoRisparmio,
-            targetMax: targetRisparmio,
+            valoreReale: margineRisparmioReale,
+            valoreRiferimento: targetRisparmio,
             colore: const Color(0xFF3B82F6),
-            entrateTotali: entrateRiferimento,
             isRisparmio: true,
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildRigaConfrontoRealeTarget({
-    required String titolo,
-    required int targetPct,
-    required double spesoReale,
-    required double targetMax,
-    required Color colore,
-    required double entrateTotali,
-    bool isRisparmio = false,
-  }) {
-    final double pctReale = entrateTotali > 0 ? (spesoReale / entrateTotali * 100) : 0.0;
-    final double diff = spesoReale - targetMax;
-    final bool eInSforamento = diff > 0.01 && !isRisparmio;
-
-    Widget badgeStato;
-    if (isRisparmio) {
-      final bool obiettivoRaggiunto = spesoReale >= targetMax && targetMax > 0;
-      badgeStato = _buildMiniBadgePill(
-        obiettivoRaggiunto ? '✓ Target Raggiunto' : 'In Accumulo',
-        obiettivoRaggiunto ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
-      );
-    } else {
-      if (eInSforamento) {
-        badgeStato = _buildMiniBadgePill('⚠️ +${diff.toStringAsFixed(0)} €', const Color(0xFFEF4444));
-      } else {
-        badgeStato = _buildMiniBadgePill('✓ In linea', const Color(0xFF10B981));
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: colore, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      titolo,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '($targetPct%)',
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Peso Reale: ${pctReale.toStringAsFixed(0)}%',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          // 📌 5. SUGGERIMENTO CONVERSAZIONALE
+          const SizedBox(height: 12),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              Text(
-                '${spesoReale.toStringAsFixed(0)} / ${targetMax.toStringAsFixed(0)} €',
-                style: TextStyle(
-                  color: eInSforamento ? const Color(0xFFEF4444) : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              Icon(
+                haSforamenti ? Icons.info_outline_rounded : Icons.lightbulb_outline_rounded,
+                color: haSforamenti ? const Color(0xFFF59E0B) : const Color(0xFF2DD4BF),
+                size: 14,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  risparmioEroso
+                      ? 'Attenzione: le spese stanno riducendo la quota da preservare per il futuro.'
+                      : (haSforamenti
+                          ? 'Consiglio: riduci le spese variabili per rientrare nei parametri.'
+                          : 'Ottimo! Stai preservando oltre il 20% delle entrate per il tuo futuro.'),
+                  style: TextStyle(
+                    color: haSforamenti ? const Color(0xFFF59E0B) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(height: 3),
-              badgeStato,
             ],
           ),
         ],
@@ -819,18 +817,78 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
     );
   }
 
-  Widget _buildMiniBadgePill(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.25)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
-      ),
+  // 📌 RIGA INTELLIGENTE (Gestisce Spese massime vs Margine minimo)
+  Widget _buildRigaConfrontoRealeTarget({
+    required String titolo,
+    required int targetPct,
+    required double valoreReale,
+    required double valoreRiferimento,
+    required Color colore,
+    bool isRisparmio = false,
+  }) {
+    // Per i consumi: allarme se SPESO > TARGET. Per il risparmio: allarme se MARGINE < TARGET MINIMO.
+    final bool inAllarme = isRisparmio
+        ? (valoreReale < valoreRiferimento && valoreRiferimento > 0)
+        : (valoreReale > valoreRiferimento && valoreRiferimento > 0);
+
+    final String etichettaTarget = isRisparmio
+        ? 'min. ${valoreRiferimento.toStringAsFixed(0)} €'
+        : '/ ${valoreRiferimento.toStringAsFixed(0)} €';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: colore, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              titolo,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '($targetPct%)',
+              style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Text(
+              '${valoreReale.toStringAsFixed(0)} €',
+              style: TextStyle(
+                color: inAllarme ? const Color(0xFFEF4444) : Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              etichettaTarget,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              isRisparmio
+                  ? (!inAllarme ? Icons.check_circle_rounded : Icons.warning_amber_rounded)
+                  : (inAllarme ? Icons.error_outline_rounded : Icons.check_circle_rounded),
+              color: isRisparmio
+                  ? (!inAllarme ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+                  : (inAllarme ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
+              size: 13,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -869,7 +927,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                   title,
                   style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 12,
+                    fontSize: 10,
                     height: 1.15,
                   ),
                   maxLines: 2,
@@ -883,7 +941,7 @@ String _filtroMeseMovimenti = 'ultimi_5'; // 👈 'ultimi_5' = Ultimi 5 recenti 
                     value,
                     style: TextStyle(
                       color: valueColor ?? Colors.white,
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,

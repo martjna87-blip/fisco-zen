@@ -410,6 +410,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
 
+    final double mancanteReale = (tasseTotaliCalcolate - riservaAccantonata).clamp(0.0, double.infinity);
+
     final double percentuale = tasseTotaliCalcolate > 0.01
         ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
         : (riservaAccantonata > 0 ? 1.0 : 0.0);
@@ -445,6 +447,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // 📌 1. HEADER (Speculare 1:1 alla Bussola: Icona 18px, Gap 8px, Font 13px, Badge 10px)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -480,18 +483,19 @@ class SerbatoioTasseWidget extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
+          // 📌 2. CERCHIO DI PROGRESSO CALIBRATO PERFETTAMENTE (114x114 px -> Altezza Totale = 227 px)
           Center(
             child: SizedBox(
-              width: 125,
-              height: 125,
+              width: 114,
+              height: 114,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    width: 120,
-                    height: 120,
+                    width: 108,
+                    height: 108,
                     child: CircularProgressIndicator(
                       value: 1.0,
                       strokeWidth: 8,
@@ -500,8 +504,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
                   ),
 
                   SizedBox(
-                    width: 120,
-                    height: 120,
+                    width: 108,
+                    height: 108,
                     child: CircularProgressIndicator(
                       value: percentuale,
                       strokeWidth: 8,
@@ -512,8 +516,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
                   if (avanzamentoBluExtra > 0)
                     SizedBox(
-                      width: 98,
-                      height: 98,
+                      width: 88,
+                      height: 88,
                       child: CircularProgressIndicator(
                         value: avanzamentoBluExtra,
                         strokeWidth: 6,
@@ -529,18 +533,27 @@ class SerbatoioTasseWidget extends StatelessWidget {
                         'IN SALVADANAIO',
                         style: TextStyle(
                           color: Colors.white54,
-                          fontSize: 9,
+                          fontSize: 8.5,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         '${riservaAccantonata.toStringAsFixed(0)} €',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'su ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -550,33 +563,36 @@ class SerbatoioTasseWidget extends StatelessWidget {
             ),
           ),
 
-          if (cuscinettoExtraVal > 0) ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+          // 📌 3. SUGGERIMENTO CONVERSAZIONALE INFERIORE
+          const SizedBox(height: 14),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                mancanteReale > 0 ? Icons.info_outline_rounded : Icons.check_circle_outline_rounded,
+                color: mancanteReale > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                size: 14,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 13),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Cuscinetto di sicurezza extra: +${cuscinettoExtraVal.toStringAsFixed(2)} €',
-                    style: const TextStyle(
-                      color: Color(0xFF3B82F6),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  mancanteReale > 0
+                      ? 'Consiglio: accantona i ${mancanteReale.toStringAsFixed(0)} € mancanti per metterti al sicuro.'
+                      : (cuscinettoExtraVal > 0
+                          ? 'Ottimo! Hai +${cuscinettoExtraVal.toStringAsFixed(0)} € di cuscinetto extra protetto.'
+                          : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta.'),
+                  style: TextStyle(
+                    color: mancanteReale > 0 ? const Color(0xFFF59E0B) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );

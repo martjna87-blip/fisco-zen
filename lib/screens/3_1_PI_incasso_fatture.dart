@@ -128,6 +128,25 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
     return '$giorno/$mese/${date.year}';
   }
 
+  bool _isScadutaDaOltre15Giorni(String? dataStr) {
+    if (dataStr == null || dataStr.isEmpty) return false;
+    try {
+      DateTime? dataFattura;
+      if (dataStr.contains('/')) {
+        final parts = dataStr.split('/');
+        if (parts.length == 3) {
+          dataFattura = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+        }
+      } else if (dataStr.contains('-')) {
+        dataFattura = DateTime.tryParse(dataStr);
+      }
+      if (dataFattura != null) {
+        return DateTime.now().difference(dataFattura).inDays > 15;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final walletProvider = Provider.of<WalletProvider>(context);
@@ -165,6 +184,9 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                   final double lordo = (f['importo'] as num).toDouble();
                   final String nomeCliente = f['cliente'] as String;
 
+                  // 📌 CONTROLLO SCADENZA > 15 GIORNI
+                  final bool isScaduta = _isScadutaDaOltre15Giorni(f['data']?.toString());
+
                   // 📌 1. LEGGIAMO IL COEFFICIENTE ATECO SALVATO NELLA SPECIFICA FATTURA
                   // (Se per qualsiasi motivo non c'è, usa come scorta quello principale)
                   final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
@@ -186,11 +208,17 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
+                      color: isScaduta
+                          ? const Color(0xFFEF4444).withOpacity(0.08)
+                          : Colors.black.withOpacity(0.35),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isEspansa ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
-                        width: 1,
+                        color: isEspansa
+                            ? const Color(0xFF2DD4BF)
+                            : (isScaduta
+                                ? const Color(0xFFEF4444).withOpacity(0.65)
+                                : Colors.white.withOpacity(0.08)),
+                        width: isScaduta && !isEspansa ? 1.2 : 1,
                       ),
                     ),
                     child: Column(
@@ -212,15 +240,51 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        nomeCliente,
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                        overflow: TextOverflow.ellipsis,
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              nomeCliente,
+                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isScaduta) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEF4444).withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFEF4444), width: 0.8),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 11),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    '> 15 gg',
+                                                    style: TextStyle(
+                                                      color: Color(0xFFEF4444),
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: 4),
                                       Text(
                                         '${f['numero'] != null && f['numero'].toString().isNotEmpty ? "#${f['numero']} • " : ""}${f['data'] ?? ''}',
-                                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                        style: TextStyle(
+                                          color: isScaduta ? const Color(0xFFEF4444).withOpacity(0.9) : Colors.white54,
+                                          fontSize: 11,
+                                          fontWeight: isScaduta ? FontWeight.w600 : FontWeight.normal,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -421,6 +485,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                     onPressed: () {
                                       if (_contoSelezionato != null) {
                                         final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
+                                        
+                                        // 1. Eseguiamo l'incasso nel provider
                                         context.read<WalletProvider>().incassaFatturaPiva(
                                           idFattura: id,
                                           cliente: nomeCliente,
@@ -429,6 +495,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           contoDestinazione: _contoSelezionato!,
                                           dataIncasso: dataFormatted,
                                         );
+
+                                        // 2. Chiamiamo la callback esterna se presente
                                         if (widget.onIncasse != null) {
                                           widget.onIncasse!(
                                             id,
@@ -438,7 +506,23 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                             dataFormatted,
                                           );
                                         }
-                                        Navigator.pop(context);
+
+                                        // 3. Ripristiniamo la UI per le prossime fatture
+                                        setState(() {
+                                          _fatturaEspansaId = null;
+                                        });
+
+                                        // 4. Se ne restano altre, mostriamo solo una notifica e restiamo nello sheet.
+                                        // Altrimenti (la lista ora è vuota), chiudiamo la schermata!
+                                        final rimanenti = context.read<WalletProvider>().fattureDaIncassare.length;
+                                        if (rimanenti > 0) {
+                                          AppNotifications.mostraInAlto(
+                                            context,
+                                            'Fattura di "$nomeCliente" incassata con successo! 🎉',
+                                          );
+                                        } else {
+                                          Navigator.pop(context);
+                                        }
                                       }
                                     },
                                     child: const Text(
