@@ -6,6 +6,7 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_secondary_popup.dart';
+import '../widgets_shared/app_datepicker.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -33,6 +34,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _giornoRicorrenzaController = TextEditingController(text: '1');
+
+  // FocusNode per aprire la tastiera automaticamente sull'importo
+  final FocusNode _amountFocusNode = FocusNode();
   
   final ScrollController _scrollControllerSpesa = ScrollController();
   final ScrollController _scrollControllerEntrata = ScrollController();
@@ -116,10 +120,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
 
   final List<Map<String, dynamic>> _entrateFrequenti = [
-    {'label': 'Stipendio', 'icon': Icons.work_outline},
-    {'label': 'Regalo', 'icon': Icons.card_giftcard_outlined},
-    {'label': 'Entrate Extra', 'icon': Icons.add_chart_outlined},
-    {'label': 'Rimborso', 'icon': Icons.replay_outlined},
+    {'label': 'Stipendio', 'icon': Icons.work_outline, 'sottoCat': 'Stipendio'},
+    {'label': 'Regalo', 'icon': Icons.card_giftcard_outlined, 'sottoCat': 'Regalo'},
+    {'label': 'Entrate Extra', 'icon': Icons.add_chart_outlined, 'sottoCat': 'Entrate Extra / Freelance'},
+    {'label': 'Rimborso', 'icon': Icons.replay_outlined, 'sottoCat': 'Rimborso'},
   ];
 
   final List<IconData> _iconeDisponibili = [
@@ -155,6 +159,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     _pageController = PageController(initialPage: initialPage);
 
     _noteController.addListener(_suggerisciCategoriaAuto);
+
+    // Gestione autofocus tastiera
+    if (initialPage != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _amountFocusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -163,6 +174,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     _amountController.dispose();
     _noteController.dispose();
     _giornoRicorrenzaController.dispose();
+    _amountFocusNode.dispose();
     _scrollControllerSpesa.dispose();
     _scrollControllerEntrata.dispose();
     _pageController.dispose();
@@ -170,12 +182,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   String _formatValuta(double importo) {
-    final parts = importo.abs().toStringAsFixed(2).split('.');
-    final intPart = parts[0].replaceAllMapped(
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     );
-    return '$intPart,${parts[1]} €';
+    return '$intPart,${parti[1]} €';
   }
 
   void _suggerisciCategoriaAuto() {
@@ -329,7 +341,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   void _salvaMovimento() {
-    final importo = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
+    final importo = double.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
       AppNotifications.mostraInAlto(
         context, 
@@ -375,18 +387,19 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       giornoRicorrenza: giornoRicorrenzaFinale,
     );
 
+    // Reset sicuro dei campi e mantenimento della tab attiva pronto per un nuovo inserimento
     setState(() {
       _amountController.clear();
       _noteController.clear();
-      _meseSelezionatoRiepilogo = DateTime(_dataSelezionata.year, _dataSelezionata.month);
-      _tipoMovimento = 'riepilogo'; 
-      _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      _dataSelezionata = DateTime.now();
+      _isRicorrente = false;
     });
+
+    _amountFocusNode.requestFocus();
 
     AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
-  // 1. 🗑️ POP-UP CONFERMA ELIMINAZIONE MOVIMENTO
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
@@ -486,7 +499,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 2. 🔁 POP-UP CONFERMA ELIMINAZIONE MOVIMENTO FUTURO
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
@@ -566,33 +578,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   Future<void> _selezionaData(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _dataSelezionata,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      locale: const Locale('it', 'IT'),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            visualDensity: VisualDensity.compact,
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF2DD4BF),
-              onPrimary: Colors.black,
-              surface: Color(0xFF1F1F23),
-              onSurface: Colors.white,
-            ),
-            dialogBackgroundColor: const Color(0xFF141417),
-          ),
-          child: Container(
-            alignment: Alignment.center,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 490),
-              child: child!,
-            ),
-          ),
-        );
-      },
+    final DateTime? picked = await AppDatePicker.selezionaData(
+      context,
+      dataIniziale: _dataSelezionata,
     );
     if (picked != null && picked != _dataSelezionata) {
       setState(() {
@@ -617,26 +605,151 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     return '${mesiBrevi[date.month - 1]} ${date.year}';
   }
 
-  void _selezionaSpesaFrequente(String label, IconData icon, String cat, String sottoCat) {
+  bool _isPreferitoSelezionato = false;
+
+  void _selezionaSpesaFrequente(Map<String, dynamic> item) {
     setState(() {
-      _noteController.text = label;
-      _iconaCorrente = icon;
-      _categoriaSelezionata = cat;
-      _sottocategoriaSelezionata = sottoCat;
+      _noteController.text = item['label'];
+      _iconaCorrente = item['icon'] as IconData;
+      _categoriaSelezionata = item['cat'] ?? '50% Spese Fisse';
+      _sottocategoriaSelezionata = item['sottoCat'] ?? 'Alimentari';
+      _isPreferitoSelezionato = true; // 🔒 Blocca le tendine
     });
   }
 
-  void _selezionaEntrataFrequente(String label, IconData icon) {
+  void _selezionaEntrataFrequente(Map<String, dynamic> item) {
     setState(() {
-      _noteController.text = label;
-      _iconaCorrente = icon;
-      if (_sottocategorieEntrata.contains(label)) {
-        _sottocategoriaEntrataSelezionata = label;
-      }
+      _noteController.text = item['label'];
+      _iconaCorrente = item['icon'] as IconData;
+      _sottocategoriaEntrataSelezionata = item['sottoCat'] ?? 'Stipendio';
+      _isPreferitoSelezionato = true; // 🔒 Blocca le tendine
     });
   }
 
-  // 3. 💳 POP-UP NUOVO CONTO
+  void _mostraGestionePreferitoModal(int index, bool isExpense) {
+    final list = isExpense ? _speseFrequenti : _entrateFrequenti;
+    final item = list[index];
+
+    final TextEditingController nameController = TextEditingController(text: item['label']);
+    IconData iconaTemp = item['icon'] as IconData;
+    String catTemp = item['cat'] ?? '50% Spese Fisse';
+    String sottoCatTemp = item['sottoCat'] ?? (isExpense ? 'Alimentari' : 'Stipendio');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AppSecondaryPopup(
+            icon: Icons.edit_note_rounded,
+            iconColor: const Color(0xFF2DD4BF),
+            titolo: 'Gestisci Preferito',
+            testoAnnulla: 'Elimina',
+            testoConferma: 'Salva Modifiche',
+            onConferma: () {
+              if (nameController.text.trim().isNotEmpty) {
+                setState(() {
+                  list[index] = {
+                    'label': nameController.text.trim(),
+                    'icon': iconaTemp,
+                    'cat': catTemp,
+                    'sottoCat': sottoCatTemp,
+                  };
+                  if (isExpense) {
+                    _selezionaSpesaFrequente(list[index]);
+                  } else {
+                    _selezionaEntrataFrequente(list[index]);
+                  }
+                });
+                Navigator.pop(ctx);
+                AppNotifications.mostraInAlto(context, 'Preferito aggiornato! ✨');
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Nome Preferito',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  if (isExpense) ...[
+                    const Text('REGOLA BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      value: catTemp,
+                      dropdownColor: const Color(0xFF18181B),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => catTemp = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  Text(isExpense ? 'CATEGORIA SPECIFICA' : 'TIPOLOGIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: sottoCatTemp,
+                    dropdownColor: const Color(0xFF18181B),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => sottoCatTemp = v);
+                    },
+                  ),
+
+                  const SizedBox(height: 14),
+                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _iconeDisponibili.map((icon) {
+                      final isSelected = iconaTemp == icon;
+                      return GestureDetector(
+                        onTap: () => setDialogState(() => iconaTemp = icon),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 18),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeContoController = TextEditingController();
     final TextEditingController saldoInizialeController = TextEditingController();
@@ -694,7 +807,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 4. 🎨 POP-UP SELETTORE PITTOGRAMMA
   void _mostraSelettoreIcone() {
     showDialog(
       context: context,
@@ -736,40 +848,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 5. 🗑️ POP-UP CONFERMA ELIMINAZIONE PREFERITO
-  void _confermaEliminazionePreferito(int index, bool isExpense) {
-    final lista = isExpense ? _speseFrequenti : _entrateFrequenti;
-    final voceDaEliminare = lista[index]['label'];
-    showDialog(
-      context: context,
-      builder: (context) => AppSecondaryPopup(
-        icon: Icons.delete_outline_rounded,
-        iconColor: const Color(0xFFEF4444),
-        titolo: 'Elimina Voce',
-        testoConferma: 'Elimina',
-        onConferma: () {
-          setState(() {
-            if (_noteController.text == voceDaEliminare) {
-              _noteController.clear();
-            }
-            lista.removeAt(index);
-          });
-          Navigator.pop(context);
-        },
-        child: Text(
-          'Vuoi davvero rimuovere "$voceDaEliminare" dai preferiti?',
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-      ),
-    );
-  }
-
-  // 6. ➕ POP-UP NUOVO PREFERITO
   void _mostraDialogNuovoPreferito(bool isExpense) {
     final TextEditingController nameController = TextEditingController();
     IconData iconaNuova = _iconeDisponibili.first;
     String categoriaNuova = '50% Spese Fisse';
-    String sottoCatNuova = 'Acquisti';
+    String sottoCatNuova = isExpense ? 'Acquisti' : 'Stipendio';
 
     showDialog(
       context: context,
@@ -784,19 +867,22 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               if (nameController.text.trim().isNotEmpty) {
                 setState(() {
                   if (isExpense) {
-                    _speseFrequenti.add({
+                    final itemNew = {
                       'label': nameController.text.trim(),
                       'icon': iconaNuova,
                       'cat': categoriaNuova,
                       'sottoCat': sottoCatNuova,
-                    });
-                    _selezionaSpesaFrequente(nameController.text.trim(), iconaNuova, categoriaNuova, sottoCatNuova);
+                    };
+                    _speseFrequenti.add(itemNew);
+                    _selezionaSpesaFrequente(itemNew);
                   } else {
-                    _entrateFrequenti.add({
+                    final itemNew = {
                       'label': nameController.text.trim(),
                       'icon': iconaNuova,
-                    });
-                    _selezionaEntrataFrequente(nameController.text.trim(), iconaNuova);
+                      'sottoCat': sottoCatNuova,
+                    };
+                    _entrateFrequenti.add(itemNew);
+                    _selezionaEntrataFrequente(itemNew);
                   }
                 });
                 Navigator.pop(context);
@@ -818,6 +904,45 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  if (isExpense) ...[
+                    const Text('REGOLA BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      value: categoriaNuova,
+                      dropdownColor: const Color(0xFF18181B),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => categoriaNuova = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  Text(isExpense ? 'CATEGORIA SPECIFICA' : 'TIPOLOGIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: sottoCatNuova,
+                    dropdownColor: const Color(0xFF18181B),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => sottoCatNuova = v);
+                    },
+                  ),
+
                   const SizedBox(height: 14),
                   const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
@@ -928,6 +1053,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   else if (index == 1) _tipoMovimento = 'uscita';
                   else if (index == 2) _tipoMovimento = 'entrata';
                 });
+
+                if (index != 0) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _amountFocusNode.requestFocus();
+                  });
+                }
               },
               children: [
                 _buildSchermataRiepilogo(),
@@ -948,15 +1079,34 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         .where((tx) => !tx.title.startsWith('Accantonamento Tasse') && !tx.id.startsWith('rule_'))
         .map((tx) {
       final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
+      
+      final bool isGiroconto = tx.category == 'Giroconto' || 
+                               tx.category == 'Trasferimento' || 
+                               tx.title.toLowerCase().contains('giroconto') ||
+                               tx.title.toLowerCase().contains('salvadanaio');
+
+      // 🧠 MAPPATURA AUTOMATICA PER LA BUSSOLA SPESE (50/30/20)
+      String regolaBussola = '50% Spese Fisse';
+      final catLower = tx.category.toLowerCase();
+      if (catLower.contains('30') || catLower.contains('svag') || catLower.contains('divertiment') || catLower.contains('variabil')) {
+        regolaBussola = '30% Spese Variabili';
+      } else if (catLower.contains('20') || catLower.contains('risparm') || catLower.contains('invest')) {
+        regolaBussola = '20% Risparmio';
+      } else if (tx.isIncome) {
+        regolaBussola = 'Entrate';
+      }
+
       return {
         'id': tx.id,
         'parentId': tx.id,
         'desc': tx.title,
         'imp': tx.amount,
         'cat': tx.category,
+        'bussola': regolaBussola,
         'data': tx.date,
         'isSpesa': !tx.isIncome,
         'isFattura': isFatturaPiva, 
+        'isGiroconto': isGiroconto,
         'isRecurrent': tx.isRecurrent,
         'isPrevisto': false,
       };
@@ -975,15 +1125,28 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           parentId = parts.first;
         }
       }
+
+      String regolaBussola = '50% Spese Fisse';
+      final catLower = tx.category.toLowerCase();
+      if (catLower.contains('30') || catLower.contains('svag') || catLower.contains('divertiment') || catLower.contains('variabil')) {
+        regolaBussola = '30% Spese Variabili';
+      } else if (catLower.contains('20') || catLower.contains('risparm') || catLower.contains('invest')) {
+        regolaBussola = '20% Risparmio';
+      } else if (tx.isIncome) {
+        regolaBussola = 'Entrate';
+      }
+
       return {
         'id': tx.id,
         'parentId': parentId,
         'desc': tx.title,
         'imp': tx.amount,
         'cat': tx.category,
+        'bussola': regolaBussola,
         'data': tx.date,
         'isSpesa': !tx.isIncome,
         'isFattura': false,
+        'isGiroconto': false,
         'isRecurrent': true,
         'isPrevisto': true,
       };
@@ -996,20 +1159,29 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       return dt.year == _meseSelezionatoRiepilogo.year && dt.month == _meseSelezionatoRiepilogo.month;
     }).toList();
 
-    final double totaleSpese = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false)
-        .fold(0.0, (sum, m) => sum + (m['imp'] as double));
-
     final double totaleEntrate = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == false && m['isPrevisto'] == false)
+        .where((m) => m['isSpesa'] == false && m['isPrevisto'] == false && m['isGiroconto'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
+    final double totaleSpese = movimentiMeseSelezionato
+        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false && m['isGiroconto'] == false)
+        .fold(0.0, (sum, m) => sum + (m['imp'] as double));
+
+    // 1. RAGGRUPPAMENTO PER CATEGORIA SPECIFICA
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
     for (var m in movimentiMeseSelezionato) {
       final cat = m['cat'] as String;
       perCategoria.putIfAbsent(cat, () => []).add(m);
     }
 
+    // 2. RAGGRUPPAMENTO PER BUSSOLA SPESE
+    final Map<String, List<Map<String, dynamic>>> perBussola = {};
+    for (var m in movimentiMeseSelezionato) {
+      final bussola = m['bussola'] as String;
+      perBussola.putIfAbsent(bussola, () => []).add(m);
+    }
+
+    // 3. RAGGRUPPAMENTO PER DATA
     final List<Map<String, dynamic>> movimentiOrdinatiData = List.from(movimentiMeseSelezionato);
     movimentiOrdinatiData.sort((a, b) => (b['data'] as DateTime).compareTo(a['data'] as DateTime));
 
@@ -1019,6 +1191,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       final dataStr = _formattaDataInItaliano(dt);
       perData.putIfAbsent(dataStr, () => []).add(m);
     }
+
+    // Selezione Mappa Attiva in base alla Tab scelta
+    final Map<String, List<Map<String, dynamic>>> mappaCorrente = _vistaRiepilogo == 'categoria'
+        ? perCategoria
+        : (_vistaRiepilogo == 'bussola' ? perBussola : perData);
 
     return Column(
       children: [
@@ -1094,6 +1271,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ),
               ),
               const SizedBox(height: 12),
+
+              // 📌 TAB SELETTORE A 3 OPZIONI: CATEGORIA | BUSSOLA | DATA
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -1117,10 +1296,35 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           ),
                           child: Center(
                             child: Text(
-                              'Per Categoria',
+                              'Categoria',
                               style: TextStyle(
                                 color: _vistaRiepilogo == 'categoria' ? Colors.black : Colors.white70,
-                                fontSize: 11,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _vistaRiepilogo = 'bussola';
+                          _categoriaEspansaIndex = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _vistaRiepilogo == 'bussola' ? const Color(0xFF2DD4BF) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Bussola',
+                              style: TextStyle(
+                                color: _vistaRiepilogo == 'bussola' ? Colors.black : Colors.white70,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1142,10 +1346,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           ),
                           child: Center(
                             child: Text(
-                              'Per Data',
+                              'Data',
                               style: TextStyle(
                                 color: _vistaRiepilogo == 'data' ? Colors.black : Colors.white70,
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1165,291 +1369,160 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ? const Center(
                   child: Text('Nessun movimento in questo mese.', style: TextStyle(color: Colors.white38, fontSize: 12)),
                 )
-              : _vistaRiepilogo == 'categoria'
-                  ? ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: perCategoria.keys.length,
-                      itemBuilder: (context, index) {
-                        final catName = perCategoria.keys.elementAt(index);
-                        final listaMovs = perCategoria[catName]!;
-                        final double totCat = listaMovs.fold(0.0, (sum, m) {
-                          final imp = m['imp'] as double;
-                          final isSpesa = m['isSpesa'] as bool;
-                          final isPrevisto = m['isPrevisto'] as bool;
-                          if (isPrevisto) return sum;
-                          return sum + (isSpesa ? -imp : imp);
-                        });
-                        final bool isEspansa = _categoriaEspansaIndex == index;
+              : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: mappaCorrente.keys.length,
+                  itemBuilder: (context, index) {
+                    final nomeGruppo = mappaCorrente.keys.elementAt(index);
+                    final listaMovs = mappaCorrente[nomeGruppo]!;
+                    final bool isCategoriaGiroconto = nomeGruppo.toLowerCase().contains('giroconto') || nomeGruppo.toLowerCase().contains('trasferimento');
 
-                        return Container(
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
-                          ),
-                          child: Column(
-                            children: [
-                              InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _categoriaEspansaIndex = isEspansa ? null : index;
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        isEspansa ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
-                                        color: const Color(0xFF2DD4BF),
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          catName,
-                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                      Text(
-                                        '${totCat >= 0 ? '+' : '-'}${_formatValuta(totCat)}',
-                                        style: TextStyle(
-                                          color: totCat >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
+                    final double totGruppo = listaMovs.fold(0.0, (sum, m) {
+                      final imp = m['imp'] as double;
+                      final isSpesa = m['isSpesa'] as bool;
+                      final isPrevisto = m['isPrevisto'] as bool;
+                      final isGiroconto = m['isGiroconto'] as bool? ?? false;
+                      if (isPrevisto || isGiroconto) return sum;
+                      return sum + (isSpesa ? -imp : imp);
+                    });
+                    final bool isEspansa = _categoriaEspansaIndex == index;
+
+                    return Container(
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
+                      ),
+                      child: Column(
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _categoriaEspansaIndex = isEspansa ? null : index;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isEspansa ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
+                                    color: const Color(0xFF2DD4BF),
+                                    size: 18,
                                   ),
-                                ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      nomeGruppo,
+                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  Text(
+                                    isCategoriaGiroconto
+                                        ? '⇄ ${_formatValuta(totGruppo)}'
+                                        : '${totGruppo >= 0 ? '+' : '-'}${_formatValuta(totGruppo)}',
+                                    style: TextStyle(
+                                      color: isCategoriaGiroconto 
+                                          ? const Color(0xFF3B82F6)
+                                          : (totGruppo >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              if (isEspansa)
-                                Container(
-                                  color: Colors.black.withOpacity(0.2),
-                                  padding: const EdgeInsets.only(left: 36, right: 10, bottom: 8, top: 4),
-                                  child: Column(
-                                    children: listaMovs.map((m) {
-                                      final dt = m['data'] as DateTime;
-                                      final isSpesa = m['isSpesa'] as bool;
-                                      final imp = m['imp'] as double;
-                                      final bool isFattura = m['isFattura'] as bool;
-                                      final String id = m['id'] as String;
-                                      final String parentId = m['parentId'] as String;
-                                      final String desc = m['desc'] as String;
-                                      final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
-                                      final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
+                            ),
+                          ),
+                          if (isEspansa)
+                            Container(
+                              color: Colors.black.withOpacity(0.2),
+                              padding: const EdgeInsets.only(left: 36, right: 10, bottom: 8, top: 4),
+                              child: Column(
+                                children: listaMovs.map((m) {
+                                  final dt = m['data'] as DateTime;
+                                  final isSpesa = m['isSpesa'] as bool;
+                                  final imp = m['imp'] as double;
+                                  final bool isFattura = m['isFattura'] as bool;
+                                  final bool isGiroconto = m['isGiroconto'] as bool? ?? false;
+                                  final String id = m['id'] as String;
+                                  final String parentId = m['parentId'] as String;
+                                  final String desc = m['desc'] as String;
+                                  final String catSpecifica = m['cat'] as String;
+                                  final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
+                                  final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Expanded(
-                                              child: Row(
-                                                children: [
-                                                  if (isRecurrent) ...[
-                                                    Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
-                                                    const SizedBox(width: 4),
-                                                  ],
-                                                  Expanded(
-                                                    child: Text(
-                                                      isPrevisto 
-                                                        ? (desc.contains('entrate') || desc.contains('uscite') ? '$desc - Previsto' : '$desc (Previsto il ${dt.day}/${dt.month})') 
-                                                        : '$desc (${dt.day}/${dt.month})',
-                                                      style: TextStyle(
-                                                        color: isPrevisto ? Colors.white38 : Colors.white60, 
-                                                        fontSize: 11, 
-                                                        fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              if (isRecurrent) ...[
+                                                Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
+                                                const SizedBox(width: 4),
+                                              ],
+                                              Expanded(
+                                                child: Text(
+                                                  _vistaRiepilogo == 'bussola'
+                                                    ? '$desc ($catSpecifica)'
+                                                    : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
+                                                  style: TextStyle(
+                                                    color: isPrevisto ? Colors.white38 : Colors.white60, 
+                                                    fontSize: 11, 
+                                                    fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
                                                   ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
-                                              style: TextStyle(
-                                                color: isPrevisto 
-                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
-                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (!isFattura) ...[
-                                              const SizedBox(width: 6),
-                                              InkWell(
-                                                onTap: () {
-                                                  if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
-                                                  } else {
-                                                    _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
-                                                  }
-                                                },
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(4),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
-                                          ],
+                                          ),
                                         ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: perData.keys.length,
-                      itemBuilder: (context, index) {
-                        final dataStr = perData.keys.elementAt(index);
-                        final listaMovs = perData[dataStr]!;
-                        
-                        final double totGiorno = listaMovs.fold(0.0, (sum, m) {
-                          final double imp = m['imp'] as double;
-                          final bool isSpesa = m['isSpesa'] as bool;
-                          final bool isPrevisto = m['isPrevisto'] as bool;
-                          if (isPrevisto) return sum;
-                          return sum + (isSpesa ? -imp : imp);
-                        });
-                        
-                        final bool isEspansa = _categoriaEspansaIndex == index;
-
-                        return Container(
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
-                          ),
-                          child: Column(
-                            children: [
-                              InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _categoriaEspansaIndex = isEspansa ? null : index;
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        isEspansa ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
-                                        color: const Color(0xFF2DD4BF),
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          dataStr,
-                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          isGiroconto 
+                                            ? _formatValuta(imp)
+                                            : '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
+                                          style: TextStyle(
+                                            color: isGiroconto
+                                              ? const Color(0xFF3B82F6)
+                                              : (isPrevisto 
+                                                ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
+                                                : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        '${totGiorno >= 0 ? '+' : '-'}${_formatValuta(totGiorno)}',
-                                        style: TextStyle(
-                                          color: totGiorno >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                        if (!isFattura) ...[
+                                          const SizedBox(width: 6),
+                                          InkWell(
+                                            onTap: () {
+                                              if (isPrevisto) {
+                                                _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
+                                              } else {
+                                                _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
+                                              }
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEF4444).withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                              if (isEspansa)
-                                Container(
-                                  color: Colors.black.withOpacity(0.2),
-                                  padding: const EdgeInsets.only(left: 36, right: 10, bottom: 8, top: 4),
-                                  child: Column(
-                                    children: listaMovs.map((m) {
-                                      final dt = m['data'] as DateTime;
-                                      final isSpesa = m['isSpesa'] as bool;
-                                      final imp = m['imp'] as double;
-                                      final bool isFattura = m['isFattura'] as bool;
-                                      final String id = m['id'] as String;
-                                      final String parentId = m['parentId'] as String;
-                                      final String desc = m['desc'] as String;
-                                      final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
-                                      final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
-
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Expanded(
-                                              child: Row(
-                                                children: [
-                                                  if (isRecurrent) ...[
-                                                    Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
-                                                    const SizedBox(width: 4),
-                                                  ],
-                                                  Expanded(
-                                                    child: Text(
-                                                      isPrevisto 
-                                                        ? '$desc (${m['cat']} - Previsto)' 
-                                                        : '$desc (${m['cat']})',
-                                                      style: TextStyle(
-                                                        color: isPrevisto ? Colors.white38 : Colors.white60, 
-                                                        fontSize: 11, 
-                                                        fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
-                                              style: TextStyle(
-                                                color: isPrevisto 
-                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
-                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (!isFattura) ...[
-                                              const SizedBox(width: 6),
-                                              InkWell(
-                                                onTap: () {
-                                                  if (isPrevisto) {
-                                                    _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
-                                                  } else {
-                                                    _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
-                                                  }
-                                                },
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(4),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -1484,8 +1557,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   child: IntrinsicWidth(
                     child: TextField(
                       controller: _amountController,
+                      focusNode: _amountFocusNode,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      autofocus: false,
+                      autofocus: true,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
@@ -1524,30 +1598,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: InputDecoration(
-                labelText: 'Descrizione',
-                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
-                filled: true,
-                fillColor: Colors.black.withOpacity(0.35),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
-                prefixIcon: IconButton(
-                  icon: Icon(_iconaCorrente, color: const Color(0xFF2DD4BF), size: 20),
-                  onPressed: _mostraSelettoreIcone,
-                  tooltip: 'Cambia pittogramma',
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Row(
+            const SizedBox(height: 12),
+
+            // 📌 1. BARRA PREFERITI SPPOSTATA SOPRA LA DESCRIZIONE CON TASTO '+' COMPATTO
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('PREFERITI RAPIDI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                Text('Tieni premuto per eliminare', style: TextStyle(color: Colors.white38, fontSize: 8, fontStyle: FontStyle.italic)),
+                const Text('PREFERITI RAPIDI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                const Text('Tieni premuto per gestire/modificare', style: TextStyle(color: Colors.white38, fontSize: 8, fontStyle: FontStyle.italic)),
               ],
             ),
             const SizedBox(height: 6),
@@ -1559,24 +1617,34 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 itemCount: (isSpesa ? _speseFrequenti.length : _entrateFrequenti.length) + 1,
                 itemBuilder: (context, index) {
                   final list = isSpesa ? _speseFrequenti : _entrateFrequenti;
-                  if (index == list.length) {
-                    return ActionChip(
-                      avatar: const Icon(Icons.add, size: 14, color: Color(0xFF2DD4BF)),
-                      label: const Text('Nuova', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                      backgroundColor: const Color(0xFF2DD4BF).withOpacity(0.12),
-                      side: const BorderSide(color: Color(0xFF2DD4BF)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      onPressed: () => _mostraDialogNuovoPreferito(isSpesa),
+                  
+                  // 📌 IL TASTO SOLO '+' È IL PRIMO ELEMENTO PICCOLINO
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: InkWell(
+                        onTap: () => _mostraDialogNuovoPreferito(isSpesa),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                          ),
+                          child: const Icon(Icons.add, size: 16, color: Color(0xFF2DD4BF)),
+                        ),
+                      ),
                     );
                   }
 
-                  final item = list[index];
+                  final item = list[index - 1];
                   final isSelected = _noteController.text == item['label'];
 
                   return Padding(
                     padding: const EdgeInsets.only(right: 6.0),
                     child: GestureDetector(
-                      onLongPress: () => _confermaEliminazionePreferito(index, isSpesa),
+                      onLongPress: () => _mostraGestionePreferitoModal(index - 1, isSpesa),
                       child: FilterChip(
                         showCheckmark: false,
                         selected: isSelected,
@@ -1595,9 +1663,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         onSelected: (_) {
                           if (isSpesa) {
-                            _selezionaSpesaFrequente(item['label'], item['icon'], item['cat'], item['sottoCat'] ?? 'Acquisti');
+                            _selezionaSpesaFrequente(item);
                           } else {
-                            _selezionaEntrataFrequente(item['label'], item['icon']);
+                            _selezionaEntrataFrequente(item);
                           }
                         },
                       ),
@@ -1606,7 +1674,34 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 },
               ),
             ),
+            const SizedBox(height: 12),
+
+            // 📌 2. CAMPO DESCRIZIONE (Se l'utente digita a mano sblocca le tendine)
+            TextField(
+              controller: _noteController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              onChanged: (_) {
+                if (_isPreferitoSelezionato) {
+                  setState(() => _isPreferitoSelezionato = false); // 🔓 Sblocca se scrive a mano
+                }
+              },
+              decoration: InputDecoration(
+                labelText: 'Descrizione',
+                labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.black.withOpacity(0.35),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.white.withOpacity(0.08))),
+                prefixIcon: IconButton(
+                  icon: Icon(_iconaCorrente, color: const Color(0xFF2DD4BF), size: 20),
+                  onPressed: _mostraSelettoreIcone,
+                  tooltip: 'Cambia pittogramma',
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
+
+            // 📌 3. DATA CON APPDATEPICKER & CONTO
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1678,6 +1773,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ],
             ),
             const SizedBox(height: 12),
+
+            // 📌 4. CATEGORIA E BUSSOLA SPESE (BLOCCATI SE È SELEZIONATO UN PREFERITO)
             if (isSpesa) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1686,14 +1783,21 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        Row(
+                          children: [
+                            const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
+                          ],
+                        ),
                         const SizedBox(height: 4),
                         _buildInlineSelector(
                           icon: Icons.category_outlined,
-                          iconColor: const Color(0xFF2DD4BF),
+                          iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
                           selectedValue: _sottocategoriaSelezionata,
                           isExpanded: _isSottocategoriaEspansa,
+                          isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
                           onToggle: () {
+                            if (_isPreferitoSelezionato) return;
                             setState(() {
                               _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
                               if (_isSottocategoriaEspansa) _scrollToOffset(120);
@@ -1715,14 +1819,21 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('REGOLE BUDGET', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        Row(
+                          children: [
+                            const Text('BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
+                          ],
+                        ),
                         const SizedBox(height: 4),
                         _buildInlineSelector(
                           icon: Icons.pie_chart_outline_rounded,
-                          iconColor: const Color(0xFF2DD4BF),
+                          iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
                           selectedValue: _categoriaSelezionata,
                           isExpanded: _isCategoriaEspansa,
+                          isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
                           onToggle: () {
+                            if (_isPreferitoSelezionato) return;
                             setState(() {
                               _isCategoriaEspansa = !_isCategoriaEspansa;
                               if (_isCategoriaEspansa) _scrollToOffset(120);
@@ -1742,7 +1853,44 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ],
               ),
               const SizedBox(height: 12),
+            ] else ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('TIPOLOGIA ENTRATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _buildInlineSelector(
+                    icon: Icons.add_chart_outlined,
+                    iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF10B981),
+                    selectedValue: _sottocategoriaEntrataSelezionata,
+                    isExpanded: _isSottocategoriaEspansa,
+                    isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
+                    onToggle: () {
+                      if (_isPreferitoSelezionato) return;
+                      setState(() {
+                        _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
+                        if (_isSottocategoriaEspansa) _scrollToOffset(120);
+                      });
+                    },
+                    items: _sottocategorieEntrata,
+                    onSelect: (val) {
+                      setState(() {
+                        _sottocategoriaEntrataSelezionata = val;
+                        _isSottocategoriaEspansa = false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
             ],
+
+            // 📌 5. REGOLE RICORRENZA
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -1887,6 +2035,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // 📌 PULSANTE DI SALVATAGGIO
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -1921,11 +2071,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     required VoidCallback onToggle,
     required List<String> items,
     required Function(String) onSelect,
+    bool isDisabled = false, // 🔒 Supporto blocco tendina
   }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.35),
+        color: isDisabled ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.35),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isExpanded ? const Color(0xFF2DD4BF).withOpacity(0.4) : Colors.white.withOpacity(0.08),
@@ -1934,7 +2085,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       child: Column(
         children: [
           InkWell(
-            onTap: onToggle,
+            onTap: isDisabled ? null : onToggle,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -1945,21 +2096,25 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   Expanded(
                     child: Text(
                       selectedValue,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: isDisabled ? Colors.white54 : Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Icon(
-                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white54,
-                    size: 18,
+                    isDisabled ? Icons.lock_outline_rounded : (isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded),
+                    color: Colors.white38,
+                    size: 16,
                   ),
                 ],
               ),
             ),
           ),
-          if (isExpanded) ...[
+          if (isExpanded && !isDisabled) ...[
             const Divider(color: Colors.white12, height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),

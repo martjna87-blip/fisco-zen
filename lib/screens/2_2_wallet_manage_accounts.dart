@@ -19,6 +19,26 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   final ScrollController _scrollController = ScrollController();
   int? _contoEspansoIndex;
 
+  // 🇮🇹 HELPER VALUTA ITALIANA CON DECIMALI (es. 1.000,50 €)
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
+  // 🇮🇹 HELPER CIFRA INTERA SENZA DECIMALI CON PUNTO MIGLIAIA (es. 1.000 €)
+  String _formattaInt(double importo) {
+    final int intVal = importo.round();
+    final strVal = intVal.abs().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$strVal €';
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -102,7 +122,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
-      text: account.amount.toStringAsFixed(2),
+      text: account.amount.toStringAsFixed(2).replaceAll('.', ','),
     );
 
     AppSecondaryPopup.mostra(
@@ -113,7 +133,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       testoConferma: 'Salva',
       onConferma: () {
         final nuovoNome = nomeController.text.trim();
-        final nuovoSaldo = double.tryParse(controller.text.replaceAll(',', '.')) ?? account.amount;
+        final nuovoSaldo = double.tryParse(controller.text.replaceAll('.', '').replaceAll(',', '.')) ?? account.amount;
 
         if (nuovoNome.isNotEmpty) {
           context.read<WalletProvider>().updateAccountDetails(
@@ -212,7 +232,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       }
 
       final String sign = tx.isIncome ? '+' : '-';
-      final String impFormatted = '$sign${tx.amount.toStringAsFixed(2)} €';
+      final String impFormatted = '$sign${_formattaValuta(tx.amount)}';
       final String dataStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}';
 
       elementiLista.add(_buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome));
@@ -307,7 +327,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
           onConferma: () {
             final nome = nomeController.text.trim();
             final dettaglioText = dettaglioController.text.trim();
-            final saldo = double.tryParse(saldoController.text.replaceAll(',', '.')) ?? 0.0;
+            final saldo = double.tryParse(saldoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
 
             if (nome.isEmpty) {
               AppNotifications.mostraInAlto(
@@ -432,7 +452,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
             titolo: 'Giroconto Tra Conti',
             testoConferma: 'Esegui Giroconto',
             onConferma: () {
-              final importo = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+              final importo = double.tryParse(importoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
               
               if (importo <= 0) {
                 AppNotifications.mostraInAlto(
@@ -455,14 +475,13 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               final accDa = accounts.firstWhere((a) => a.title == daConto);
               final accA = accounts.firstWhere((a) => a.title == aConto);
 
-              // 🛡️ CONTROLLO SALDO INSUFFICIENTE ESPLICITO
               if (accDa.amount < importo) {
                 AppNotifications.mostraInAlto(
                   context,
-                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${accDa.amount.toStringAsFixed(2)} €)',
+                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${_formattaValuta(accDa.amount)})',
                   type: NotificationType.error,
                 );
-                return; // 👈 BLOCCA L'ESECUZIONE E NON CHIUDE IL POP-UP
+                return;
               }
 
               try {
@@ -477,7 +496,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 Navigator.pop(context);
                 AppNotifications.mostraInAlto(
                   context,
-                  'Giroconto di ${importo.toStringAsFixed(2)} € eseguito con successo! 🎉',
+                  'Giroconto di ${_formattaValuta(importo)} eseguito con successo! 🎉',
                 );
               } catch (e) {
                 AppNotifications.mostraInAlto(
@@ -680,7 +699,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '${saldoTotale.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                              _formattaValuta(saldoTotale), // 🇮🇹 Formattazione italiana (es. 10.000,00 €)
                               style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -748,7 +767,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                           ),
                           const SizedBox.shrink(),
                           Text(
-                            '${nettoReale.toStringAsFixed(2)} €',
+                            _formattaValuta(nettoReale), // 🇮🇹 Formattazione italiana (es. 1.250,00 €)
                             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -850,7 +869,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '${account.amount.toStringAsFixed(2)} €',
+                                      _formattaValuta(account.amount), // 🇮🇹 Formattazione italiana (es. 1.500,00 €)
                                       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                     ),
                                     if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
@@ -864,7 +883,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                               const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
                                               const SizedBox(width: 4),
                                               Text(
-                                                (account.amount - account.virtualTaxAmount).toStringAsFixed(2),
+                                                _formattaValuta(account.amount - account.virtualTaxAmount),
                                                 style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -876,7 +895,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                               const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
                                               const SizedBox(width: 4),
                                               Text(
-                                                account.virtualTaxAmount.toStringAsFixed(2),
+                                                _formattaValuta(account.virtualTaxAmount),
                                                 style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
