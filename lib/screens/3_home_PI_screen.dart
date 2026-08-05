@@ -498,27 +498,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Positioned(
-                  top: topPadding + 10,
-                  right: 16,
-                  child: FilledButton.icon(
-                    onPressed: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
-                    icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
-                    label: Text(
-                      'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ),
+  top: topPadding + 10,
+  right: 16,
+  child: FilledButton.icon(
+    onPressed: () {
+      AppNotifications.mostraInAlto(
+        context,
+        'Profilo ATECO attivo: ${(_coefficienteRedditivita * 100).toInt()}% • Gestibile in Impostazioni Profilo',
+        type: NotificationType.success,
+      );
+    },
+    icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
+    label: Text(
+      'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
+      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+    ),
+    style: FilledButton.styleFrom(
+      backgroundColor: Colors.white.withOpacity(0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+  ),
+),
                 Padding(
                   padding: EdgeInsets.only(top: topPadding + 18),
                   child: Column(

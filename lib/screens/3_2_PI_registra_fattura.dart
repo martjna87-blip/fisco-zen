@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_datepicker.dart';
 
 // 🇮🇹 FORMATTATORE IN TEMPO REALE PER VALUTA ITALIANA (1.000,00)
 class ItalianCurrencyFormatter extends TextInputFormatter {
@@ -150,25 +151,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   }
 
   Future<void> _selezionaData(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _dataSelezionata,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF2DD4BF),
-              onPrimary: Colors.black,
-              surface: Color(0xFF18181B),
-              onSurface: Colors.white,
-            ),
-            dialogBackgroundColor: const Color(0xFF18181B),
-          ),
-          child: child!,
-        );
-      },
+    final DateTime? picked = await AppDatePicker.selezionaData(
+      context,
+      dataIniziale: _dataSelezionata,
     );
     if (picked != null && picked != _dataSelezionata) {
       setState(() {

@@ -12,6 +12,60 @@ class SerbatoioTasseWidget extends StatelessWidget {
     this.cardColor = const Color(0xFF292524),
   });
 
+  // 🇮🇹 HELPER PER CIFRE INTERE CON PUNTO MIGLIAIA (es. 1.116 €)
+  static String _formattaInt(double importo) {
+    final int intVal = importo.round();
+    return intVal.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+  }
+
+  // 🇮🇹 HELPER VALUTA DECIMALE ITALIANA (es. 1.115,75 €)
+  static String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
+  // 🛡️ HELPER PARSING SICURO (Riconosce 11.2 come 11,20 € ed evita che diventi 112 €!)
+  static double _parseImportoSicuro(String text) {
+    if (text.trim().isEmpty) return 0.0;
+    String pulito = text.trim().replaceAll(' ', '').replaceAll('€', '');
+    
+    // 1. Se contiene SIA punto che virgola (es. 1.000,50 o 1,000.50)
+    if (pulito.contains('.') && pulito.contains(',')) {
+      if (pulito.lastIndexOf(',') > pulito.lastIndexOf('.')) {
+        // Standard italiano: 1.000,50 -> rimuovi punto, virgola diventa punto decimale
+        pulito = pulito.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        // Standard anglosassone (es. 1,000.50) -> rimuovi virgola
+        pulito = pulito.replaceAll(',', '');
+      }
+    } 
+    // 2. Se contiene SOLO il punto (es. 11.2 o 11.25 o 1.000)
+    else if (pulito.contains('.')) {
+      final parti = pulito.split('.');
+      // Se dopo l'ultimo punto ci sono 1 o 2 cifre (es. 11.2 o 11.25), l'utente intende un decimale!
+      if (parti.last.length == 1 || parti.last.length == 2) {
+        final dec = parti.removeLast();
+        pulito = '${parti.join('')}.$dec';
+      } else {
+        // Se ci sono 3 cifre (es. 1.000 o 15.000), è un separatore di migliaia
+        pulito = pulito.replaceAll('.', '');
+      }
+    } 
+    // 3. Se contiene SOLO la virgola (es. 11,2 o 1000,50)
+    else {
+      pulito = pulito.replaceAll(',', '.');
+    }
+
+    return double.tryParse(pulito) ?? 0.0;
+  }
+
   // 🎨 WIDGET BARRA AVANZAMENTO PROPORZIONALE REALE PER IL POP-UP
   static Widget _buildBarraAvanzamentoSmart(int percentualeInt) {
     if (percentualeInt < 100) {
@@ -41,8 +95,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
       );
     }
 
-    final int flexVerde = 100;
-    final int flexBlu = percentualeInt - 100;
+    const int flexVerde = 100;
+    final int flexCiano = percentualeInt - 100;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
@@ -53,12 +107,12 @@ class SerbatoioTasseWidget extends StatelessWidget {
           children: [
             Expanded(
               flex: flexVerde,
-              child: Container(color: const Color(0xFF10B981)), // 🟢 Verde
+              child: Container(color: const Color(0xFF10B981)), // 🟢 Verde 100%
             ),
-            if (flexBlu > 0)
+            if (flexCiano > 0)
               Expanded(
-                flex: flexBlu,
-                child: Container(color: const Color(0xFF3B82F6)), // 🔵 Blu Cuscinetto
+                flex: flexCiano,
+                child: Container(color: const Color(0xFF06B6D4)), // 🩵 Ciano Cuscinetto Extra
               ),
           ],
         ),
@@ -114,15 +168,17 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
     bool modalitaAccantona = true;
 
+    // 🇮🇹 Inizializza il campo con la virgola italiana
     final TextEditingController importoController = TextEditingController(
-      text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2) : '',
+      text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2).replaceAll('.', ',') : '',
     );
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final double importoInserito = double.tryParse(importoController.text.replaceAll(',', '.')) ?? 0.0;
+          // 🛡️ UTILIZZA IL PARSER SICURO PER LEGGERE IL CAMPO TESTO
+          final double importoInserito = _parseImportoSicuro(importoController.text);
           
           final double nuovaRiservaTotale = modalitaAccantona
               ? (riservaGiaAccantonata + importoInserito)
@@ -149,7 +205,15 @@ class SerbatoioTasseWidget extends StatelessWidget {
             titolo: modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse',
             testoConferma: modalitaAccantona ? 'Metti al Sicuro' : 'Sblocca Cifra',
             onConferma: () {
-              if (importoInserito <= 0) return;
+              // 🚨 ALERT SE IMPORTO NON VALIDO, VUOTO O ZERO
+              if (importoInserito <= 0) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Importo non valido! Inserisci una cifra corretta (es. 100 o 11,50).',
+                  type: NotificationType.warning,
+                );
+                return;
+              }
 
               if (modalitaAccantona) {
                 final contoSorgente = accounts.firstWhere((a) => a.id == contoSorgenteAccantonaId);
@@ -196,7 +260,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                 Navigator.pop(ctx);
                 AppNotifications.mostraInAlto(
                   context,
-                  'Sbloccati ${importoInserito.toStringAsFixed(2)} € verso ${contoDestinazione.title}! 🔓',
+                  'Sbloccati ${_formattaValuta(importoInserito)} verso ${contoDestinazione.title}! 🔓',
                   type: NotificationType.warning,
                 );
               }
@@ -219,7 +283,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                           onTap: () {
                             setDialogState(() {
                               modalitaAccantona = true;
-                              importoController.text = mancanteReale > 0 ? mancanteReale.toStringAsFixed(2) : '';
+                              importoController.text = mancanteReale > 0 ? mancanteReale.toStringAsFixed(2).replaceAll('.', ',') : '';
                             });
                           },
                           child: AnimatedContainer(
@@ -272,7 +336,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                    Text('${tasseTotaliCalcolate.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(_formattaValuta(tasseTotaliCalcolate), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -280,7 +344,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                    Text('${riservaGiaAccantonata.toStringAsFixed(2)} €', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(_formattaValuta(riservaGiaAccantonata), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -301,8 +365,8 @@ class SerbatoioTasseWidget extends StatelessWidget {
                         ),
                         if (extraCuscinetto > 0)
                           Text(
-                            '+${extraCuscinetto.toStringAsFixed(0)} € Cuscinetto',
-                            style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.bold),
+                            '+${_formattaInt(extraCuscinetto)} € Cuscinetto',
+                            style: const TextStyle(color: Color(0xFF06B6D4), fontSize: 11, fontWeight: FontWeight.bold), // 🩵 Ciano
                           ),
                       ],
                     ),
@@ -330,7 +394,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     items: contiDisponibili.map((acc) {
                       return DropdownMenuItem<String>(
                         value: acc.id,
-                        child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
+                        child: Text('${acc.title} (${_formattaInt(acc.amount)} €)'),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -358,7 +422,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                     items: contiDisponibili.map((acc) {
                       return DropdownMenuItem<String>(
                         value: acc.id,
-                        child: Text('${acc.title} (${acc.amount.toStringAsFixed(0)} €)'),
+                        child: Text('${acc.title} (${_formattaInt(acc.amount)} €)'),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -447,7 +511,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 📌 1. HEADER (Speculare 1:1 alla Bussola: Icona 18px, Gap 8px, Font 13px, Badge 10px)
+          // 📌 1. HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -485,7 +549,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // 📌 2. CERCHIO DI PROGRESSO CALIBRATO PERFETTAMENTE (114x114 px -> Altezza Totale = 227 px)
+          // 📌 2. CERCHIO DI PROGRESSO
           Center(
             child: SizedBox(
               width: 114,
@@ -522,7 +586,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                         value: avanzamentoBluExtra,
                         strokeWidth: 6,
                         strokeCap: StrokeCap.round,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF06B6D4)), // 🩵 Ciano Cuscinetto Extra
                       ),
                     ),
 
@@ -540,7 +604,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        '${riservaAccantonata.toStringAsFixed(0)} €',
+                        '${_formattaInt(riservaAccantonata)} €',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -549,7 +613,7 @@ class SerbatoioTasseWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        'su ${tasseTotaliCalcolate.toStringAsFixed(0)} €',
+                        'su ${_formattaInt(tasseTotaliCalcolate)} €',
                         style: const TextStyle(
                           color: Colors.white38,
                           fontSize: 10.5,
@@ -578,9 +642,9 @@ class SerbatoioTasseWidget extends StatelessWidget {
               Expanded(
                 child: Text(
                   mancanteReale > 0
-                      ? 'Consiglio: accantona i ${mancanteReale.toStringAsFixed(0)} € mancanti per metterti al sicuro.'
+                      ? 'Consiglio: accantona i ${_formattaInt(mancanteReale)} € mancanti per metterti al sicuro.'
                       : (cuscinettoExtraVal > 0
-                          ? 'Ottimo! Hai +${cuscinettoExtraVal.toStringAsFixed(0)} € di cuscinetto extra protetto.'
+                          ? 'Ottimo! Hai +${_formattaInt(cuscinettoExtraVal)} € di cuscinetto extra protetto.'
                           : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta.'),
                   style: TextStyle(
                     color: mancanteReale > 0 ? const Color(0xFFF59E0B) : Colors.white70,
