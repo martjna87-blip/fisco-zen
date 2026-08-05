@@ -1,9 +1,58 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+
+// 🇮🇹 FORMATTATORE IN TEMPO REALE PER VALUTA ITALIANA (1.000,00)
+class ItalianCurrencyFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9,]'), '');
+
+    int firstCommaIndex = cleanText.indexOf(',');
+    if (firstCommaIndex != -1) {
+      cleanText = cleanText.substring(0, firstCommaIndex + 1) +
+          cleanText.substring(firstCommaIndex + 1).replaceAll(',', '');
+      List<String> parts = cleanText.split(',');
+      if (parts.length > 1 && parts[1].length > 2) {
+        cleanText = '${parts[0]},${parts[1].substring(0, 2)}';
+      }
+    }
+
+    List<String> parts = cleanText.split(',');
+    String intPart = parts[0];
+    String decPart = parts.length > 1 ? ',${parts[1]}' : (cleanText.endsWith(',') ? ',' : '');
+
+    if (intPart.length > 1 && intPart.startsWith('0')) {
+      intPart = intPart.replaceFirst(RegExp(r'^0+'), '');
+      if (intPart.isEmpty) intPart = '0';
+    }
+
+    String formattedInt = '';
+    int count = 0;
+    for (int i = intPart.length - 1; i >= 0; i--) {
+      count++;
+      formattedInt = intPart[i] + formattedInt;
+      if (count % 3 == 0 && i != 0) {
+        formattedInt = '.$formattedInt';
+      }
+    }
+
+    String finalString = formattedInt + decPart;
+
+    return TextEditingValue(
+      text: finalString,
+      selection: TextSelection.collapsed(offset: finalString.length),
+    );
+  }
+}
 
 class RegistraFatturaSheet extends StatefulWidget {
   final Function(String cliente, double importo, String dataFormattata)? onFatturaSalvata;
@@ -24,6 +73,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   final _searchAtecoController = TextEditingController();
 
   DateTime _dataSelezionata = DateTime.now();
+  bool _isAtecoEspanso = false;
 
   // 🔒 ATECO PREDEFINITO (Fisso dall'Onboarding)
   String _defaultAtecoCodice = '74.10.21';
@@ -268,7 +318,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       return;
     }
 
-    final double? importo = double.tryParse(importoText.replaceAll(',', '.'));
+    // Rimuove i punti delle migliaia e converte la virgola in punto per il calcolo matematico
+    final double? importo = double.tryParse(importoText.replaceAll('.', '').replaceAll(',', '.'));
     if (importo == null || importo <= 0) {
       AppNotifications.mostraInAlto(
         context, 
@@ -388,51 +439,196 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             TextField(
               controller: _importoController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [ItalianCurrencyFormatter()],
               style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 18, fontWeight: FontWeight.bold),
               decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
             ),
             
-            // 🏷️ SELETTORE ATECO FATTURA (MOSTRIAMO IL BADGE SOLO SE CORRISPONDE AL PREDEFINITO)
+            // 🏷️ SELETTORE ATECO FATTURA INLINE CON RICERCA E BADGE VERIFIED
             const SizedBox(height: 12),
-            InkWell(
-              onTap: _apriSelettoreAteco,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _isAtecoEspanso ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.1),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.category_rounded, color: Color(0xFF2DD4BF), size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _atecoNome,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _isAtecoEspanso = !_isAtecoEspanso;
+                        if (!_isAtecoEspanso) {
+                          _searchAtecoController.clear();
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.category_rounded, color: Color(0xFF2DD4BF), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _atecoNome,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isCurrentSelectedDefault) ...[
+                            const SizedBox(width: 6),
+                            const Tooltip(
+                              message: 'Codice ATECO Predefinito Profilo',
+                              triggerMode: TooltipTriggerMode.tap,
+                              child: Icon(
+                                Icons.verified_rounded,
+                                color: Color(0xFF2DD4BF),
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Icon(
+                            _isAtecoEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                            color: const Color(0xFF2DD4BF),
+                            size: 18,
+                          ),
+                        ],
                       ),
                     ),
-                    if (isCurrentSelectedDefault) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
-                        ),
-                        child: const Text(
-                          'PREDEFINITO',
-                          style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 8, fontWeight: FontWeight.bold),
-                        ),
+                  ),
+                  if (_isAtecoEspanso) ...[
+                    const Divider(color: Colors.white12, height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          // 🔍 CAMPO RICERCA INTEGRATO NELLA TENDINA
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: TextField(
+                              controller: _searchAtecoController,
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              onChanged: (_) => setState(() {}),
+                              decoration: const InputDecoration(
+                                hintText: 'Cerca codice ATECO o mansione...',
+                                hintStyle: TextStyle(color: Colors.white38, fontSize: 11),
+                                icon: Icon(Icons.search_rounded, color: Color(0xFF2DD4BF), size: 16),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          
+                          // LISTA FILTRATA
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            child: ListView(
+                              shrinkWrap: true,
+                              physics: const BouncingScrollPhysics(),
+                              children: (() {
+                                final query = _searchAtecoController.text.toLowerCase().replaceAll('.', '').trim();
+                                final atecoFiltrati = _databaseAteco.where((item) {
+                                  return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) || 
+                                         item['descrizione'].toString().toLowerCase().contains(query);
+                                }).toList();
+
+                                if (atecoFiltrati.isEmpty) {
+                                  return [
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 12),
+                                      child: Center(
+                                        child: Text(
+                                          'Nessun codice ATECO trovato',
+                                          style: TextStyle(color: Colors.white38, fontSize: 11),
+                                        ),
+                                      ),
+                                    ),
+                                  ];
+                                }
+
+                                return atecoFiltrati.map((item) {
+                                  final double coef = (item['coef'] as num).toDouble();
+                                  final String codice = item['codice'].toString();
+                                  final String nomeFmt = '$codice - ${item['descrizione']} (${(coef * 100).toInt()}%)';
+                                  final bool isSelected = codice == _atecoCodice;
+                                  final bool isDefaultAteco = codice == _defaultAtecoCodice;
+
+                                  return InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _atecoCoef = coef;
+                                        _atecoCodice = codice;
+                                        _atecoNome = nomeFmt;
+                                        _isAtecoEspanso = false;
+                                        _searchAtecoController.clear();
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      margin: const EdgeInsets.only(bottom: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                            color: isSelected ? const Color(0xFF2DD4BF) : Colors.white38,
+                                            size: 15,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              nomeFmt,
+                                              style: TextStyle(
+                                                color: isSelected ? Colors.white : Colors.white70,
+                                                fontSize: 11,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isDefaultAteco) ...[
+                                            const SizedBox(width: 6),
+                                            const Tooltip(
+                                              message: 'Codice Predefinito Profilo',
+                                              triggerMode: TooltipTriggerMode.tap,
+                                              child: Icon(
+                                                Icons.verified_rounded,
+                                                color: Color(0xFF2DD4BF),
+                                                size: 15,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList();
+                              })(),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                    const Icon(Icons.search_rounded, color: Color(0xFF2DD4BF), size: 16),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
 
@@ -466,10 +662,20 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     );
   }
 
-  // 📊 CALCOLO RIPARTIZIONE INTELLIGENTE CON REGOLE FISCALI ITALIANE (100% TASSE / 80% INPS)
+  // 🇮🇹 HELPER VALUTA ITALIANA (1.000,00 €)
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
+  // 📊 CALCOLO RIPARTIZIONE PRUDENZIALE (NETTO = LORDO - SALDO - ACCONTO - CUSCINETTO)
   Widget _buildRipartizionePreviewCard(BuildContext context) {
     final wallet = Provider.of<WalletProvider>(context);
-    final double importoLordo = double.tryParse(_importoController.text.replaceAll(',', '.')) ?? 0.0;
+    final double importoLordo = double.tryParse(_importoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
 
     if (importoLordo <= 0) return const SizedBox.shrink();
 
@@ -487,19 +693,21 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final double accontoInps = saldoInps * 0.80;
     final double totaleAcconto = accontoImposta + accontoInps;
 
-    // Totale F24 da accantonare
+    // Totale F24 da accantonare (Saldo + Acconti se abilitato in alto a destra)
     final double totaleF24 = _calcolaAncheAccontoF24 ? (totaleSaldo + totaleAcconto) : totaleSaldo;
 
-    // Il Netto della singola fattura (togliendo il saldo reale di competenza)
-    final double nettoTotaleFattura = importoLordo - totaleSaldo;
+    // 📌 NUOVO CALCOLO: Liquidità rimasta dopo aver sottratto TUTTO il F24
+    final double nettoDopoTasse = importoLordo - totaleF24;
 
-    // 3. Cuscinetto Mesi No-Lavoro (Ferie) - Predefinito 10 Mesi Lavorativi
-    const int mesiAttivi = 10; 
-    final double percentualeFondoFerie = (12 - mesiAttivi) / 12;
-    final double quotaFondoFerie = nettoTotaleFattura * percentualeFondoFerie;
+    // 3. Cuscinetto Mesi No-Lavoro - DINAMICO DAL PROVIDER (Onboarding)
+    final int mesiLavorati = wallet.mesiAttivi > 0 ? wallet.mesiAttivi : 10;
+    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+    
+    // Il cuscinetto si calcola sulla liquidità al netto di tutto il F24
+    final double quotaFondoFerie = nettoDopoTasse * percentualeFondoFerie;
 
-    // 4. Netto Spendibile Subito
-    final double nettoSpendibileSubito = nettoTotaleFattura - quotaFondoFerie;
+    // 4. Netto Spendibile Reale (pronto per essere speso senza rischi)
+    final double nettoSpendibileSubito = nettoDopoTasse - quotaFondoFerie;
 
     return Container(
       margin: const EdgeInsets.only(top: 14),
@@ -528,30 +736,44 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           
+          // 1. INCASSO LORDO (#10B981)
           _buildSalvaDanaioRow(
-            icon: Icons.shield_rounded,
-            color: const Color(0xFFF59E0B),
-            title: _calcolaAncheAccontoF24 ? 'Accantonamento F24 (Saldo + Acconti)' : 'Accantonamento F24 (Solo Saldo)',
-            value: '${totaleF24.toStringAsFixed(2)} €',
+            icon: Icons.add_circle_outline_rounded,
+            color: const Color(0xFF10B981),
+            title: 'Incasso Lordo:',
+            value: '+${_formattaValuta(importoLordo)}',
+            isBold: true,
           ),
-          const Divider(color: Colors.white12, height: 12),
+          const SizedBox(height: 6),
 
-          _buildSalvaDanaioRow(
-            icon: Icons.beach_access_rounded,
-            color: const Color(0xFF3B82F6),
-            title: 'Cuscinetto Mesi No-Lavoro (10 Mesi)',
-            value: '${quotaFondoFerie.toStringAsFixed(2)} €',
-          ),
-          const Divider(color: Colors.white12, height: 12),
-
+          // 2. NETTO SPENDIBILE (#2DD4BF)
           _buildSalvaDanaioRow(
             icon: Icons.account_balance_wallet_rounded,
             color: const Color(0xFF2DD4BF),
-            title: 'Netto Spendibile Subito',
-            value: '${nettoSpendibileSubito.toStringAsFixed(2)} €',
+            title: 'Netto Spendibile:',
+            value: '+${_formattaValuta(nettoSpendibileSubito)}',
             isBold: true,
+          ),
+          const SizedBox(height: 6),
+
+          // 3. TASSE (SALDO + ACCONTO) (#3B82F6)
+          _buildSalvaDanaioRow(
+            icon: Icons.shield_rounded,
+            color: const Color(0xFF3B82F6),
+            title: _calcolaAncheAccontoF24 ? 'Tasse (Saldo + Acconto):' : 'Tasse (Solo Saldo):',
+            value: '-${_formattaValuta(totaleF24)}',
+            isBold: true,
+          ),
+          const SizedBox(height: 6),
+
+          // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
+          _buildSalvaDanaioRow(
+            icon: Icons.beach_access_rounded,
+            color: const Color(0xFF8B5CF6),
+            title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
+            value: '-${_formattaValuta(quotaFondoFerie)}',
           ),
         ],
       ),

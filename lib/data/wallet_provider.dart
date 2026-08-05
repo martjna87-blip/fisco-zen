@@ -158,6 +158,8 @@ class WalletProvider extends ChangeNotifier {
   double _speseFisseMensili = 800.0;
   double _fatturatoStimatoAnnuo = 35000.0;
   int _mesiAttiviIncasso = 10;
+  int get mesiAttivi => _mesiAttiviIncasso;
+  int get mesiAttiviIncasso => _mesiAttiviIncasso;
 
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,

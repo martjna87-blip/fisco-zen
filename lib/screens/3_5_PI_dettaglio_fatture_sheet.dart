@@ -32,6 +32,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
   ];
 
+  // 🇮🇹 HELPER VALUTA ITALIANA (1.000,00 €)
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
   void _confermaEliminazione(BuildContext context, Map<String, dynamic> fattura) {
     showDialog(
       context: context,
@@ -84,12 +94,9 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
       return sorgenteFatture;
     }
 
+    // 🧮 PRINCIPIO DI CASSA: Usiamo la data di incasso vera (dataIncasso)
     return sorgenteFatture.where((f) {
-      if (f['mese'] != null && f['mese'] is int) {
-        return f['mese'] == _meseSelezionato;
-      }
-
-      final rawData = f['data'];
+      final rawData = f['dataIncasso'] ?? f['data'];
       if (rawData != null) {
         if (rawData is DateTime) {
           return rawData.month == _meseSelezionato;
@@ -103,6 +110,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
           final parti = rawData.split(RegExp(r'[/.-]'));
           if (parti.length >= 2) {
+            // Formato DD/MM/YYYY
             final meseParsed = int.tryParse(parti[1]);
             if (meseParsed != null) {
               return meseParsed == _meseSelezionato;
@@ -147,6 +155,10 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final listaTutteIncassate = walletProvider.fattureIncassate;
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
 
+    // 📌 CALCOLO MESI E PERCENTUALE CUSCINETTO DAL PROVIDER
+    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
+    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
@@ -155,7 +167,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
     for (var f in fattureFiltrate) {
       final double lordo = (f['importo'] as num).toDouble();
-      // 📌 LEGGIAMO L'ATECO SPECIFICO DI OGNI SINGOLA FATTURA
       final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
       final double imponibile = lordo * coefFattura;
       
@@ -175,13 +186,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final double totaleTasseY = inpsYTotale + impostaYTotale;
     final double totaleAccontiY1 = accontoInpsY1Totale + accontoImpostaY1Totale;
     final double grandTotaleAccantonare = totaleTasseY + totaleAccontiY1;
-    final double nettoTotaleRimanente = lordoTotale - grandTotaleAccantonare;
+
+    // 📌 FORMULA PRUDENZIALE PER IL RIEPILOGO GENERALE
+    final double grandNettoDopoTasse = lordoTotale - grandTotaleAccantonare;
+    final double grandQuotaFondoFerie = grandNettoDopoTasse * percentualeFondoFerie;
+    final double nettoTotaleSpendibile = grandNettoDopoTasse - grandQuotaFondoFerie;
 
     return AppPopupWrapper(
       title: 'Dettaglio Fiscale',
-      badgeText: 'Fatture Incassate',
+      badgeText: 'P.IVA',
       badgeColor: const Color(0xFF2DD4BF),
-      badgeTextColor: Colors.black,
       child: Column(
         children: [
           // 📌 SELETTORE MESI
@@ -241,30 +255,36 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                       final bool isExpanded = _expandedFattureIds.contains(fId);
 
                       final double lordo = (f['importo'] as num).toDouble();
-                      // 📌 LEGGIAMO L'ATECO SPECIFICO DI OGNI SINGOLA FATTURA ANCHE PER LA CARD
                       final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
                       final double imponibile = lordo * coefFattura;
 
                       final double inpsY = imponibile * widget.aliquotaInps;
                       final double impostaY = imponibile * widget.aliquotaImposta;
-                      final double totaleTasseY = inpsY + impostaY;
+                      final double totaleTasseYCard = inpsY + impostaY;
                       
-                      final double accontoInpsY1 = inpsY * 0.80;
-                      final double accontoImpostaY1 = impostaY * 1.00;
-                      final double totaleAccontiY1 = accontoInpsY1 + accontoImpostaY1;
+                      final double accontoInpsY1Card = inpsY * 0.80;
+                      final double accontoImpostaY1Card = impostaY * 1.00;
+                      final double totaleAccontiY1Card = accontoInpsY1Card + accontoImpostaY1Card;
 
-                      final double totaleAccantonareCard = totaleTasseY + totaleAccontiY1;
-                      final double nettoRimanenteCard = lordo - totaleAccantonareCard;
+                      final double totaleTasseAccantonare = totaleTasseYCard + totaleAccontiY1Card;
+
+                      // 📌 CALCOLO PRUDENZIALE SINGOLA FATTURA
+                      final double nettoDopoTasseCard = lordo - totaleTasseAccantonare;
+                      final double quotaFondoFerieCard = nettoDopoTasseCard * percentualeFondoFerie;
+                      final double nettoSpendibileCard = nettoDopoTasseCard - quotaFondoFerieCard;
+
+                      final String dataIncassoStr = _formattaGiornoMese(f['dataIncasso'] ?? f['data']);
+                      final String dataEmissioneStr = _formattaGiornoMese(f['data'] ?? f['dataIncasso']);
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
+                          color: Colors.black.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isExpanded
-                                ? const Color(0xFF2DD4BF).withOpacity(0.4)
-                                : Colors.white.withOpacity(0.1),
+                                ? const Color(0xFF2DD4BF).withOpacity(0.5)
+                                : const Color(0xFF2DD4BF).withOpacity(0.2),
                           ),
                         ),
                         child: InkWell(
@@ -279,114 +299,151 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                           },
                           borderRadius: BorderRadius.circular(16),
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(14),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // TESTATA CARD: CLIENTE, BADGE ATECO & IMPORTO LORDO
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      child: Row(
                                         children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  '${f['cliente']} (${f['numero'] ?? 'Fattura'})',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  '${(coefFattura * 100).toInt()}%',
-                                                  style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          if (_formattaGiornoMese(f['data']).isNotEmpty)
-                                            Text(
-                                              'Incassata il ${_formattaGiornoMese(f['data'])}',
-                                              style: const TextStyle(color: Colors.white54, fontSize: 10),
+                                          Flexible(
+                                            child: Text(
+                                              '${f['cliente']} (#${f['numero'] ?? ''})',
+                                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                                            ),
+                                            child: Text(
+                                              '${(coefFattura * 100).toInt()}%',
+                                              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     Row(
                                       children: [
                                         Text(
-                                          '+${lordo.toStringAsFixed(2)} €',
+                                          '+${_formattaValuta(lordo)}',
                                           style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.bold),
                                         ),
                                         const SizedBox(width: 6),
                                         Icon(
                                           isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                          color: Colors.white54,
+                                          color: const Color(0xFF2DD4BF),
                                           size: 18,
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
+
+                                // DATE SOTTO IL NOME E NUMERO FATTURA
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        'Netto: +${nettoRimanenteCard.toStringAsFixed(2)} €',
-                                        style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    const Icon(Icons.calendar_today_rounded, color: Colors.white54, size: 11),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Registrazione: $dataEmissioneStr',
+                                      style: const TextStyle(color: Colors.white54, fontSize: 11),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        'Tasse: -${totaleAccantonareCard.toStringAsFixed(2)} €',
-                                        style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 11, fontWeight: FontWeight.w600),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    const SizedBox(width: 10),
+                                    const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 11),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Incasso: $dataIncassoStr',
+                                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
+
+                                // SEZIONE ESPANSA IN STILE "REGISTRA FATTURA"
                                 if (isExpanded) ...[
+                                  const SizedBox(height: 12),
+                                  Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                                  const SizedBox(height: 12),
+
+                                  // 1. INCASSO LORDO (#10B981)
+                                  _buildSalvaDanaioRow(
+                                    icon: Icons.add_circle_outline_rounded,
+                                    color: const Color(0xFF10B981),
+                                    title: 'Incasso Lordo:',
+                                    value: '+${_formattaValuta(lordo)}',
+                                    isBold: true,
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // 2. NETTO SPENDIBILE (#2DD4BF)
+                                  _buildSalvaDanaioRow(
+                                    icon: Icons.account_balance_wallet_rounded,
+                                    color: const Color(0xFF2DD4BF),
+                                    title: 'Netto Spendibile:',
+                                    value: '+${_formattaValuta(nettoSpendibileCard)}',
+                                    isBold: true,
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // 3. TASSE (SALDO + ACCONTO) (#3B82F6)
+                                  _buildSalvaDanaioRow(
+                                    icon: Icons.shield_rounded,
+                                    color: const Color(0xFF3B82F6),
+                                    title: 'Tasse (Saldo + Acconto):',
+                                    value: '-${_formattaValuta(totaleTasseAccantonare)}',
+                                    isBold: true,
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
+                                  _buildSalvaDanaioRow(
+                                    icon: Icons.beach_access_rounded,
+                                    color: const Color(0xFF8B5CF6),
+                                    title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
+                                    value: '-${_formattaValuta(quotaFondoFerieCard)}',
+                                  ),
+
                                   const SizedBox(height: 10),
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 8),
-                                  _buildRowDetail('Saldo INPS', '${inpsY.toStringAsFixed(2)} €', Colors.white70),
-                                  const SizedBox(height: 2),
-                                  _buildRowDetail('Saldo Imposta', '${impostaY.toStringAsFixed(2)} €', Colors.white70),
-                                  const SizedBox(height: 2),
-                                  _buildRowDetail('Totale Saldo', '${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
-                                  Divider(color: Colors.white.withOpacity(0.12), height: 10),
-                                  _buildRowDetail('Acconto INPS', '${accontoInpsY1.toStringAsFixed(2)} €', Colors.white70),
-                                  const SizedBox(height: 2),
-                                  _buildRowDetail('Acconto Imposta', '${accontoImpostaY1.toStringAsFixed(2)} €', Colors.white70),
-                                  const SizedBox(height: 2),
-                                  _buildRowDetail('Totale Acconto', '${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                                  Divider(color: Colors.white.withOpacity(0.12), height: 10),
-                                  _buildRowDetail('Totale Tasse da Accantonare:', '-${totaleAccantonareCard.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
-                                  const SizedBox(height: 2),
-                                  _buildRowDetail('Netto Rimanente Reale:', '+${nettoRimanenteCard.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
-                                  const SizedBox(height: 10),
+                                  
+                                  // DETTAGLIO ANALITICO: SALDO
+                                  _buildSimpleRow('Saldo INPS', _formattaValuta(inpsY), Colors.white70),
+                                  const SizedBox(height: 3),
+                                  _buildSimpleRow('Saldo Imposta', _formattaValuta(impostaY), Colors.white70),
+                                  const SizedBox(height: 3),
+                                  _buildSimpleRow('Totale Saldo', _formattaValuta(totaleTasseYCard), const Color(0xFFF59E0B), isBold: true),
+                                  
+                                  const SizedBox(height: 8),
+                                  Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                                  const SizedBox(height: 8),
+                                  
+                                  // DETTAGLIO ANALITICO: ACCONTO
+                                  _buildSimpleRow('Acconto INPS', _formattaValuta(accontoInpsY1Card), Colors.white70),
+                                  const SizedBox(height: 3),
+                                  _buildSimpleRow('Acconto Imposta', _formattaValuta(accontoImpostaY1Card), Colors.white70),
+                                  const SizedBox(height: 3),
+                                  _buildSimpleRow('Totale Acconto', _formattaValuta(totaleAccontiY1Card), const Color(0xFFF97316), isBold: true),
+                                  
+                                  const SizedBox(height: 12),
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: InkWell(
                                       onTap: () => _confermaEliminazione(context, f),
                                       borderRadius: BorderRadius.circular(8),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFEF4444).withOpacity(0.12),
                                           borderRadius: BorderRadius.circular(8),
@@ -415,15 +472,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
           const SizedBox(height: 10),
 
-          // 📌 SCHEDA RIEPILOGO IN BASSO
+          // 📌 SCHEDA RIEPILOGO IN BASSO (CON ANNI DINAMICI E CUSCINETTO)
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withOpacity(0.5),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -433,25 +491,75 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                           ? 'RIEPILOGO FISCALE COMPLETO'
                           : 'RIEPILOGO FISCALE (${_mesiStr[_meseSelezionato].toUpperCase()})',
                       style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 9,
+                        color: Color(0xFF2DD4BF),
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
                       ),
                     ),
-                    const Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 15),
+                    const Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 16),
                   ],
                 ),
+                const SizedBox(height: 12),
+                
+                // 1. INCASSO LORDO (#10B981)
+                _buildSalvaDanaioRow(
+                  icon: Icons.add_circle_outline_rounded,
+                  color: const Color(0xFF10B981),
+                  title: 'Incasso Lordo:',
+                  value: '+${_formattaValuta(lordoTotale)}',
+                  isBold: true,
+                ),
                 const SizedBox(height: 6),
-                _buildRowDetail('Totale Incassato Lordo:', '${lordoTotale.toStringAsFixed(2)} €', Colors.white, isBold: true),
-                const SizedBox(height: 2),
-                _buildRowDetail('Totale Saldo:', '-${totaleTasseY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
-                const SizedBox(height: 2),
-                _buildRowDetail('Totale Acconto:', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
-                Divider(color: Colors.white.withOpacity(0.15), height: 10),
-                _buildRowDetail('Totale Tasse da Accantonare:', '-${grandTotaleAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
-                const SizedBox(height: 2),
-                _buildRowDetail('Totale Netto Rimanente:', '+${nettoTotaleRimanente.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+
+                // 2. NETTO SPENDIBILE (#2DD4BF)
+                _buildSalvaDanaioRow(
+                  icon: Icons.account_balance_wallet_rounded,
+                  color: const Color(0xFF2DD4BF),
+                  title: 'Netto Spendibile:',
+                  value: '+${_formattaValuta(nettoTotaleSpendibile)}',
+                  isBold: true,
+                ),
+                const SizedBox(height: 6),
+
+                // 3. TOTALE TASSE (SALDO + ACCONTO) (#3B82F6)
+                _buildSalvaDanaioRow(
+                  icon: Icons.shield_rounded,
+                  color: const Color(0xFF3B82F6),
+                  title: 'Totale Tasse (Saldo + Acconto):',
+                  value: '-${_formattaValuta(grandTotaleAccantonare)}',
+                  isBold: true,
+                ),
+                const SizedBox(height: 6),
+
+                // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
+                _buildSalvaDanaioRow(
+                  icon: Icons.beach_access_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
+                  value: '-${_formattaValuta(grandQuotaFondoFerie)}',
+                ),
+                
+                const SizedBox(height: 10),
+                Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                const SizedBox(height: 8),
+
+                // 5. TOTALE SALDO DINAMICO (#F59E0B)
+                _buildSalvaDanaioRow(
+                  icon: Icons.remove_circle_outline,
+                  color: const Color(0xFFF59E0B),
+                  title: 'Totale Saldo (Anno ${DateTime.now().year}):',
+                  value: '-${_formattaValuta(totaleTasseY)}',
+                ),
+                const SizedBox(height: 6),
+
+                // 6. TOTALE ACCONTO DINAMICO (#F97316)
+                _buildSalvaDanaioRow(
+                  icon: Icons.history_toggle_off_rounded,
+                  color: const Color(0xFFF97316),
+                  title: 'Totale Acconto (Anno ${DateTime.now().year + 1}):',
+                  value: '-${_formattaValuta(totaleAccontiY1)}',
+                ),
               ],
             ),
           ),
@@ -460,7 +568,38 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     );
   }
 
-  Widget _buildRowDetail(String label, String value, Color color, {bool isBold = false}) {
+  // HELPER IN STILE "REGISTRA FATTURA" CON ICONA E VALORE IN EVIDENZA
+  Widget _buildSalvaDanaioRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String value,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isBold ? Colors.white : Colors.white70,
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  // HELPER PER LE VOCI DI DETTAGLIO ANALITICO
+  Widget _buildSimpleRow(String label, String value, Color color, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -469,7 +608,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
             label,
             style: TextStyle(
               color: isBold ? Colors.white : Colors.white60,
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             ),
             maxLines: 1,
@@ -481,7 +620,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
           value,
           style: TextStyle(
             color: color,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
           ),
         ),

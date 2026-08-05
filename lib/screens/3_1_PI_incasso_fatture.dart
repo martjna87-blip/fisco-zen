@@ -39,6 +39,16 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
   bool _isTendinaContiAperta = false;
   DateTime _dataSelezionata = DateTime.now();
 
+  // 🇮🇹 HELPER VALUTA ITALIANA (1.000,00 €)
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -202,7 +212,14 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                   final double totaleAccontiY1 = accontoInpsY1 + accontoImpostaY1;
 
                   final double tasseTotaliAccantonare = totaleSaldoY + totaleAccontiY1;
-                  final double disponibileNetto = lordo - tasseTotaliAccantonare;
+
+                  // 📌 3. CALCOLO PRUDENZIALE CUSCINETTO & NETTO SPENDIBILE REALE
+                  final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
+                  final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+                  
+                  final double nettoDopoTasse = lordo - tasseTotaliAccantonare;
+                  final double quotaFondoFerie = nettoDopoTasse * percentualeFondoFerie;
+                  final double disponibileNetto = nettoDopoTasse - quotaFondoFerie;
 
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -292,7 +309,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                 Row(
                                   children: [
                                     Text(
-                                      '+${lordo.toStringAsFixed(2)} €',
+                                      '+${_formattaValuta(lordo)}',
                                       style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 14, fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(width: 6),
@@ -323,15 +340,60 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                   ),
                                   child: Column(
                                     children: [
-                                      _buildDetailRow(Icons.add_circle_outline, 'Entrata Incasso Lordo:', '+${lordo.toStringAsFixed(2)} €', const Color(0xFF10B981)),
+                                      // 1. INCASSO LORDO (#10B981)
+                                      _buildDetailRow(
+                                        Icons.add_circle_outline,
+                                        'Incasso Lordo:',
+                                        '+${_formattaValuta(lordo)}',
+                                        const Color(0xFF10B981),
+                                        isBold: true,
+                                      ),
                                       const SizedBox(height: 6),
-                                      _buildDetailRow(Icons.account_balance_wallet_outlined, 'Disponibile Spendibile Netto:', '+${disponibileNetto.toStringAsFixed(2)} €', const Color(0xFF2DD4BF), isBold: true),
+
+                                      // 2. NETTO SPENDIBILE (#2DD4BF)
+                                      _buildDetailRow(
+                                        Icons.account_balance_wallet_outlined,
+                                        'Netto Spendibile:',
+                                        '+${_formattaValuta(disponibileNetto)}',
+                                        const Color(0xFF2DD4BF),
+                                        isBold: true,
+                                      ),
                                       const SizedBox(height: 6),
-                                      _buildDetailRow(Icons.shield_outlined, 'Totale Tasse da Accantonare:', '-${tasseTotaliAccantonare.toStringAsFixed(2)} €', const Color(0xFF3B82F6), isBold: true),
+
+                                      // 3. TASSE (SALDO + ACCONTO) (#3B82F6)
+                                      _buildDetailRow(
+                                        Icons.shield_outlined,
+                                        'Tasse (Saldo + Acconto):',
+                                        '-${_formattaValuta(tasseTotaliAccantonare)}',
+                                        const Color(0xFF3B82F6),
+                                        isBold: true,
+                                      ),
+                                      const SizedBox(height: 6),
+
+                                      // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
+                                      _buildDetailRow(
+                                        Icons.beach_access_rounded,
+                                        'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
+                                        '-${_formattaValuta(quotaFondoFerie)}',
+                                        const Color(0xFF8B5CF6),
+                                      ),
+
                                       const Divider(color: Colors.white12, height: 14),
-                                      _buildDetailRow(Icons.remove_circle_outline, 'Saldo Tasse (Anno Y):', '-${totaleSaldoY.toStringAsFixed(2)} €', const Color(0xFFF59E0B)),
+
+                                      // CALCOLO ANNO CORRENTE E SUCCESSIVO
+                                      _buildDetailRow(
+                                        Icons.remove_circle_outline,
+                                        'Saldo Tasse (Anno ${_dataSelezionata.year}):',
+                                        '-${_formattaValuta(totaleSaldoY)}',
+                                        const Color(0xFFF59E0B),
+                                      ),
                                       const SizedBox(height: 6),
-                                      _buildDetailRow(Icons.history_toggle_off_rounded, 'Acconti (Anno Y+1):', '-${totaleAccontiY1.toStringAsFixed(2)} €', const Color(0xFFF97316)),
+                                      _buildDetailRow(
+                                        Icons.history_toggle_off_rounded,
+                                        'Acconti (Anno ${_dataSelezionata.year + 1}):',
+                                        '-${_formattaValuta(totaleAccontiY1)}',
+                                        const Color(0xFFF97316),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -526,7 +588,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                       }
                                     },
                                     child: const Text(
-                                      'Conferma Incasso e Accantona',
+                                      'Conferma Incasso',
                                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                   ),
