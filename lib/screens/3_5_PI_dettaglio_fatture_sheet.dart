@@ -155,7 +155,9 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
     for (var f in fattureFiltrate) {
       final double lordo = (f['importo'] as num).toDouble();
-      final double imponibile = lordo * widget.coefficienteRedditivita;
+      // 📌 LEGGIAMO L'ATECO SPECIFICO DI OGNI SINGOLA FATTURA
+      final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+      final double imponibile = lordo * coefFattura;
       
       final double inpsY = imponibile * widget.aliquotaInps;
       final double impostaY = imponibile * widget.aliquotaImposta;
@@ -177,7 +179,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
     return AppPopupWrapper(
       title: 'Dettaglio Fiscale',
-      badgeText: 'Coeff. ${(widget.coefficienteRedditivita * 100).toInt()}%',
+      badgeText: 'Fatture Incassate',
       badgeColor: const Color(0xFF2DD4BF),
       badgeTextColor: Colors.black,
       child: Column(
@@ -239,7 +241,9 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                       final bool isExpanded = _expandedFattureIds.contains(fId);
 
                       final double lordo = (f['importo'] as num).toDouble();
-                      final double imponibile = lordo * widget.coefficienteRedditivita;
+                      // 📌 LEGGIAMO L'ATECO SPECIFICO DI OGNI SINGOLA FATTURA ANCHE PER LA CARD
+                      final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+                      final double imponibile = lordo * coefFattura;
 
                       final double inpsY = imponibile * widget.aliquotaInps;
                       final double impostaY = imponibile * widget.aliquotaImposta;
@@ -286,10 +290,28 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            '${f['cliente']} (${f['numero'] ?? 'Fattura'})',
-                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                            overflow: TextOverflow.ellipsis,
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  '${f['cliente']} (${f['numero'] ?? 'Fattura'})',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '${(coefFattura * 100).toInt()}%',
+                                                  style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           if (_formattaGiornoMese(f['data']).isNotEmpty)
                                             Text(
@@ -393,7 +415,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
           const SizedBox(height: 10),
 
-          // 📌 SCHEDA RIEPILOGO IN BASSO (Integrata armoniosamente)
+          // 📌 SCHEDA RIEPILOGO IN BASSO
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
