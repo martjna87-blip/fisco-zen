@@ -83,17 +83,23 @@ class _WalletScreenState extends State<WalletScreen> {
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double residuoTasseDaCoprire = tasseDaAccantonare;
 
+    // 📌 CALCOLO NETTO SPENDIBILE PRUDENZIALE (CON CUSCINETTO NO-LAVORO)
+    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
+    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+
     final double sommaContiLiquidi = walletProvider.accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
-    final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+
+    final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+    final double cuscinettoFerie = postTasse * percentualeFondoFerie;
+    final double nettoRealeSpendibile = postTasse - cuscinettoFerie;
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
     // 🤖 CALCOLO DINAMICO DELLE SPESE REALI PER IL PERIODO SELEZIONATO
     final txsFiltrate = movimenti.where((tx) {
       if (tx.isIncome) return false;
-      // Escludiamo i Giroconti/Trasferimenti interni dal calcolo consumi
       if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
 
       if (_isVistaAnnuale) {
@@ -110,7 +116,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
     for (var tx in txsFiltrate) {
       final cat = tx.category.toLowerCase();
-      // Classificazione esatta basata sia sulla Regola Budget sia sulla Sottocategoria
       if (cat.contains('30') || cat.contains('svag') || cat.contains('divertiment') || cat.contains('variabil')) {
         spesoRealeSvago += tx.amount;
       } else if (cat.contains('20') || cat.contains('risparm') || cat.contains('invest')) {
@@ -118,14 +123,12 @@ class _WalletScreenState extends State<WalletScreen> {
       } else if (cat.contains('50') || cat.contains('fiss') || cat.contains('alimentar') || cat.contains('casa') || cat.contains('bollet') || cat.contains('auto')) {
         spesoRealeBisogni += tx.amount;
       } else {
-        // Fallback su Bisogni Fissi solo per spese generiche senza categoria
         spesoRealeBisogni += tx.amount;
       }
     }
 
     final double totaleSpeseReali = spesoRealeBisogni + spesoRealeSvago + spesoRealeRisparmio;
 
-    // Entrate REALI di riferimento per calcolare i target 50/30/20 del periodo
     final double entratePeriodo = movimenti.where((tx) {
       if (!tx.isIncome) return false;
       if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
@@ -138,14 +141,12 @@ class _WalletScreenState extends State<WalletScreen> {
       }
     }).fold(0.0, (sum, tx) => sum + tx.amount);
 
-    // Se non ci sono entrate nel mese, il target viene calcolato sulle entrate reali o sul lordo incassato
     final double entrateRiferimento = entratePeriodo > 0 ? entratePeriodo : walletProvider.fatturatoTotale;
 
     final double targetBisogni = entrateRiferimento * 0.50;
     final double targetSvago = entrateRiferimento * 0.30;
     final double targetRisparmio = entrateRiferimento * 0.20;
 
-    // 🔍 LOGICA FILTRAGGIO MOVIMENTI
     final List<dynamic> movimentiFiltrati = (() {
       final lista = List.from(movimenti);
       lista.sort((a, b) => b.date.compareTo(a.date));
@@ -168,7 +169,6 @@ class _WalletScreenState extends State<WalletScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // 🎯 HEADER WALLET IMMERSIVO
             Stack(
               alignment: Alignment.center,
               children: [
@@ -268,7 +268,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _formattaInt(patrimonioNetto), // 🇮🇹 Formattazione italiana (es. 10.000 €)
+                                _formattaInt(patrimonioNetto),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 44,
@@ -297,8 +297,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                     icon: Icons.payments_rounded,
                                     color: const Color(0xFF10B981),
                                     titolo: 'Liquidità Reale Spendibile',
-                                    descrizione: 'Sono i tuoi veri soldi personali spendibili. Calcolati prendendo i saldi dei tuoi conti e togliendo le tasse stimate in sospeso.',
-                                    formula: 'Conti Liquidi − Tasse da Accantonare',
+                                    descrizione: 'Sono i tuoi veri soldi personali spendibili in serenità. Calcolati prendendo i saldi dei tuoi conti e togliendo sia le tasse stimate che il cuscinetto di protezione per i mesi non lavorati.',
+                                    formula: 'Conti Liquidi − Tasse − Cuscinetto No-Lavoro',
                                   );
                                 },
                                 borderRadius: BorderRadius.circular(16),
@@ -315,7 +315,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                       const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _formattaInt(nettoReale), // 🇮🇹 Formattazione italiana (es. 1.250 €)
+                                        _formattaInt(nettoRealeSpendibile),
                                         style: const TextStyle(
                                           color: Color(0xFF10B981),
                                           fontSize: 13,
@@ -355,7 +355,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                       const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _formattaInt(tasseTotaliCalcolate), // 🇮🇹 Formattazione italiana (es. 1.116 €)
+                                        _formattaInt(tasseTotaliCalcolate),
                                         style: const TextStyle(
                                           color: Color(0xFF3B82F6),
                                           fontSize: 13,
@@ -410,7 +410,6 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
 
-            // CONTENUTO SCROLLABILE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -418,7 +417,6 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 1. 📊 SCHEDA BUSSOLA SPESE
                   _buildRipartizioneSpeseCard(
                     spesoBisogni: spesoRealeBisogni,
                     spesoSvago: spesoRealeSvago,
@@ -432,7 +430,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 2. 3 QUADRANTI AZIONE
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -454,7 +451,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: _buildMiniCard(
                           icon: Icons.account_balance_wallet_outlined,
                           title: 'Gestione\nConti',
-                          value: '3 Attivi',
+                          value: '${walletProvider.accounts.length} Attivi',
                           onTap: () {
                             AppPopupWrapper.mostra(
                               context: context,
@@ -467,8 +464,8 @@ class _WalletScreenState extends State<WalletScreen> {
                       Expanded(
                         child: _buildMiniCard(
                           icon: Icons.pie_chart_outline_rounded,
-                          title: 'Pilotaggio\nBudget',
-                          value: 'Pianificazione',
+                          title: 'Pianificazione\nSpese',
+                          value: 'Budget',
                           onTap: () {
                             AppPopupWrapper.mostra(
                               context: context,
@@ -482,7 +479,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 3. SERBATOIO RISERVA TASSE
                   if (mostraPiva) ...[
                     GestureDetector(
                       onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
@@ -509,12 +505,11 @@ class _WalletScreenState extends State<WalletScreen> {
                               : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded),
                           title: acc.title,
                           subtitle: acc.subtitle,
-                          amount: _formattaValuta(acc.amount), // 🇮🇹 Formattazione italiana (es. 1.500,00 €)
+                          amount: _formattaValuta(acc.amount),
                           color: acc.color,
                         ),
                       )),
 
-                  // 🎯 HEADER CON TITOLO E TENDINA SELETTORE MESI
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -556,7 +551,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 📌 LISTA MOVIMENTI O STATO VUOTO
                   if (movimentiFiltrati.isEmpty)
                     Container(
                       width: double.infinity,
@@ -578,7 +572,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           icon: tx.isIncome ? Icons.arrow_downward_rounded : Icons.shopping_bag_outlined,
                           title: tx.title,
                           subtitle: tx.subtitle,
-                          amount: '${tx.isIncome ? '+' : '-'}${_formattaValuta(tx.amount)}', // 🇮🇹 Formattazione italiana (es. +3.000,00 €)
+                          amount: '${tx.isIncome ? '+' : '-'}${_formattaValuta(tx.amount)}',
                           isIncome: tx.isIncome,
                         )),
                 ],
@@ -590,7 +584,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  // 📊 SCHEDA BUSSOLA SPESE
   Widget _buildRipartizioneSpeseCard({
     required double spesoBisogni,
     required double spesoSvago,
@@ -626,7 +619,6 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 📌 1. HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -664,7 +656,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
           const SizedBox(height: 14),
 
-          // 📌 2. SELETTORE PERIODO
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -749,7 +740,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
           const SizedBox(height: 12),
 
-          // 📌 3. BARRA GLOBALE
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: Container(
@@ -781,9 +771,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
           const SizedBox(height: 14),
 
-          // 📌 4. LE 3 RIGHE CON CIFRE ITALIANE
           _buildRigaConfrontoRealeTarget(
-            titolo: 'Bisogni Fissi',
+            titolo: 'Spese Fisse & Bisogni',
             targetPct: 50,
             valoreReale: spesoBisogni,
             valoreRiferimento: targetBisogni,
@@ -799,7 +788,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           const SizedBox(height: 8),
           _buildRigaConfrontoRealeTarget(
-            titolo: 'Margine & Risparmio',
+            titolo: 'Risparmi & Futuro',
             targetPct: 20,
             valoreReale: margineRisparmioReale,
             valoreRiferimento: targetRisparmio,
@@ -807,7 +796,6 @@ class _WalletScreenState extends State<WalletScreen> {
             isRisparmio: true,
           ),
 
-          // 📌 5. SUGGERIMENTO CONVERSAZIONALE
           const SizedBox(height: 12),
           Divider(color: Colors.white.withOpacity(0.06), height: 1),
           const SizedBox(height: 10),
@@ -842,7 +830,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  // 📌 RIGA INTELLIGENTE CON FORMATTAZIONE ITALIANA
   Widget _buildRigaConfrontoRealeTarget({
     required String titolo,
     required int targetPct,
@@ -884,7 +871,7 @@ class _WalletScreenState extends State<WalletScreen> {
         Row(
           children: [
             Text(
-              _formattaInt(valoreReale), // 🇮🇹 Formattazione italiana (es. 500 €)
+              _formattaInt(valoreReale),
               style: TextStyle(
                 color: inAllarme ? const Color(0xFFEF4444) : Colors.white,
                 fontSize: 12,
@@ -951,7 +938,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   title,
                   style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 10,
+                    fontSize: 12,
                     height: 1.15,
                   ),
                   maxLines: 2,
@@ -965,7 +952,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     value,
                     style: TextStyle(
                       color: valueColor ?? Colors.white,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,

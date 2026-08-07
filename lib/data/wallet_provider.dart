@@ -82,6 +82,7 @@ class TransactionModel {
   final bool isRecurrent; 
   final String? frequenza; 
   final String? giornoRicorrenza; 
+  final DateTime? dataFineRicorrenza; // 🟢 Nuova proprietà di scadenza
 
   TransactionModel({
     required this.id,
@@ -95,6 +96,7 @@ class TransactionModel {
     this.isRecurrent = false,
     this.frequenza,
     this.giornoRicorrenza,
+    this.dataFineRicorrenza,
   });
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +111,7 @@ class TransactionModel {
         'isRecurrent': isRecurrent,
         'frequenza': frequenza,
         'giornoRicorrenza': giornoRicorrenza,
+        'dataFineRicorrenza': dataFineRicorrenza?.toIso8601String(),
       };
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => TransactionModel(
@@ -123,6 +126,9 @@ class TransactionModel {
         isRecurrent: json['isRecurrent'] as bool? ?? false,
         frequenza: json['frequenza'] as String?,
         giornoRicorrenza: json['giornoRicorrenza'] as String?,
+        dataFineRicorrenza: json['dataFineRicorrenza'] != null 
+            ? DateTime.parse(json['dataFineRicorrenza'] as String) 
+            : null,
       );
 }
 
@@ -140,7 +146,7 @@ class WalletProvider extends ChangeNotifier {
 
   // PROFILO ONBOARDING & MOTORE FISCALE
   String _codiceAteco = '62.02.00';
-  String get codiceAteco => _codiceAteco; // 👈 RIGA AGGIUNTA QUI!
+  String get codiceAteco => _codiceAteco;
   double _coefficienteRedditivita = 0.78;
   String _tipoCassa = 'gestioneSeparata';
   bool _isStartup = true;
@@ -159,7 +165,6 @@ class WalletProvider extends ChangeNotifier {
   double _fatturatoStimatoAnnuo = 35000.0;
   int _mesiAttiviIncasso = 10;
   int get mesiAttivi => _mesiAttiviIncasso;
-  int get mesiAttiviIncasso => _mesiAttiviIncasso;
 
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,
@@ -310,37 +315,61 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
+  // 🟢 CONTROLLO SCADENZA IMMUNE DA ORARI E MILLISECONDI
+  bool _superaDataFine(DateTime dataVirtuale, DateTime? dataFine) {
+    if (dataFine == null) return false;
+    final dVirtuale = DateTime(dataVirtuale.year, dataVirtuale.month, dataVirtuale.day);
+    final dFine = DateTime(dataFine.year, dataFine.month, dataFine.day);
+    return dVirtuale.isAfter(dFine);
+  }
+
   List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
     final oggi = DateTime.now();
     final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
     for (var tx in ricorrenti) {
-      if (tx.frequenza == 'Ogni mese' && tx.giornoRicorrenza != null) {
-        int giornoPrevisto = int.tryParse(tx.giornoRicorrenza!) ?? 1;
-        DateTime dataVirtuale;
-        try {
-          dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoPrevisto);
-        } catch (e) {
-          dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0); 
-        }
+      // 1. GESTIONE TUTTE LE FREQUENZE MULTI-MENSILI E MENSILI
+      if (tx.frequenza != 'Ogni settimana') {
+        int stepMesi = 1;
+        if (tx.frequenza == 'Ogni 2 mesi') stepMesi = 2;
+        else if (tx.frequenza == 'Ogni 3 mesi (Trimestrale)') stepMesi = 3;
+        else if (tx.frequenza == 'Ogni 6 mesi (Semestrale)') stepMesi = 6;
+        else if (tx.frequenza == 'Ogni anno (Annuale)') stepMesi = 12;
 
-        bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
+        int mesiDiff = (meseRiferimento.year - tx.date.year) * 12 + (meseRiferimento.month - tx.date.month);
 
-        if (dataVirtuale.isAfter(oggi) && !isStessoMeseCreazione) {
-          previsti.add(TransactionModel(
-            id: 'prev_${tx.id}_${dataVirtuale.month}', 
-            title: tx.title,
-            subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', 
-            amount: tx.amount,
-            isIncome: tx.isIncome,
-            category: tx.category,
-            date: dataVirtuale,
-            accountId: tx.accountId,
-            isRecurrent: true, 
-          ));
+        if (mesiDiff >= 0 && mesiDiff % stepMesi == 0) {
+          int giornoPrevisto = int.tryParse(tx.giornoRicorrenza ?? '1') ?? tx.date.day;
+
+          int maxGiorniMese = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0).day;
+          int giornoEffettivo = giornoPrevisto > maxGiorniMese ? maxGiorniMese : giornoPrevisto;
+
+          DateTime dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoEffettivo);
+
+          // 🔒 STOP PREVISIONI SE È STATO SUPERATO IL TERMINE DELLA RICORRENZA
+          if (_superaDataFine(dataVirtuale, tx.dataFineRicorrenza)) {
+            continue;
+          }
+
+          bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
+
+          if (dataVirtuale.isAfter(oggi) && !isStessoMeseCreazione) {
+            previsti.add(TransactionModel(
+              id: 'prev_${tx.id}_${dataVirtuale.month}', 
+              title: tx.title,
+              subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', 
+              amount: tx.amount,
+              isIncome: tx.isIncome,
+              category: tx.category,
+              date: dataVirtuale,
+              accountId: tx.accountId,
+              isRecurrent: true, 
+            ));
+          }
         }
       }
+      // 2. GESTIONE FREQUENZA SETTIMANALE
       else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
         final keySettimanale = '${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}';
         if (_skippedPredictions.contains(keySettimanale)) continue;
@@ -353,6 +382,11 @@ class WalletProvider extends ChangeNotifier {
         for (int i = 1; i <= daysInMonth; i++) {
           DateTime checkDate = DateTime(meseRiferimento.year, meseRiferimento.month, i);
           if (checkDate.weekday == targetWeekday) {
+            // 🔒 VERIFICA ANCHE LA DATA DI FINE PER LE OCCORRENZE SETTIMANALI
+            if (_superaDataFine(checkDate, tx.dataFineRicorrenza)) {
+              continue;
+            }
+
             if (checkDate.isAfter(oggi) && checkDate.isAfter(tx.date)) {
               numOccorrenze++;
               primaDataValida ??= checkDate; 
@@ -408,6 +442,124 @@ class WalletProvider extends ChangeNotifier {
       throw Exception('Impossibile eliminare: deve esserci almeno un conto attivo.');
     }
     _accounts.removeWhere((a) => a.id == accountId);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  void chiudiContoGuidato({
+    required String targetAccountId,
+    required String? saldoDestinazioneAccountId,
+    required Map<String, String> mappaNuoviContiRicorrenze, // idTx -> newAccountId ('ANNULLA' per disattivare)
+  }) {
+    final targetIndex = _accounts.indexWhere((a) => a.id == targetAccountId);
+    if (targetIndex == -1) return;
+
+    final target = _accounts[targetIndex];
+
+    // 1. Blocco di sicurezza sui conti protetti
+    if (target.role == AccountRole.principal ||
+        target.role == AccountRole.taxReserve ||
+        target.id == '1' ||
+        target.id == '3') {
+      throw Exception('"${target.title}" è un conto di sistema protetto e non può essere eliminato.');
+    }
+
+    // 2. SMISTAMENTO SALDO RESIDUO
+    if (target.amount != 0.0) {
+      final double residuo = target.amount;
+
+      if (saldoDestinazioneAccountId != null && saldoDestinazioneAccountId != 'AZZERA') {
+        // Giroconto di chiusura verso un altro conto
+        final contoDestinazione = _accounts.firstWhere(
+          (a) => a.id == saldoDestinazioneAccountId,
+          orElse: () => _accounts.first,
+        );
+        contoDestinazione.amount += residuo;
+
+        _transactions.insert(
+          0,
+          TransactionModel(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: 'Chiusura: ${target.title}',
+            subtitle: 'Giroconto residuo a ${contoDestinazione.title}',
+            amount: residuo.abs(),
+            isIncome: residuo > 0,
+            category: 'Giroconto',
+            date: DateTime.now(),
+            accountId: contoDestinazione.id,
+          ),
+        );
+      } else {
+        // L'utente ha indicato di aver prelevato/azzerato fisicamente il saldo
+        _transactions.insert(
+          0,
+          TransactionModel(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: 'Azzeramento: ${target.title}',
+            subtitle: 'Rettifica saldo pre-chiusura',
+            amount: residuo.abs(),
+            isIncome: false,
+            category: 'Risparmi',
+            date: DateTime.now(),
+            accountId: target.id,
+          ),
+        );
+      }
+    }
+
+    // 3. GESTIONE RICORRENZE E SIGILLO STORICO
+    for (int i = 0; i < _transactions.length; i++) {
+      final tx = _transactions[i];
+
+      if (tx.accountId == targetAccountId && tx.isRecurrent) {
+        final nuovaScelta = mappaNuoviContiRicorrenze[tx.id];
+
+        if (nuovaScelta == 'ANNULLA' || nuovaScelta == null) {
+          _transactions[i] = TransactionModel(
+            id: tx.id,
+            title: '${tx.title} [Ex ${target.title}]',
+            subtitle: tx.subtitle,
+            amount: tx.amount,
+            isIncome: tx.isIncome,
+            category: tx.category,
+            date: tx.date,
+            accountId: tx.accountId,
+            isRecurrent: false,
+          );
+        } else {
+          _transactions[i] = TransactionModel(
+            id: tx.id,
+            title: tx.title,
+            subtitle: tx.subtitle,
+            amount: tx.amount,
+            isIncome: tx.isIncome,
+            category: tx.category,
+            date: tx.date,
+            accountId: nuovaScelta,
+            isRecurrent: true,
+            frequenza: tx.frequenza,
+            giornoRicorrenza: tx.giornoRicorrenza,
+          );
+        }
+      } 
+      else if (tx.accountId == targetAccountId) {
+        _transactions[i] = TransactionModel(
+          id: tx.id,
+          title: '${tx.title} [Ex ${target.title}]',
+          subtitle: tx.subtitle,
+          amount: tx.amount,
+          isIncome: tx.isIncome,
+          category: tx.category,
+          date: tx.date,
+          accountId: tx.accountId,
+          isRecurrent: false,
+        );
+      }
+    }
+
+    _accounts.removeAt(targetIndex);
+
+    _aggiornaTasseVirtuali();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -556,6 +708,7 @@ class WalletProvider extends ChangeNotifier {
     bool isRecurrent = false, 
     String? frequenza,        
     String? giornoRicorrenza, 
+    DateTime? dataFineRicorrenza, // 🟢 Accetta dataFineRicorrenza
   }) {
     final DateTime dataUso = date ?? DateTime.now();
 
@@ -576,6 +729,7 @@ class WalletProvider extends ChangeNotifier {
       isRecurrent: isRecurrent,
       frequenza: frequenza,
       giornoRicorrenza: giornoRicorrenza,
+      dataFineRicorrenza: dataFineRicorrenza, // 🟢 Salva il campo nel modello
     );
 
     _transactions.insert(0, newTx);
@@ -805,6 +959,23 @@ class WalletProvider extends ChangeNotifier {
     );
 
     _accounts.add(newAccount);
+
+    if (initialAmount > 0) {
+      _transactions.insert(
+        0,
+        TransactionModel(
+          id: '${newId}_init',
+          title: 'Saldo Iniziale: $title',
+          subtitle: 'Apertura conto',
+          amount: initialAmount,
+          isIncome: true,
+          category: 'Risparmi',
+          date: DateTime.now(),
+          accountId: newId,
+        ),
+      );
+    }
+
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -839,8 +1010,29 @@ class WalletProvider extends ChangeNotifier {
   }) {
     final idx = _accounts.indexWhere((a) => a.id == accountId);
     if (idx != -1) {
+      final oldTitle = _accounts[idx].title;
       _accounts[idx].title = newTitle;
       _accounts[idx].amount = newAmount;
+
+      for (int i = 0; i < _transactions.length; i++) {
+        final tx = _transactions[i];
+        if (tx.title.contains(oldTitle) && tx.category == 'Giroconto') {
+          _transactions[i] = TransactionModel(
+            id: tx.id,
+            title: tx.title.replaceAll(oldTitle, newTitle),
+            subtitle: tx.subtitle,
+            amount: tx.amount,
+            isIncome: tx.isIncome,
+            category: tx.category,
+            date: tx.date,
+            accountId: tx.accountId,
+            isRecurrent: tx.isRecurrent,
+            frequenza: tx.frequenza,
+            giornoRicorrenza: tx.giornoRicorrenza,
+          );
+        }
+      }
+
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
@@ -908,10 +1100,6 @@ class WalletProvider extends ChangeNotifier {
       titoloA = 'Rientro Liquidità da Tasse ⚠️';
     }
 
-    // 🎯 addTransaction si occupa GIÀ di aggiornare i saldi dei due conti!
-    // Non dobbiamo fare accDa.amount -= importo a mano qui.
-
-    // 1. Registra l'uscita dal primo conto
     addTransaction(
       title: titoloDa,
       amount: importo,
@@ -920,7 +1108,6 @@ class WalletProvider extends ChangeNotifier {
       accountId: accDa.id,
     );
 
-    // 2. Registra l'entrata nel secondo conto
     addTransaction(
       title: titoloA,
       amount: importo,

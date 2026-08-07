@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,16 +20,18 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   DateTime _meseSelezionato = DateTime(2026, 8);
   String _filtroVisualizzazione = 'tutti';
 
-  final Set<String> _categorieEspanse = {'Bisogni (50%)', 'Svago (30%)'};
+  // 🔒 STATO INIZIALE: TUTTI I TRE ELEMENTI SONO CHIUSI ALL'APERTURA
+  final Set<String> _categorieEspanse = {};
 
   double _percentBisogni = 50.0;
   double _percentSvago = 30.0;
   double _percentRisparmio = 20.0;
   double _entrateMensiliRiferimento = 2500.00;
 
-  final List<String> _nomiMesi = [
-    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  // 🇮🇹 MESI A 3 LETTERE PER NON OCCUPARE SPAZIO
+  final List<String> _nomiMesiBrevi = [
+    'GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU',
+    'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
   ];
 
   final List<String> _sottocategorieDisponibili = [
@@ -78,6 +79,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       'previsto': 120.00,
       'tipo': 'annuale_spalmata',
       'totaleAnnuale': 1440.00,
+      'meseScadenza': 'SET',
     },
     {
       'id': '5',
@@ -127,8 +129,26 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     super.dispose();
   }
 
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$intPart,${parti[1]} €';
+  }
+
+  String _formattaInt(double importo) {
+    final intVal = importo.round();
+    final strVal = intVal.abs().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$strVal €';
+  }
+
   String _stringaMeseAnno(DateTime dt) {
-    return '${_nomiMesi[dt.month - 1]} ${dt.year}';
+    return '${_nomiMesiBrevi[dt.month - 1]} ${dt.year}';
   }
 
   void _cambiaMese(int delta) {
@@ -154,7 +174,9 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   void _gestisciSpesaDialog(Map<String, dynamic> voce) {
     HapticFeedback.heavyImpact();
     final TextEditingController nomeCtrl = TextEditingController(text: voce['nome']);
-    final TextEditingController previstoCtrl = TextEditingController(text: (voce['previsto'] as num).toStringAsFixed(2));
+    final TextEditingController previstoCtrl = TextEditingController(
+      text: (voce['previsto'] as num).toStringAsFixed(2).replaceAll('.', ','),
+    );
     String sottoCatSel = voce['sottocategoria'] ?? 'Alimentari';
 
     AppSecondaryPopup.mostra(
@@ -165,7 +187,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       testoConferma: 'Salva',
       onConferma: () {
         final nuovoNome = nomeCtrl.text.trim();
-        final nuovoPrevisto = double.tryParse(previstoCtrl.text.replaceAll(',', '.')) ?? voce['previsto'];
+        final nuovoPrevisto = double.tryParse(previstoCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? voce['previsto'];
 
         if (nuovoNome.isNotEmpty) {
           setState(() {
@@ -182,7 +204,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
         children: [
           TextField(
             controller: nomeCtrl,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
               labelText: 'Nome Spesa',
               labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -195,22 +217,23 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           TextField(
             controller: previstoCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               labelText: 'Budget Previsto (€)',
               labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 16),
             ),
           ),
           const SizedBox(height: 12),
-          const Text('CATEGORIA', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+          const Text('CATEGORIA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             value: _sottocategorieDisponibili.contains(sottoCatSel) ? sottoCatSel : _sottocategorieDisponibili.first,
             dropdownColor: const Color(0xFF1C1C21),
-            style: const TextStyle(color: Colors.white, fontSize: 13),
+            style: const TextStyle(color: Colors.white, fontSize: 12),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
@@ -228,8 +251,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               Navigator.pop(context);
               AppNotifications.mostraInAlto(context, 'Voce rimossa dal piano', type: NotificationType.warning);
             },
-            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-            label: const Text('Elimina questa spesa', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
+            label: const Text('Elimina questa spesa', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -241,11 +264,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final TextEditingController importoCtrl = TextEditingController();
     final TextEditingController quotaManualeCtrl = TextEditingController();
 
-    String categoriaSel = 'Bisogni (50%)';
+    String categoriaSel = '50';
     String sottoCatSel = _sottocategorieDisponibili.first;
-    String tipoSpesaSel = 'mensile'; // 'mensile' | 'annuale'
-    String modalitaAccantonamento = 'spalmata_12'; // 'spalmata_12' | 'addebito_unico' | 'manuale'
-    String meseScadenzaSel = _nomiMesi[_meseSelezionato.month - 1];
+    String tipoSpesaSel = 'mensile'; 
+    String modalitaAccantonamento = 'spalmata_12';
+    String meseScadenzaSel = _nomiMesiBrevi[_meseSelezionato.month - 1];
 
     AppSecondaryPopup.mostra(
       context: context,
@@ -255,8 +278,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       testoConferma: 'Aggiungi',
       onConferma: () {
         final nome = nomeCtrl.text.trim();
-        final importoTotale = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
-        final quotaManuale = double.tryParse(quotaManualeCtrl.text.replaceAll(',', '.')) ?? 0.0;
+        final importoTotale = double.tryParse(importoCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+        final quotaManuale = double.tryParse(quotaManualeCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
 
         if (nome.isNotEmpty && importoTotale > 0) {
           double quotaMensileCalcolata = importoTotale;
@@ -265,8 +288,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             if (modalitaAccantonamento == 'spalmata_12') {
               quotaMensileCalcolata = importoTotale / 12;
             } else if (modalitaAccantonamento == 'addebito_unico') {
-              // Se siamo nel mese di scadenza, grava al 100%, altrimenti 0 €
-              final bool eMeseDiScadenza = _nomiMesi[_meseSelezionato.month - 1] == meseScadenzaSel;
+              final bool eMeseDiScadenza = _nomiMesiBrevi[_meseSelezionato.month - 1] == meseScadenzaSel;
               quotaMensileCalcolata = eMeseDiScadenza ? importoTotale : 0.0;
             } else if (modalitaAccantonamento == 'manuale') {
               quotaMensileCalcolata = quotaManuale;
@@ -277,7 +299,9 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             _vociPianificate.add({
               'id': DateTime.now().millisecondsSinceEpoch.toString(),
               'nome': nome,
-              'categoria': categoriaSel,
+              'categoria': categoriaSel == '50' 
+                  ? 'Bisogni (50%)' 
+                  : (categoriaSel == '30' ? 'Svago (30%)' : 'Risparmio (20%)'),
               'sottocategoria': sottoCatSel,
               'previsto': quotaMensileCalcolata,
               'tipo': tipoSpesaSel == 'annuale' ? 'annuale_spalmata' : 'mensile',
@@ -287,7 +311,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             });
           });
           Navigator.pop(context);
-          AppNotifications.mostraInAlto(context, 'Spesa "$nome" aggiunta al piano! 🎉');
+          AppNotifications.mostraInAlto(context, 'Spesa "$nome" aggiunta alla pianificazione! 🎉');
         } else {
           AppNotifications.mostraInAlto(
             context,
@@ -299,8 +323,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       child: StatefulBuilder(
         builder: (context, setDialogState) {
           final bool isAnnuale = tipoSpesaSel == 'annuale';
-          final double importoTotale = double.tryParse(importoCtrl.text.replaceAll(',', '.')) ?? 0.0;
-          final double quotaManuale = double.tryParse(quotaManualeCtrl.text.replaceAll(',', '.')) ?? 0.0;
+          final double importoTotale = double.tryParse(importoCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
 
           return SingleChildScrollView(
             child: Column(
@@ -309,7 +332,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               children: [
                 TextField(
                   controller: nomeCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: 'Nome spesa (es. Assicurazione, TARI)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -323,7 +346,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                   children: [
                     Expanded(
                       child: ChoiceChip(
-                        label: const Text('Spesa Mensile', style: TextStyle(fontSize: 12)),
+                        label: const Text('Spesa Mensile', style: TextStyle(fontSize: 11)),
                         selected: !isAnnuale,
                         selectedColor: const Color(0xFF2DD4BF),
                         backgroundColor: Colors.white.withOpacity(0.05),
@@ -334,7 +357,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: ChoiceChip(
-                        label: const Text('Annuale 📅', style: TextStyle(fontSize: 12)),
+                        label: const Text('Annuale', style: TextStyle(fontSize: 11)),
                         selected: isAnnuale,
                         selectedColor: const Color(0xFF3B82F6),
                         backgroundColor: Colors.white.withOpacity(0.05),
@@ -349,18 +372,17 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                   controller: importoCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setDialogState(() {}),
-                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
                     labelText: isAnnuale ? 'Importo Totale Annuale (€)' : 'Costo Mensile (€)',
                     labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 18),
+                    prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Color(0xFF2DD4BF), size: 16),
                   ),
                 ),
 
-                // 📌 SEZIONE CONFIGURAZIONE ANNUALE
                 if (isAnnuale) ...[
                   const SizedBox(height: 12),
                   const Text('MESE DI SCADENZA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -368,29 +390,28 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                   DropdownButtonFormField<String>(
                     value: meseScadenzaSel,
                     dropdownColor: const Color(0xFF1C1C21),
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF3B82F6), size: 18),
+                      prefixIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF3B82F6), size: 16),
                     ),
-                    items: _nomiMesi.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                    items: _nomiMesiBrevi.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                     onChanged: (val) => setDialogState(() => meseScadenzaSel = val!),
                   ),
                   const SizedBox(height: 12),
                   const Text('COME VUOI GESTIRLA NEL BUDGET?', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   
-                  // SELETTORE MODALITÀ
                   Column(
                     children: [
                       RadioListTile<String>(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         activeColor: const Color(0xFF2DD4BF),
-                        title: const Text('Spalma su 12 mesi', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        subtitle: Text('Accantoni ${(importoTotale / 12).toStringAsFixed(0)} € al mese', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                        title: const Text('Spalma su 12 mesi', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        subtitle: Text('Accantoni ${_formattaValuta(importoTotale / 12)} al mese', style: const TextStyle(color: Colors.white54, fontSize: 10)),
                         value: 'spalmata_12',
                         groupValue: modalitaAccantonamento,
                         onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
@@ -399,8 +420,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         activeColor: const Color(0xFF2DD4BF),
-                        title: const Text('Addebito Unico a Scadenza', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        subtitle: Text('0 € nei mesi ordinari, ${importoTotale.toStringAsFixed(0)} € solo a $meseScadenzaSel', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                        title: const Text('Addebito Unico a Scadenza', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        subtitle: Text('0 € nei mesi ordinari, ${_formattaValuta(importoTotale)} solo a $meseScadenzaSel', style: const TextStyle(color: Colors.white54, fontSize: 10)),
                         value: 'addebito_unico',
                         groupValue: modalitaAccantonamento,
                         onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
@@ -409,8 +430,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         activeColor: const Color(0xFF2DD4BF),
-                        title: const Text('Quota Mensile Personalizzata', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Decidi tu quanti euro mettere via al mese', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        title: const Text('Quota Mensile Personalizzata', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Decidi tu quanti euro mettere via al mese', style: TextStyle(color: Colors.white54, fontSize: 10)),
                         value: 'manuale',
                         groupValue: modalitaAccantonamento,
                         onChanged: (val) => setDialogState(() => modalitaAccantonamento = val!),
@@ -424,7 +445,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                       controller: quotaManualeCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (_) => setDialogState(() {}),
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
                       decoration: InputDecoration(
                         labelText: 'Quota Mensile da Accantonare (€)',
                         labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
@@ -437,21 +458,21 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 ],
 
                 const SizedBox(height: 12),
-                const Text('MACRO CATEGORIA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                const Text('REGOLA DI BUDGET (50/30/20)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
                   value: categoriaSel,
                   dropdownColor: const Color(0xFF1C1C21),
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'Bisogni (50%)', child: Text('📌 Bisogni Fissi (50%)')),
-                    DropdownMenuItem(value: 'Svago (30%)', child: Text('🎉 Svago & Tempo Libero (30%)')),
-                    DropdownMenuItem(value: 'Risparmio (20%)', child: Text('🐷 Risparmi & Futuro (20%)')),
+                    DropdownMenuItem(value: '50', child: Text('Spese Fisse & Bisogni (50%)')),
+                    DropdownMenuItem(value: '30', child: Text('Spese Variabili & Tempo Libero (30%)')),
+                    DropdownMenuItem(value: '20', child: Text('Risparmi & Futuro (20%)')),
                   ],
                   onChanged: (val) => setDialogState(() => categoriaSel = val!),
                 ),
@@ -467,14 +488,16 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     double tempBisogni = _percentBisogni;
     double tempSvago = _percentSvago;
     double tempRisparmio = _percentRisparmio;
-    final TextEditingController entrateCtrl = TextEditingController(text: _entrateMensiliRiferimento.toStringAsFixed(0));
+    final TextEditingController entrateCtrl = TextEditingController(
+      text: _entrateMensiliRiferimento.toStringAsFixed(0),
+    );
 
     AppSecondaryPopup.mostra(
       context: context,
       icon: Icons.tune_rounded,
       iconColor: const Color(0xFF2DD4BF),
       titolo: 'Regola 50 / 30 / 20',
-      testoConferma: 'Salva',
+      testoConferma: 'Salva Regola',
       onConferma: () {
         final int totale = (tempBisogni + tempSvago + tempRisparmio).round();
         if (totale == 100) {
@@ -506,32 +529,32 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 TextField(
                   controller: entrateCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                   decoration: InputDecoration(
-                    labelText: 'Entrate Mensili Nette (€)',
-                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                    labelText: 'Entrate Mensili Nette di Riferimento (€)',
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.payments_outlined, color: Color(0xFF2DD4BF), size: 18),
+                    prefixIcon: const Icon(Icons.payments_outlined, color: Color(0xFF2DD4BF), size: 16),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text('📌 Bisogni: ${tempBisogni.toInt()}%', style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 14),
+                Text('Spese Fisse & Bisogni: ${tempBisogni.toInt()}%', style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 12)),
                 Slider(
                   value: tempBisogni,
                   min: 10, max: 80, divisions: 14,
                   activeColor: const Color(0xFF2DD4BF),
                   onChanged: (val) => setDialogState(() => tempBisogni = val),
                 ),
-                Text('🎉 Svago: ${tempSvago.toInt()}%', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('Spese Variabili & Tempo Libero: ${tempSvago.toInt()}%', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 12)),
                 Slider(
                   value: tempSvago,
                   min: 10, max: 80, divisions: 14,
                   activeColor: const Color(0xFFF59E0B),
                   onChanged: (val) => setDialogState(() => tempSvago = val),
                 ),
-                Text('🐷 Risparmi: ${tempRisparmio.toInt()}%', style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('Risparmi & Futuro: ${tempRisparmio.toInt()}%', style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 12)),
                 Slider(
                   value: tempRisparmio,
                   min: 0, max: 50, divisions: 10,
@@ -545,7 +568,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     style: TextStyle(
                       color: eValido ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ),
@@ -583,36 +606,36 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     }
 
     return AppPopupWrapper(
-      title: 'Pilotaggio Budget',
+      title: 'Pianificazione Spese', // 👈 TITOLO ELEGANTE E PERSONALE
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. BARRA MESI E PULSANTI D'AZIONE
+          // 1. BARRA MESI COMPATTA CON MESI A 3 LETTERE + TASTI AZIONE
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Row(
                   children: [
                     InkWell(
                       onTap: () => _cambiaMese(-1),
-                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 22),
+                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
                       stringaMeseCorrente.toUpperCase(),
-                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     InkWell(
                       onTap: () => _cambiaMese(1),
-                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
+                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
                     ),
                   ],
                 ),
@@ -621,29 +644,43 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 children: [
                   InkWell(
                     onTap: _mostraDialogModificaRegola,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.white12),
                       ),
-                      child: const Text('Target 50/30/20', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune_rounded, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text('Modifica 50/30/20', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
                   InkWell(
                     onTap: _mostraDialogAggiungiSpesa,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF2DD4BF).withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
                       ),
-                      child: const Text('+ Spesa', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
+                          SizedBox(width: 2),
+                          Text('Spesa', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -651,42 +688,39 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 2. BANNER COMPATTO DEL COACH FINANZIARIO
-          _buildCoachBannerPulito(percentualeRisparmioStimata),
-
-          const SizedBox(height: 12),
-
-          // 3. FILTRI
+          // 2. FILTRI COMPATTI
           Row(
             children: [
               FilterChip(
                 selected: _filtroVisualizzazione == 'tutti',
-                label: const Text('Tutte le Voci', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text('Tutte le Voci', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 backgroundColor: Colors.white.withOpacity(0.05),
                 selectedColor: const Color(0xFF2DD4BF).withOpacity(0.25),
                 side: BorderSide(color: _filtroVisualizzazione == 'tutti' ? const Color(0xFF2DD4BF) : Colors.white12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                visualDensity: VisualDensity.compact,
                 onSelected: (_) => setState(() => _filtroVisualizzazione = 'tutti'),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               FilterChip(
                 selected: _filtroVisualizzazione == 'da_saldare',
-                avatar: const Icon(Icons.hourglass_top_rounded, size: 14, color: Color(0xFFF59E0B)),
-                label: const Text('Da Saldare ⏳', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                avatar: const Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFF59E0B)),
+                label: const Text('Da Saldare', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 backgroundColor: Colors.white.withOpacity(0.05),
                 selectedColor: const Color(0xFFF59E0B).withOpacity(0.25),
                 side: BorderSide(color: _filtroVisualizzazione == 'da_saldare' ? const Color(0xFFF59E0B) : Colors.white12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                visualDensity: VisualDensity.compact,
                 onSelected: (_) => setState(() => _filtroVisualizzazione = 'da_saldare'),
               ),
             ],
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // 4. CATEGORIE ESPANDIBILI
+          // 3. CATEGORIE (INIZIALMENTE TUTTE CHIUSE)
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
@@ -696,37 +730,44 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 children: [
                   _buildCategoryCardPulita(
                     provider: walletProvider,
-                    categoriaKey: 'Bisogni (50%)',
-                    title: '📌 Bisogni Fissi',
+                    categoriaKey: '50',
+                    title: 'Spese Fisse & Bisogni',
+                    icon: Icons.home_rounded,
                     targetPct: _percentBisogni,
                     pianificatoTotale: pianificatoBisogni,
                     spesoRealeTotale: spesoBisogni,
                     color: const Color(0xFF2DD4BF),
                     voci: _vociPianificate.where((v) => v['categoria'] == 'Bisogni (50%)').toList(),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildCategoryCardPulita(
                     provider: walletProvider,
-                    categoriaKey: 'Svago (30%)',
-                    title: '🎉 Svago & Tempo Libero',
+                    categoriaKey: '30',
+                    title: 'Spese Variabili & Tempo Libero',
+                    icon: Icons.explore_rounded,
                     targetPct: _percentSvago,
                     pianificatoTotale: pianificatoSvago,
                     spesoRealeTotale: spesoSvago,
                     color: const Color(0xFFF59E0B),
                     voci: _vociPianificate.where((v) => v['categoria'] == 'Svago (30%)').toList(),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildCategoryCardPulita(
                     provider: walletProvider,
-                    categoriaKey: 'Risparmio (20%)',
-                    title: '🐷 Risparmi & Futuro',
+                    categoriaKey: '20',
+                    title: 'Risparmi & Futuro',
+                    icon: Icons.trending_up_rounded,
                     targetPct: _percentRisparmio,
                     pianificatoTotale: pianificatoRisparmio,
                     spesoRealeTotale: spesoRisparmio,
                     color: const Color(0xFF3B82F6),
                     voci: _vociPianificate.where((v) => v['categoria'] == 'Risparmio (20%)').toList(),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // 💡 SUGGERIMENTO COERENTE IN STILE LAMPADINA DISCRETA
+                  _buildNotaDiscreta(percentualeRisparmioStimata),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -736,32 +777,34 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  Widget _buildCoachBannerPulito(double pctRisparmio) {
+  // 💡 NOTA ELEGANTE E DISCRETA IN STILE BUSSOLA FISCON
+  Widget _buildNotaDiscreta(double pctRisparmio) {
     final bool ok = pctRisparmio >= _percentRisparmio;
-    final Color colore = ok ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final Color colore = ok ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colore.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colore.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded, color: colore, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              ok
-                  ? 'Piano ok! Risparmi stimati: ${pctRisparmio.toStringAsFixed(0)}%'
-                  : 'Sforamento: risparmio stimato al ${pctRisparmio.toStringAsFixed(0)}% (Target ${_percentRisparmio.toInt()}%)',
-              style: TextStyle(color: colore, fontSize: 13, fontWeight: FontWeight.bold),
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.lightbulb_outline_rounded : Icons.info_outline_rounded,
+          color: colore,
+          size: 14,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            ok
+                ? 'Ottimo! Stai mantenendo una quota risparmio stimata del ${pctRisparmio.toStringAsFixed(0)}% per il tuo futuro.'
+                : 'Consiglio: le spese pianificate riducono il risparmio al ${pctRisparmio.toStringAsFixed(0)}% (Target ${_percentRisparmio.toInt()}%).',
+            style: TextStyle(
+              color: ok ? Colors.white70 : const Color(0xFFF59E0B),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -769,6 +812,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     required WalletProvider provider,
     required String categoriaKey,
     required String title,
+    required IconData icon,
     required double targetPct,
     required double pianificatoTotale,
     required double spesoRealeTotale,
@@ -779,17 +823,10 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double pctProgresso = pianificatoTotale > 0 ? (spesoRealeTotale / pianificatoTotale).clamp(0.0, 1.0) : 0.0;
     final bool isSforato = spesoRealeTotale > pianificatoTotale && pianificatoTotale > 0;
 
-    int saldateCount = 0;
-    for (var v in voci) {
-      final double spesoReale = _calcolaSpesoReale(provider, v['nome'], v['sottocategoria'] ?? '');
-      final double previsto = (v['previsto'] as num).toDouble();
-      if (spesoReale >= previsto && previsto > 0) saldateCount++;
-    }
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
@@ -805,43 +842,45 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 }
               });
             },
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        isEspansa ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
-                        color: color,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      Icon(icon, color: color, size: 16),
                       const SizedBox(width: 8),
+                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: color.withOpacity(0.18), borderRadius: BorderRadius.circular(6)),
-                        child: Text('${targetPct.toInt()}%', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: color.withOpacity(0.18), borderRadius: BorderRadius.circular(5)),
+                        child: Text('${targetPct.toInt()}%', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
                       const Spacer(),
                       Text(
-                        '${spesoRealeTotale.toStringAsFixed(0)} / ${pianificatoTotale.toStringAsFixed(0)} €',
+                        '${_formattaInt(spesoRealeTotale)} / ${_formattaInt(pianificatoTotale)}',
                         style: TextStyle(
                           color: isSforato ? const Color(0xFFEF4444) : Colors.white,
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        isEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white54,
+                        size: 18,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: pctProgresso,
-                      minHeight: 6,
+                      minHeight: 4,
                       backgroundColor: Colors.white10,
                       valueColor: AlwaysStoppedAnimation<Color>(isSforato ? const Color(0xFFEF4444) : color),
                     ),
@@ -853,7 +892,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           if (isEspansa) ...[
             const Divider(color: Colors.white10, height: 1),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               child: Column(
                 children: voci.map((v) => _buildVoceTilePulita(provider, v)).toList(),
               ),
@@ -868,7 +907,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double previsto = (v['previsto'] as num).toDouble();
     final double spesoReale = _calcolaSpesoReale(provider, v['nome'], v['sottocategoria'] ?? '');
     final String tipo = v['tipo'] ?? 'mensile';
-    final String? meseScadenza = v['meseScadenza']; // 👈 Legge il mese salvato
+    final String? meseScadenza = v['meseScadenza'];
 
     final double differenza = spesoReale - previsto;
     final bool isSforato = differenza > 0.01 && previsto > 0;
@@ -882,20 +921,19 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     Color coloreImporto = Colors.white;
 
     if (tipo == 'annuale_spalmata') {
-      // 👈 Mostra chiaramente in quale mese scade la spesa annuale
       final String etichetta = meseScadenza != null 
           ? 'Accantonata • Scade a $meseScadenza' 
           : 'Accantonata';
       badgeStato = _buildBadgeTag(etichetta, const Color(0xFF3B82F6));
       coloreImporto = const Color(0xFF3B82F6);
     } else if (isSforato) {
-      badgeStato = _buildBadgeTag('⚠️ +${differenza.toStringAsFixed(0)} €', const Color(0xFFEF4444));
+      badgeStato = _buildBadgeTag('+${_formattaInt(differenza)} Fuori Budget', const Color(0xFFEF4444));
       coloreImporto = const Color(0xFFEF4444);
     } else if (isSaldata) {
-      badgeStato = _buildBadgeTag('✓ Saldata', const Color(0xFF10B981));
+      badgeStato = _buildBadgeTag('Saldata', const Color(0xFF10B981));
       coloreImporto = const Color(0xFF10B981);
     } else {
-      badgeStato = _buildBadgeTag('⏳ In Attesa', const Color(0xFFF59E0B));
+      badgeStato = _buildBadgeTag('In Attesa', const Color(0xFFF59E0B));
       coloreImporto = const Color(0xFFF59E0B);
     }
 
@@ -903,13 +941,13 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       color: Colors.transparent,
       child: InkWell(
         onLongPress: () => _gestisciSpesaDialog(v),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          margin: const EdgeInsets.symmetric(vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSforato ? const Color(0xFFEF4444).withOpacity(0.5) : Colors.white.withOpacity(0.05),
             ),
@@ -920,15 +958,15 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(v['nome'], style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text(v['nome'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 3),
                     badgeStato,
                   ],
                 ),
               ),
               Text(
-                '${spesoReale.toStringAsFixed(0)} / ${previsto.toStringAsFixed(0)} €',
-                style: TextStyle(color: coloreImporto, fontSize: 14, fontWeight: FontWeight.bold),
+                '${_formattaInt(spesoReale)} / ${_formattaInt(previsto)}',
+                style: TextStyle(color: coloreImporto, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -939,15 +977,15 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
   Widget _buildBadgeTag(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -26,6 +26,7 @@ class DettaglioFattureSheet extends StatefulWidget {
 class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
   int _meseSelezionato = 0; 
   final Set<String> _expandedFattureIds = {}; 
+  bool _isSospesoEspanso = false;
 
   final List<String> _mesiStr = [
     'Anno', 'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giug',
@@ -110,7 +111,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
           final parti = rawData.split(RegExp(r'[/.-]'));
           if (parti.length >= 2) {
-            // Formato DD/MM/YYYY
             final meseParsed = int.tryParse(parti[1]);
             if (meseParsed != null) {
               return meseParsed == _meseSelezionato;
@@ -152,13 +152,15 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
   Widget build(BuildContext context) {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    final listaTutteIncassate = walletProvider.fattureIncassate;
+    final listaTutteIncassate = widget.fattureIncassate ?? walletProvider.fattureIncassate;
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
+    final fattureInSospeso = walletProvider.fattureDaIncassare;
 
     // 📌 CALCOLO MESI E PERCENTUALE CUSCINETTO DAL PROVIDER
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
     final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
+    // 1. CALCOLI SULLE FATTURE INCASSATE
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
@@ -187,10 +189,33 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final double totaleAccontiY1 = accontoInpsY1Totale + accontoImpostaY1Totale;
     final double grandTotaleAccantonare = totaleTasseY + totaleAccontiY1;
 
-    // 📌 FORMULA PRUDENZIALE PER IL RIEPILOGO GENERALE
     final double grandNettoDopoTasse = lordoTotale - grandTotaleAccantonare;
     final double grandQuotaFondoFerie = grandNettoDopoTasse * percentualeFondoFerie;
     final double nettoTotaleSpendibile = grandNettoDopoTasse - grandQuotaFondoFerie;
+
+    // 2. CALCOLI SULLE FATTURE EMESSE IN SOSPESO
+    double lordoSospeso = 0.0;
+    double imponibileSospeso = 0.0;
+    double inpsSospeso = 0.0;
+    double impostaSospeso = 0.0;
+
+    for (var f in fattureInSospeso) {
+      final double importo = (f['importo'] as num?)?.toDouble() ?? 0.0;
+      final double coef = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+      
+      final double imponibile = importo * coef;
+      lordoSospeso += importo;
+      imponibileSospeso += imponibile;
+      inpsSospeso += (imponibile * widget.aliquotaInps);
+      impostaSospeso += (imponibile * widget.aliquotaImposta);
+    }
+
+    final double saldoSospeso = inpsSospeso + impostaSospeso;
+    final double accontiSospeso = (inpsSospeso * 0.80) + (impostaSospeso * 1.00);
+    final double totaleF24Sospeso = saldoSospeso + accontiSospeso;
+
+    final int annoCorrente = DateTime.now().year;
+    final int annoProssimo = annoCorrente + 1;
 
     return AppPopupWrapper(
       title: 'Dettaglio Fiscale',
@@ -198,7 +223,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
       badgeColor: const Color(0xFF2DD4BF),
       child: Column(
         children: [
-          // 📌 SELETTORE MESI
+          // 📌 SELETTORE MESI FISSO IN ALTO
           SizedBox(
             height: 32,
             child: ListView.builder(
@@ -235,23 +260,29 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
           ),
           const SizedBox(height: 10),
 
-          // 📌 LISTA FATTURE INCASSATE
+          // 📌 AREA FLUIDA SENZA OVERFLOW (Avvolge Lista e Box Finali)
           Expanded(
-            child: fattureFiltrate.isEmpty
-                ? Center(
-                    child: Text(
-                      _meseSelezionato == 0
-                          ? 'Nessuna fattura incassata salvata.'
-                          : 'Nessuna fattura presente per ${_mesiStr[_meseSelezionato]}.',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-                    ),
-                  )
-                : ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: fattureFiltrate.length,
-                    itemBuilder: (context, index) {
-                      final f = fattureFiltrate[index];
-                      final String fId = f['id']?.toString() ?? index.toString();
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  // 1. ELENCO FATTURE
+                  if (fattureFiltrate.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 30),
+                      child: Center(
+                        child: Text(
+                          _meseSelezionato == 0
+                              ? 'Nessuna fattura incassata salvata.'
+                              : 'Nessuna fattura presente per ${_mesiStr[_meseSelezionato]}.',
+                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                        ),
+                      ),
+                    )
+                  else
+                    ...fattureFiltrate.asMap().entries.map((entry) {
+                      final f = entry.value;
+                      final String fId = f['id']?.toString() ?? entry.key.toString();
                       final bool isExpanded = _expandedFattureIds.contains(fId);
 
                       final double lordo = (f['importo'] as num).toDouble();
@@ -268,7 +299,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                       final double totaleTasseAccantonare = totaleTasseYCard + totaleAccontiY1Card;
 
-                      // 📌 CALCOLO PRUDENZIALE SINGOLA FATTURA
                       final double nettoDopoTasseCard = lordo - totaleTasseAccantonare;
                       final double quotaFondoFerieCard = nettoDopoTasseCard * percentualeFondoFerie;
                       final double nettoSpendibileCard = nettoDopoTasseCard - quotaFondoFerieCard;
@@ -303,7 +333,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // TESTATA CARD: CLIENTE, BADGE ATECO & IMPORTO LORDO
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -350,8 +379,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-
-                                // DATE SOTTO IL NOME E NUMERO FATTURA
                                 Row(
                                   children: [
                                     const Icon(Icons.calendar_today_rounded, color: Colors.white54, size: 11),
@@ -369,14 +396,10 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     ),
                                   ],
                                 ),
-
-                                // SEZIONE ESPANSA IN STILE "REGISTRA FATTURA"
                                 if (isExpanded) ...[
                                   const SizedBox(height: 12),
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 12),
-
-                                  // 1. INCASSO LORDO (#10B981)
                                   _buildSalvaDanaioRow(
                                     icon: Icons.add_circle_outline_rounded,
                                     color: const Color(0xFF10B981),
@@ -385,8 +408,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     isBold: true,
                                   ),
                                   const SizedBox(height: 6),
-
-                                  // 2. NETTO SPENDIBILE (#2DD4BF)
                                   _buildSalvaDanaioRow(
                                     icon: Icons.account_balance_wallet_rounded,
                                     color: const Color(0xFF2DD4BF),
@@ -395,8 +416,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     isBold: true,
                                   ),
                                   const SizedBox(height: 6),
-
-                                  // 3. TASSE (SALDO + ACCONTO) (#3B82F6)
                                   _buildSalvaDanaioRow(
                                     icon: Icons.shield_rounded,
                                     color: const Color(0xFF3B82F6),
@@ -405,37 +424,28 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     isBold: true,
                                   ),
                                   const SizedBox(height: 6),
-
-                                  // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
                                   _buildSalvaDanaioRow(
                                     icon: Icons.beach_access_rounded,
                                     color: const Color(0xFF8B5CF6),
                                     title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
                                     value: '-${_formattaValuta(quotaFondoFerieCard)}',
                                   ),
-
                                   const SizedBox(height: 10),
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 8),
-                                  
-                                  // DETTAGLIO ANALITICO: SALDO
                                   _buildSimpleRow('Saldo INPS', _formattaValuta(inpsY), Colors.white70),
                                   const SizedBox(height: 3),
                                   _buildSimpleRow('Saldo Imposta', _formattaValuta(impostaY), Colors.white70),
                                   const SizedBox(height: 3),
                                   _buildSimpleRow('Totale Saldo', _formattaValuta(totaleTasseYCard), const Color(0xFFF59E0B), isBold: true),
-                                  
                                   const SizedBox(height: 8),
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 8),
-                                  
-                                  // DETTAGLIO ANALITICO: ACCONTO
                                   _buildSimpleRow('Acconto INPS', _formattaValuta(accontoInpsY1Card), Colors.white70),
                                   const SizedBox(height: 3),
                                   _buildSimpleRow('Acconto Imposta', _formattaValuta(accontoImpostaY1Card), Colors.white70),
                                   const SizedBox(height: 3),
                                   _buildSimpleRow('Totale Acconto', _formattaValuta(totaleAccontiY1Card), const Color(0xFFF97316), isBold: true),
-                                  
                                   const SizedBox(height: 12),
                                   Align(
                                     alignment: Alignment.centerRight,
@@ -468,99 +478,191 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                       );
                     },
                   ),
-          ),
 
-          const SizedBox(height: 10),
+                  const SizedBox(height: 4),
 
-          // 📌 SCHEDA RIEPILOGO IN BASSO (CON ANNI DINAMICI E CUSCINETTO)
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _meseSelezionato == 0
-                          ? 'RIEPILOGO FISCALE COMPLETO'
-                          : 'RIEPILOGO FISCALE (${_mesiStr[_meseSelezionato].toUpperCase()})',
-                      style: const TextStyle(
-                        color: Color(0xFF2DD4BF),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                  // 2. SCHEDA RIEPILOGO COMPLETO
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _meseSelezionato == 0
+                                  ? 'RIEPILOGO FISCALE COMPLETO'
+                                  : 'RIEPILOGO FISCALE (${_mesiStr[_meseSelezionato].toUpperCase()})',
+                              style: const TextStyle(
+                                color: Color(0xFF2DD4BF),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 16),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.add_circle_outline_rounded,
+                          color: const Color(0xFF10B981),
+                          title: 'Incasso Lordo:',
+                          value: '+${_formattaValuta(lordoTotale)}',
+                          isBold: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.account_balance_wallet_rounded,
+                          color: const Color(0xFF2DD4BF),
+                          title: 'Netto Spendibile:',
+                          value: '+${_formattaValuta(nettoTotaleSpendibile)}',
+                          isBold: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.shield_rounded,
+                          color: const Color(0xFF3B82F6),
+                          title: 'Totale Tasse (Saldo + Acconto):',
+                          value: '-${_formattaValuta(grandTotaleAccantonare)}',
+                          isBold: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.beach_access_rounded,
+                          color: const Color(0xFF8B5CF6),
+                          title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
+                          value: '-${_formattaValuta(grandQuotaFondoFerie)}',
+                        ),
+                        const SizedBox(height: 10),
+                        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                        const SizedBox(height: 8),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.remove_circle_outline,
+                          color: const Color(0xFFF59E0B),
+                          title: 'Totale Saldo (Anno $annoCorrente):',
+                          value: '-${_formattaValuta(totaleTasseY)}',
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSalvaDanaioRow(
+                          icon: Icons.history_toggle_off_rounded,
+                          color: const Color(0xFFF97316),
+                          title: 'Totale Acconto (Anno $annoProssimo):',
+                          value: '-${_formattaValuta(totaleAccontiY1)}',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 3. ⚠️ BOX GIALLO IN FONDO COME ULTIMO ELEMENTO: FATTURE EMESSE IN SOSPESO
+                  if (lordoSospeso > 0) ...[
+                    const SizedBox(height: 12),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.35)),
+                      ),
+                      child: Column(
+                        children: [
+                          InkWell(
+                            onTap: () => setState(() => _isSospesoEspanso = !_isSospesoEspanso),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.schedule_rounded, color: Color(0xFFF59E0B), size: 18),
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'FATTURE EMESSE IN SOSPESO',
+                                            style: TextStyle(
+                                              color: Color(0xFFF59E0B),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${fattureInSospeso.length} fattur${fattureInSospeso.length == 1 ? "a" : "e"} per ${_formattaValuta(lordoSospeso)}',
+                                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Icon(
+                                    _isSospesoEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                    color: const Color(0xFFF59E0B),
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (_isSospesoEspanso) ...[
+                            const Divider(color: Colors.white12, height: 1),
+                            Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 🏷️ NUOVA NOMENCLATURA AGGIORNATA
+                                  _buildRow('Lordo non incassato:', '+${_formattaValuta(lordoSospeso)}', color: Colors.white),
+                                  _buildRow('Imponibile Fiscale Stimato:', _formattaValuta(imponibileSospeso)),
+                                  _buildRow('Saldo Tasse Stimato (Anno $annoCorrente):', '-${_formattaValuta(saldoSospeso)}', color: const Color(0xFFF59E0B)),
+                                  _buildRow('Acconti Stimati (Anno $annoProssimo):', '-${_formattaValuta(accontiSospeso)}', color: const Color(0xFFF97316)),
+                                  Divider(color: Colors.white.withOpacity(0.12), height: 10),
+                                  _buildRow('Totale Tasse Stimato in Sospeso:', '-${_formattaValuta(totaleF24Sospeso)}', color: const Color(0xFFEF4444), isBold: true),
+                                  
+                                  const SizedBox(height: 10),
+                                  // 💡 BANNER STRATEGICO COMPETENZA ANNO SOLARE
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.2)),
+                                    ),
+                                    child: const Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFF59E0B), size: 16),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Regola del Criterio di Cassa: Se queste fatture non vengono validate e incassate entro il 31 Dicembre, la relativa quota tasse slitterà automaticamente alla dichiarazione dei redditi dell\'anno prossimo!',
+                                            style: TextStyle(color: Colors.white70, fontSize: 10, height: 1.35),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    const Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 16),
                   ],
-                ),
-                const SizedBox(height: 12),
-                
-                // 1. INCASSO LORDO (#10B981)
-                _buildSalvaDanaioRow(
-                  icon: Icons.add_circle_outline_rounded,
-                  color: const Color(0xFF10B981),
-                  title: 'Incasso Lordo:',
-                  value: '+${_formattaValuta(lordoTotale)}',
-                  isBold: true,
-                ),
-                const SizedBox(height: 6),
-
-                // 2. NETTO SPENDIBILE (#2DD4BF)
-                _buildSalvaDanaioRow(
-                  icon: Icons.account_balance_wallet_rounded,
-                  color: const Color(0xFF2DD4BF),
-                  title: 'Netto Spendibile:',
-                  value: '+${_formattaValuta(nettoTotaleSpendibile)}',
-                  isBold: true,
-                ),
-                const SizedBox(height: 6),
-
-                // 3. TOTALE TASSE (SALDO + ACCONTO) (#3B82F6)
-                _buildSalvaDanaioRow(
-                  icon: Icons.shield_rounded,
-                  color: const Color(0xFF3B82F6),
-                  title: 'Totale Tasse (Saldo + Acconto):',
-                  value: '-${_formattaValuta(grandTotaleAccantonare)}',
-                  isBold: true,
-                ),
-                const SizedBox(height: 6),
-
-                // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
-                _buildSalvaDanaioRow(
-                  icon: Icons.beach_access_rounded,
-                  color: const Color(0xFF8B5CF6),
-                  title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
-                  value: '-${_formattaValuta(grandQuotaFondoFerie)}',
-                ),
-                
-                const SizedBox(height: 10),
-                Divider(color: Colors.white.withOpacity(0.12), height: 1),
-                const SizedBox(height: 8),
-
-                // 5. TOTALE SALDO DINAMICO (#F59E0B)
-                _buildSalvaDanaioRow(
-                  icon: Icons.remove_circle_outline,
-                  color: const Color(0xFFF59E0B),
-                  title: 'Totale Saldo (Anno ${DateTime.now().year}):',
-                  value: '-${_formattaValuta(totaleTasseY)}',
-                ),
-                const SizedBox(height: 6),
-
-                // 6. TOTALE ACCONTO DINAMICO (#F97316)
-                _buildSalvaDanaioRow(
-                  icon: Icons.history_toggle_off_rounded,
-                  color: const Color(0xFFF97316),
-                  title: 'Totale Acconto (Anno ${DateTime.now().year + 1}):',
-                  value: '-${_formattaValuta(totaleAccontiY1)}',
-                ),
-              ],
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           ),
         ],
@@ -568,7 +670,40 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     );
   }
 
-  // HELPER IN STILE "REGISTRA FATTURA" CON ICONA E VALORE IN EVIDENZA
+  Widget _buildRow(String label, String value, {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isBold ? Colors.white : Colors.white54,
+                fontSize: 11,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.9)),
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // HELPER CON ICONA E VALORE IN EVIDENZA
   Widget _buildSalvaDanaioRow({
     required IconData icon,
     required Color color,

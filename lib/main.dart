@@ -8,14 +8,22 @@ import 'screens/1_onboarding_wizard.dart';
 import 'screens/1_main_menu.dart';
 import 'data/wallet_provider.dart';
 import 'data/notifications_provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  // 1. Assicura che il motore grafico di Flutter sia pronto
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🎯 1. FORZA LA MODALITÀ EDGE-TO-EDGE SUL DISPOSITIVO
+  // 2. Connette FiscON al tuo progetto Cloud a Milano
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // 🎯 3. FORZA LA MODALITÀ EDGE-TO-EDGE SUL DISPOSITIVO
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  // 🎨 2. CONFIGURAZIONE BARRA DI STATO E NAVIGAZIONE 100% TRASPARENTI
+  // 🎨 4. CONFIGURAZIONE BARRA DI STATO E NAVIGAZIONE 100% TRASPARENTI
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent, // Barra orologio/batteria trasparente
@@ -26,11 +34,12 @@ void main() {
     ),
   );
 
+  // 🚀 5. AVVIA L'APPLICAZIONE CON TUTTI I PROVIDER CARICATI
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => WalletProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationsProvider()), // 👈 NUOVO!
+        ChangeNotifierProvider(create: (_) => NotificationsProvider()),
       ],
       child: const FiscOnApp(),
     ),

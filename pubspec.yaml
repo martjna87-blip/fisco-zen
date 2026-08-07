@@ -17,7 +17,12 @@ dependencies:
   intl: any # 👈 Usare 'any' risolve qualsiasi problema di versione in Codespaces
   shared_preferences: ^2.5.5
   image_picker: ^1.1.2
-cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.8
+
+  # 🟢 I 3 PACCHETTI FIREBASE (Aggiunti qui sotto, allineati a 2 spazi)
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
 
 dev_dependencies:
   flutter_test:

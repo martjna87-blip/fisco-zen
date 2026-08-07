@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>78731481051-7bpk52du4ve3ajtj9ogpoee11ammc6t6.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.78731481051-7bpk52du4ve3ajtj9ogpoee11ammc6t6</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD9kWorwDAtaYb8HQH2L3YFYHuE6MUvAvw</string>
+	<key>GCM_SENDER_ID</key>
+	<string>78731481051</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.fiscoZen</string>
+	<key>PROJECT_ID</key>
+	<string>fiscon-app</string>
+	<key>STORAGE_BUCKET</key>
+	<string>fiscon-app.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:78731481051:ios:096f995794641d3ac1e1fe</string>
+</dict>
+</plist>

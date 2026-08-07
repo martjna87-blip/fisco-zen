@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "78731481051",
+    "project_id": "fiscon-app",
+    "storage_bucket": "fiscon-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78731481051:android:f8dd3318077d8024c1e1fe",
+        "android_client_info": {
+          "package_name": "com.example.fisco_zen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "78731481051-rs84c2kga4utr0oenugcnl78q39r0had.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtAmtMWtQ0WpcHNBak2khWVXSROtdRK7o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "78731481051-rs84c2kga4utr0oenugcnl78q39r0had.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

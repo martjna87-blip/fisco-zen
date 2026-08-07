@@ -29,16 +29,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     return '$intPart,${parti[1]} €';
   }
 
-  // 🇮🇹 HELPER CIFRA INTERA SENZA DECIMALI CON PUNTO MIGLIAIA (es. 1.000 €)
-  String _formattaInt(double importo) {
-    final int intVal = importo.round();
-    final strVal = intVal.abs().toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
-    return '$strVal €';
-  }
-
   @override
   void dispose() {
     _scrollController.dispose();
@@ -72,53 +62,160 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     }
   }
 
-  // 1. 🗑️ POP-UP CONFERMA ELIMINAZIONE CONTO
   void _confermaEliminazioneConto(BuildContext context, AccountModel account) {
     if (account.role == AccountRole.principal || account.role == AccountRole.taxReserve) {
       AppNotifications.mostraInAlto(
         context,
-        ' "${account.title}" è un conto protetto e non può essere eliminato.',
+        '"${account.title}" è un conto protetto e non può essere eliminato.',
         type: NotificationType.warning,
       );
       return;
+    }
+
+    final provider = context.read<WalletProvider>();
+    final altriConti = provider.accounts.where((a) => a.id != account.id).toList();
+
+    // Cerca le transazioni ricorrenti collegate a questo conto
+    final ricorrentiAttive = provider.transactions
+        .where((t) => t.accountId == account.id && t.isRecurrent)
+        .toList();
+
+    // Stato iniziale per le selezioni dell'utente
+    String? contoSceltoSaldo = altriConti.isNotEmpty ? altriConti.first.id : 'AZZERA';
+    final Map<String, String> scelteRicorrenze = {};
+    for (var tx in ricorrentiAttive) {
+      scelteRicorrenze[tx.id] = altriConti.isNotEmpty ? altriConti.first.id : 'ANNULLA';
     }
 
     AppSecondaryPopup.mostra(
       context: context,
       icon: Icons.warning_amber_rounded,
       iconColor: const Color(0xFFEF4444),
-      titolo: 'Elimina Conto',
-      testoConferma: 'Elimina',
+      titolo: 'Chiusura Conto: ${account.title}',
+      testoConferma: 'Conferma Chiusura',
       onConferma: () {
         try {
-          context.read<WalletProvider>().deleteAccount(account.id);
+          provider.chiudiContoGuidato(
+            targetAccountId: account.id,
+            saldoDestinazioneAccountId: contoSceltoSaldo,
+            mappaNuoviContiRicorrenze: scelteRicorrenze,
+          );
           Navigator.pop(context);
           setState(() {
             _contoEspansoIndex = null;
           });
-          AppNotifications.mostraInAlto(
-            context,
-            'Conto "${account.title}" eliminato! 🎉',
-          );
+          AppNotifications.mostraInAlto(context, 'Conto "${account.title}" chiuso regolarmente! 🎉');
         } catch (e) {
           Navigator.pop(context);
-          AppNotifications.mostraInAlto(
-            context,
-            '$e'.replaceAll('Exception: ', ''),
-            type: NotificationType.error,
-          );
+          AppNotifications.mostraInAlto(context, '$e'.replaceAll('Exception: ', ''), type: NotificationType.error);
         }
       },
-      child: SingleChildScrollView(
-        child: Text(
-          'Vuoi davvero eliminare il conto "${account.title}"?\nQuesta azione non potrà essere annullata.',
-          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-        ),
+      child: StatefulBuilder(
+        builder: (context, setDialogState) {
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- SEZIONE 1: SALDO RESIDUO ---
+                if (account.amount != 0.0) ...[
+                  Text(
+                    'Sul conto è presente un saldo di ${_formattaValuta(account.amount)}.\nDove vuoi trasferire questo importo?',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: contoSceltoSaldo,
+                    dropdownColor: const Color(0xFF18181B),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      ...altriConti.map((c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text('Trasferisci a: ${c.title}'),
+                          )),
+                      const DropdownMenuItem(
+                        value: 'AZZERA',
+                        child: Text('Azzeramento (Denaro speso/prelevato)'),
+                      ),
+                    ],
+                    onChanged: (v) => setDialogState(() => contoSceltoSaldo = v),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white12, height: 1),
+                  const SizedBox(height: 16),
+                ],
+
+                // --- SEZIONE 2: LISTA SPESE RICORRENTI ---
+                if (ricorrentiAttive.isNotEmpty) ...[
+                  Text(
+                    'Ci sono ${ricorrentiAttive.length} spese ricorrenti collegate a questo conto. Su quale conto vuoi spostare i futuri addebiti?',
+                    style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  ...ricorrentiAttive.map((tx) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${tx.title} (${_formattaValuta(tx.amount)})',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            value: scelteRicorrenze[tx.id],
+                            dropdownColor: const Color(0xFF18181B),
+                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.black.withOpacity(0.3),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                            items: [
+                              ...altriConti.map((c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Text('Sposta su: ${c.title}'),
+                                  )),
+                              const DropdownMenuItem(
+                                value: 'ANNULLA',
+                                child: Text('Annulla Ricorrenza futura', style: TextStyle(color: Color(0xFFEF4444))),
+                              ),
+                            ],
+                            onChanged: (v) => setDialogState(() {
+                              if (v != null) scelteRicorrenze[tx.id] = v;
+                            }),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ] else ...[
+                  Text(
+                    'Vuoi davvero chiudere il conto "${account.title}"?\nNessuna spesa ricorrente attiva riscontrata.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
-
-  // 2. ✏️ POP-UP MODIFICA CONTO
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
@@ -183,7 +280,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // 3. 📜 POP-UP DETTAGLIO MOVIMENTI CONTO
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
     final transactions = context.read<WalletProvider>().transactions;
 
@@ -301,7 +397,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // 4. ➕ POP-UP NUOVO CONTO
   void _mostraDialogNuovoConto() {
     final TextEditingController nomeController = TextEditingController();
     final TextEditingController dettaglioController = TextEditingController();
@@ -343,21 +438,13 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
               final coloreConto = _getAccountTypeColor(tipoSelezionato);
 
+              // 🟢 Una sola chiamata pulita: crea il conto e registra tutto al posto giusto!
               provider.addAccount(
                 title: nome,
                 subtitle: sottotitoloFinale,
                 initialAmount: saldo,
                 color: coloreConto,
               );
-
-              if (saldo > 0) {
-                provider.addTransaction(
-                  title: 'Saldo Iniziale: $nome',
-                  amount: saldo,
-                  isIncome: true,
-                  category: 'Risparmi',
-                );
-              }
 
               Navigator.pop(context);
               AppNotifications.mostraInAlto(context, 'Conto "$nome" creato con successo! 🎉');
@@ -430,7 +517,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // 5. 🔄 POP-UP GIROCONTO TRA CONTI
   void _mostraDialogGiroconto(List<AccountModel> accounts) {
     if (accounts.length < 2) return;
 
@@ -650,6 +736,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
+  // ===========================================================================
+  // 🔴 INIZIO SOSTITUZIONE — METODO: build(BuildContext context) in 2_2_wallet_manage_accounts.dart
+  // ===========================================================================
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
@@ -657,19 +746,25 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final accounts = walletProvider.accounts;
     final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
+    // 📌 CALCOLO DELLE QUOTE GLOBALI PRUDENZIALI
+    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
+    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+
     final double sommaContiLiquidi = accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
 
     final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    final double nettoReale = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+    final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+    final double cuscinettoFerie = postTasse * percentualeFondoFerie;
+    final double nettoRealeSpendibile = postTasse - cuscinettoFerie;
 
     return AppPopupWrapper(
       title: 'Gestione Conti',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 📌 SCHEDA PATRIMONIO E PULSANTI D'AZIONE
+          // 📌 HEADER GLOBALE: LIQUIDITÀ SPENDIBILE + CUSCINETTO PROTETTO
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
@@ -699,47 +794,12 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              _formattaValuta(saldoTotale), // 🇮🇹 Formattazione italiana (es. 10.000,00 €)
+                              _formattaValuta(saldoTotale),
                               style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Row(
-                      children: [
-                        // Tasto Nuovo Conto
-                        InkWell(
-                          onTap: _mostraDialogNuovoConto,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
-                                SizedBox(width: 3),
-                                Text(
-                                  'Nuovo',
-                                  style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Tasto Giroconto
-                        IconButton(
-                          icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                          onPressed: () => _mostraDialogGiroconto(accounts),
-                          tooltip: 'Esegui Giroconto',
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -747,6 +807,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   const SizedBox(height: 12),
                   const Divider(color: Colors.white12, height: 1),
                   const SizedBox(height: 12),
+                  // 📊 TABELLA GLOBALE 2 RIGHE: SPENDIBILE + CUSCINETTO
                   Table(
                     columnWidths: const {
                       0: IntrinsicColumnWidth(),
@@ -762,13 +823,40 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             children: [
                               Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
                               SizedBox(width: 6),
-                              Text('LIQUIDITA:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                              Text('LIQUIDITÀ SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox.shrink(),
                           Text(
-                            _formattaValuta(nettoReale), // 🇮🇹 Formattazione italiana (es. 1.250,00 €)
+                            _formattaValuta(nettoRealeSpendibile),
                             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const TableRow(
+                        children: [
+                          SizedBox(height: 6),
+                          SizedBox.shrink(),
+                          SizedBox(height: 6),
+                        ],
+                      ),
+                      TableRow(
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                'CUSCINETTO MESI NO-LAVORO ($mesiLavorati MESI):',
+                                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox.shrink(),
+                          Text(
+                            _formattaValuta(cuscinettoFerie),
+                            style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -779,7 +867,58 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
             ),
           ),
           const SizedBox(height: 14),
-          // 📌 LISTA CONTI ORDINABILE
+
+          // 📌 INTESTAZIONE E AZIONI DEI CONTI (Qui sono stati spostati i tasti "Nuovo" e "Giroconto")
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'I TUOI CONTI & CARTE',
+                    style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                ],
+              ),
+              Row(
+                children: [
+                  InkWell(
+                    onTap: _mostraDialogNuovoConto,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
+                          SizedBox(width: 3),
+                          Text(
+                            'Nuovo',
+                            style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
+                    onPressed: () => _mostraDialogGiroconto(accounts),
+                    tooltip: 'Esegui Giroconto',
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // 📌 LISTA CONTI ORDINABILE E PULITA
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
@@ -787,14 +926,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('I TUOI CONTI & CARTE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                      Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
                   ReorderableListView.builder(
                     buildDefaultDragHandles: false,
                     shrinkWrap: true,
@@ -808,6 +939,8 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     },
                     itemBuilder: (context, index) {
                       final account = accounts[index];
+                      final bool isPrincipal = account.id == '1' || account.title.toLowerCase().contains('principale');
+                      final double contoPostTasse = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
 
                       return Container(
                         key: ValueKey(account.id),
@@ -869,10 +1002,11 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      _formattaValuta(account.amount), // 🇮🇹 Formattazione italiana (es. 1.500,00 €)
+                                      _formattaValuta(account.amount),
                                       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                     ),
-                                    if (mostraPiva && (account.id == '1' || account.title.toLowerCase().contains('principale'))) ...[
+                                    // 📌 RIPARTIZIONE CONTABILE ORDINATA SUL CONTO PRINCIPALE (Post-Tasse e Tasse)
+                                    if (mostraPiva && isPrincipal) ...[
                                       const SizedBox(height: 4),
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -883,7 +1017,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                               const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
                                               const SizedBox(width: 4),
                                               Text(
-                                                _formattaValuta(account.amount - account.virtualTaxAmount),
+                                                _formattaValuta(contoPostTasse),
                                                 style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],

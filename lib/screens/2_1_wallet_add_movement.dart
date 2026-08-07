@@ -45,6 +45,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   String _contoSelezionato = 'Conto Principale (IBAN)';
   DateTime _dataSelezionata = DateTime.now(); 
   DateTime _meseSelezionatoRiepilogo = DateTime.now();
+  DateTime? _dataFineRicorrenza;
 
   final List<String> _sottocategorieSpesa = [
     'Casa/Affitto',
@@ -362,7 +363,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     final accounts = context.read<WalletProvider>().accounts;
     final matchingAccount = accounts.firstWhere(
-      (acc) => acc.title == _contoSelezionato || _contoSelezionato.contains(acc.title),
+      (acc) => acc.title == _contoSelezionato,
       orElse: () => accounts.first,
     );
 
@@ -385,6 +386,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       isRecurrent: _isRicorrente,
       frequenza: _isRicorrente ? _frequenzaSelezionata : null,
       giornoRicorrenza: giornoRicorrenzaFinale,
+      dataFineRicorrenza: _isRicorrente ? _dataFineRicorrenza : null, // 🟢 Data di fine opzionale
     );
 
     // Reset sicuro dei campi e mantenimento della tab attiva pronto per un nuovo inserimento
@@ -393,6 +395,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _noteController.clear();
       _dataSelezionata = DateTime.now();
       _isRicorrente = false;
+      _dataFineRicorrenza = null; // 🟢 Reset di fine ricorrenza
     });
 
     _amountFocusNode.requestFocus();
@@ -763,12 +766,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         testoConferma: 'Crea e Seleziona',
         onConferma: () {
           final nome = nomeContoController.text.trim();
+          final saldo = double.tryParse(
+                saldoInizialeController.text.replaceAll('.', '').replaceAll(',', '.'),
+              ) ?? 0.0;
+
           if (nome.isNotEmpty) {
+            final provider = context.read<WalletProvider>();
+            provider.addAccount(
+              title: nome,
+              subtitle: 'Conto personalizzato',
+              initialAmount: saldo,
+              color: const Color(0xFF2DD4BF),
+            );
+
             setState(() {
-              _contiDisponibili.add(nome);
-              _contoSelezionato = nome;
+              _contoSelezionato = provider.accounts.last.title;
               _isContoEspanso = false;
             });
+
             Navigator.pop(context);
           }
         },
@@ -784,7 +799,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -797,8 +815,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                prefixIcon: const Icon(Icons.euro_symbol_rounded, color: Colors.white54, size: 18),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(
+                  Icons.euro_symbol_rounded,
+                  color: Colors.white54,
+                  size: 18,
+                ),
               ),
             ),
           ],
@@ -1746,25 +1771,36 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     children: [
                       const Text('CONTO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                       const SizedBox(height: 4),
-                      _buildInlineSelector(
-                        icon: Icons.account_balance_wallet_outlined,
-                        iconColor: Colors.white54,
-                        selectedValue: _contoSelezionato,
-                        isExpanded: _isContoEspanso,
-                        onToggle: () {
-                          setState(() => _isContoEspanso = !_isContoEspanso);
-                          if (_isContoEspanso) _scrollToOffset(100);
-                        },
-                        items: [..._contiDisponibili, '+ Aggiungi conto...'],
-                        onSelect: (val) {
-                          if (val == '+ Aggiungi conto...') {
-                            _mostraDialogNuovoConto();
-                          } else {
-                            setState(() {
-                              _contoSelezionato = val;
-                              _isContoEspanso = false;
-                            });
+                      Builder(
+                        builder: (context) {
+                          final contiProvider = context.watch<WalletProvider>().accounts;
+                          final List<String> nomiContiReali = contiProvider.map((c) => c.title).toList();
+
+                          if (!nomiContiReali.contains(_contoSelezionato) && nomiContiReali.isNotEmpty) {
+                            _contoSelezionato = nomiContiReali.first;
                           }
+
+                          return _buildInlineSelector(
+                            icon: Icons.account_balance_wallet_outlined,
+                            iconColor: Colors.white54,
+                            selectedValue: _contoSelezionato,
+                            isExpanded: _isContoEspanso,
+                            onToggle: () {
+                              setState(() => _isContoEspanso = !_isContoEspanso);
+                              if (_isContoEspanso) _scrollToOffset(100);
+                            },
+                            items: [...nomiContiReali, '+ Aggiungi conto...'],
+                            onSelect: (val) {
+                              if (val == '+ Aggiungi conto...') {
+                                _mostraDialogNuovoConto();
+                              } else {
+                                setState(() {
+                                  _contoSelezionato = val;
+                                  _isContoEspanso = false;
+                                });
+                              }
+                            },
+                          );
                         },
                       ),
                     ],
@@ -2025,6 +2061,81 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   ),
                                 ),
                             ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // 🟢 BARRA COMPATTA SCADENZA RICORRENZA
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('TERMINE RICORRENZA (OPZIONALE)', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await AppDatePicker.selezionaData(
+                              context,
+                              // 🟢 Parte da oggi (o dalla data selezionata per il movimento)
+                              dataIniziale: _dataFineRicorrenza ?? _dataSelezionata,
+                            );
+                            if (picked != null) {
+                              setState(() => _dataFineRicorrenza = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.35),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: _dataFineRicorrenza != null 
+                                    ? const Color(0xFF2DD4BF).withOpacity(0.5) 
+                                    : Colors.white.withOpacity(0.08),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _dataFineRicorrenza != null ? Icons.event_available_rounded : Icons.all_inclusive_rounded,
+                                      color: _dataFineRicorrenza != null ? const Color(0xFF2DD4BF) : Colors.white38,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _dataFineRicorrenza != null
+                                          ? 'Fino al: ${_formattaDataInItaliano(_dataFineRicorrenza!)}'
+                                          : '∞ Senza fine (default)',
+                                      style: TextStyle(
+                                        color: _dataFineRicorrenza != null ? Colors.white : Colors.white54,
+                                        fontSize: 12,
+                                        fontWeight: _dataFineRicorrenza != null ? FontWeight.bold : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_dataFineRicorrenza != null)
+                                  InkWell(
+                                    onTap: () => setState(() => _dataFineRicorrenza = null),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close_rounded, color: Colors.white70, size: 14),
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 16),
+                              ],
+                            ),
                           ),
                         ),
                       ],
