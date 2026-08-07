@@ -10,34 +10,32 @@ import 'data/wallet_provider.dart';
 import 'data/notifications_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'data/auth_provider.dart';
+import 'screens/auth_screen.dart';
 
 void main() async {
-  // 1. Assicura che il motore grafico di Flutter sia pronto
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Connette FiscON al tuo progetto Cloud a Milano
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 🎯 3. FORZA LA MODALITÀ EDGE-TO-EDGE SUL DISPOSITIVO
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  // 🎨 4. CONFIGURAZIONE BARRA DI STATO E NAVIGAZIONE 100% TRASPARENTI
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent, // Barra orologio/batteria trasparente
-      statusBarIconBrightness: Brightness.light, // Icone bianche su Android
-      statusBarBrightness: Brightness.dark, // iOS: scritte bianche (orologio/batteria)
-      systemNavigationBarColor: Colors.transparent, // Barra gesti in basso trasparente
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
 
-  // 🚀 5. AVVIA L'APPLICAZIONE CON TUTTI I PROVIDER CARICATI
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
         ChangeNotifierProvider(create: (_) => NotificationsProvider()),
       ],
@@ -77,7 +75,6 @@ class FiscOnApp extends StatelessWidget {
   }
 }
 
-// 🚦 SMISTATORE AUTOMATICO ALL'AVVIO
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -89,18 +86,25 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkOnboardingStatus();
+    _checkFlow();
   }
 
-  Future<void> _checkOnboardingStatus() async {
+  Future<void> _checkFlow() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
     final bool isCompleted = prefs.getBool('onboarding_completed') ?? false;
     final bool isPiva = prefs.getBool('isPartitaIVA') ?? true;
 
     if (!mounted) return;
 
-    if (isCompleted) {
-      // ✅ Questionario completato: va direttamente alla Home
+    if (!authProvider.isAuthenticated) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AuthScreen(),
+        ),
+      );
+    } else if (isCompleted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -108,7 +112,6 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       );
     } else {
-      // 🆕 Primo avvio: apre il Questionario
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
