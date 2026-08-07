@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;import '../data/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+
+import '../data/auth_provider.dart';
 import '../data/wallet_provider.dart';
 import '../main.dart';
 import '3_4_PI_pro_upgrade.dart';
@@ -25,6 +27,57 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  // 🗑️ FUNZIONE ELIMINAZIONE ACCOUNT
+  Future<void> _confermaEliminazioneAccount(BuildContext context, AuthProvider authProvider) async {
+    final confermato = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Eliminare l\'account?', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Questa azione è irreversibile. Tutti i tuoi dati salvati verranno cancellati definitivamente.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Elimina definitivamente', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confermato == true && context.mounted) {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await user.delete();
+        }
+        await authProvider.signOut();
+        if (context.mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const SplashScreen()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Per sicurezza, effettua di nuovo il login prima di eliminare l\'account.'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final walletProvider = Provider.of<WalletProvider>(context);
@@ -32,7 +85,7 @@ class ProfileScreen extends StatelessWidget {
     final userEmail = FirebaseAuth.instance.currentUser?.email ?? 'Utente FiscON';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Stile scuro FiscON
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -125,7 +178,10 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Profilo PRO')),                      );
+                        MaterialPageRoute(
+                          builder: (context) => const ProUpgradeSheet(funzionalita: 'Profilo PRO'),
+                        ),
+                      );
                     },
                   ),
                   const Divider(color: Colors.white10, height: 1),
@@ -141,7 +197,6 @@ MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Pro
                     ),
                     trailing: const Icon(Icons.chevron_right, color: Colors.white38),
                     onTap: () {
-                      // Qui in futuro collegheremo il wizard di modifica profilo fiscale
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Modifica profilo fiscale in arrivo!')),
                       );
@@ -179,7 +234,7 @@ MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Pro
                       style: TextStyle(color: Colors.white),
                     ),
                     trailing: const Icon(Icons.open_in_new, color: Colors.white38, size: 18),
-                    onTap: () => _apriLink(context, 'https://www.iubenda.com'), // Sostituiremo col link reale
+                    onTap: () => _apriLink(context, 'https://www.iubenda.com'),
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   ListTile(
@@ -189,9 +244,48 @@ MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Pro
                       style: TextStyle(color: Colors.white),
                     ),
                     trailing: const Icon(Icons.open_in_new, color: Colors.white38, size: 18),
-                    onTap: () => _apriLink(context, 'https://www.iubenda.com'), // Sostituiremo col link reale
+                    onTap: () => _apriLink(context, 'https://www.iubenda.com'),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 🧪 SEZIONE STRUMENTI DI TEST / SANDBOX
+            const Text(
+              'STRUMENTI DI SVILUPPO',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.bug_report_outlined, color: Colors.amber),
+                title: const Text(
+                  'Apri Test Sandbox',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Reset conti, azzeramento dati e simulatore PRO',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfiloSandboxScreen()),
+                  );
+                },
               ),
             ),
 
@@ -225,6 +319,25 @@ MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Pro
                 },
               ),
             ),
+
+            const SizedBox(height: 12),
+
+            // 🗑️ PULSANTE ELIMINA ACCOUNT (OBBLIGATORIO APPLE)
+            Center(
+              child: TextButton.icon(
+                icon: const Icon(Icons.delete_forever, color: Colors.white38, size: 18),
+                label: const Text(
+                  'Elimina account e dati salvati',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 12,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+                onPressed: () => _confermaEliminazioneAccount(context, authProvider),
+              ),
+            ),
+            const SizedBox(height: 80), 
           ],
         ),
       ),
