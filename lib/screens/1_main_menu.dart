@@ -13,6 +13,7 @@ import '2_1_wallet_add_movement.dart';
 import '4_notifications_screen.dart'; // 👈 2. NUOVA SCHERMATA CENTRO NOTIFICHE
 import '../widgets_shared/app_speed_dial_menu.dart'; // 👈 3. NUOVO SPEED DIAL ANIMATO
 import '3_2_PI_registra_fattura.dart'; // 👈 4. FORM REGISTRAZIONE FATTURA RAPIDA
+import '0_profile_screen.dart';
 
 class MainMenu extends StatefulWidget {
   final bool hasPartitaIva;
@@ -44,9 +45,9 @@ class _MainMenuState extends State<MainMenu> {
         coefficienteIniziale: widget.coefficienteIniziale,
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
       ),
-      const SizedBox.shrink(),
-      const NotificationsScreen(), // 👈 ORA APRE LA VERA SCHERMATA NOTIFICHE!
-      const ProfiloSandboxScreen(),
+      const ProfiloSandboxScreen(), // 🟢 2° ELEMENTO: Ora apre i comandi di Test / Sandbox
+      const NotificationsScreen(),
+      const ProfileScreen(),        // 4° ELEMENTO: Profilo Utente & GDPR
     ];
 
     return Scaffold(
@@ -97,11 +98,7 @@ class _MainMenuState extends State<MainMenu> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          if (index == 0 || index == 1) {
-            _currentIndex = 0;
-          } else {
-            _currentIndex = index;
-          }
+          _currentIndex = index; // 🟢 Imposta direttamente l'indice selezionato (0, 1, 2, 3)
         });
       },
       behavior: HitTestBehavior.opaque,

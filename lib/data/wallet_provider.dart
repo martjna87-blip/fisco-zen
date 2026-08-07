@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // 🛡️ 1. ENUM PER I RUOLI DI SISTEMA INDELEBILI
 enum AccountRole {
@@ -82,7 +84,7 @@ class TransactionModel {
   final bool isRecurrent; 
   final String? frequenza; 
   final String? giornoRicorrenza; 
-  final DateTime? dataFineRicorrenza; // 🟢 Nuova proprietà di scadenza
+  final DateTime? dataFineRicorrenza;
 
   TransactionModel({
     required this.id,
@@ -132,7 +134,11 @@ class TransactionModel {
       );
 }
 
-class WalletProvider extends ChangeNotifier {
+class WalletProvider with ChangeNotifier {
+  // 🟢 ISTANZA FIRESTORE E IDENTIFICATIVO UTENTE
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+
   List<AccountModel> _accounts = [
     AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
     AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
@@ -144,7 +150,6 @@ class WalletProvider extends ChangeNotifier {
   bool _isProUser = false;
   bool get isProUser => _isProUser;
 
-  // PROFILO ONBOARDING & MOTORE FISCALE
   String _codiceAteco = '62.02.00';
   String get codiceAteco => _codiceAteco;
   double _coefficienteRedditivita = 0.78;
@@ -273,7 +278,6 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 📊 MATEMATICA E STATISTICHE GLOBALI
   double get patrimonioNetto => _accounts.fold(0.0, (sum, item) => sum + item.amount);
   double get _tasseLordeAccantonate => _accounts.fold(0.0, (sum, item) => sum + item.virtualTaxAmount);
 
@@ -315,7 +319,6 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // 🟢 CONTROLLO SCADENZA IMMUNE DA ORARI E MILLISECONDI
   bool _superaDataFine(DateTime dataVirtuale, DateTime? dataFine) {
     if (dataFine == null) return false;
     final dVirtuale = DateTime(dataVirtuale.year, dataVirtuale.month, dataVirtuale.day);
@@ -329,7 +332,6 @@ class WalletProvider extends ChangeNotifier {
     final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
     for (var tx in ricorrenti) {
-      // 1. GESTIONE TUTTE LE FREQUENZE MULTI-MENSILI E MENSILI
       if (tx.frequenza != 'Ogni settimana') {
         int stepMesi = 1;
         if (tx.frequenza == 'Ogni 2 mesi') stepMesi = 2;
@@ -347,7 +349,6 @@ class WalletProvider extends ChangeNotifier {
 
           DateTime dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoEffettivo);
 
-          // 🔒 STOP PREVISIONI SE È STATO SUPERATO IL TERMINE DELLA RICORRENZA
           if (_superaDataFine(dataVirtuale, tx.dataFineRicorrenza)) {
             continue;
           }
@@ -369,7 +370,6 @@ class WalletProvider extends ChangeNotifier {
           }
         }
       }
-      // 2. GESTIONE FREQUENZA SETTIMANALE
       else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
         final keySettimanale = '${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}';
         if (_skippedPredictions.contains(keySettimanale)) continue;
@@ -382,7 +382,6 @@ class WalletProvider extends ChangeNotifier {
         for (int i = 1; i <= daysInMonth; i++) {
           DateTime checkDate = DateTime(meseRiferimento.year, meseRiferimento.month, i);
           if (checkDate.weekday == targetWeekday) {
-            // 🔒 VERIFICA ANCHE LA DATA DI FINE PER LE OCCORRENZE SETTIMANALI
             if (_superaDataFine(checkDate, tx.dataFineRicorrenza)) {
               continue;
             }
@@ -449,14 +448,13 @@ class WalletProvider extends ChangeNotifier {
   void chiudiContoGuidato({
     required String targetAccountId,
     required String? saldoDestinazioneAccountId,
-    required Map<String, String> mappaNuoviContiRicorrenze, // idTx -> newAccountId ('ANNULLA' per disattivare)
+    required Map<String, String> mappaNuoviContiRicorrenze,
   }) {
     final targetIndex = _accounts.indexWhere((a) => a.id == targetAccountId);
     if (targetIndex == -1) return;
 
     final target = _accounts[targetIndex];
 
-    // 1. Blocco di sicurezza sui conti protetti
     if (target.role == AccountRole.principal ||
         target.role == AccountRole.taxReserve ||
         target.id == '1' ||
@@ -464,12 +462,10 @@ class WalletProvider extends ChangeNotifier {
       throw Exception('"${target.title}" è un conto di sistema protetto e non può essere eliminato.');
     }
 
-    // 2. SMISTAMENTO SALDO RESIDUO
     if (target.amount != 0.0) {
       final double residuo = target.amount;
 
       if (saldoDestinazioneAccountId != null && saldoDestinazioneAccountId != 'AZZERA') {
-        // Giroconto di chiusura verso un altro conto
         final contoDestinazione = _accounts.firstWhere(
           (a) => a.id == saldoDestinazioneAccountId,
           orElse: () => _accounts.first,
@@ -490,7 +486,6 @@ class WalletProvider extends ChangeNotifier {
           ),
         );
       } else {
-        // L'utente ha indicato di aver prelevato/azzerato fisicamente il saldo
         _transactions.insert(
           0,
           TransactionModel(
@@ -507,7 +502,6 @@ class WalletProvider extends ChangeNotifier {
       }
     }
 
-    // 3. GESTIONE RICORRENZE E SIGILLO STORICO
     for (int i = 0; i < _transactions.length; i++) {
       final tx = _transactions[i];
 
@@ -656,8 +650,40 @@ class WalletProvider extends ChangeNotifier {
       await prefs.setString('fattureDaIncassare', jsonEncode(_fattureDaIncassare));
       await prefs.setString('fattureIncassate', jsonEncode(_fattureIncassate));
       await prefs.setString('skippedPredictions', jsonEncode(_skippedPredictions));
+
+      // 🟢 SALVATAGGIO AUTOMATICO SU CLOUD FIRESTORE
+      await _salvaDatiSuCloud();
     } catch (e) {
       debugPrint('Errore durante il salvataggio: $e');
+    }
+  }
+
+  // 🟢 FUNZIONE PER IL BACKUP DEI DATI SU FIRESTORE
+  Future<void> _salvaDatiSuCloud() async {
+    if (_userId == null) return;
+    try {
+      await _firestore.collection('utenti').doc(_userId).set({
+        'isPartitaIVA': isPartitaIVA,
+        'coeffRedditivita': coeffRedditivita,
+        'aliquotaImposta': aliquotaImposta,
+        'aliquotaInps': aliquotaInps,
+        'accontiVersatiAnnoPrecedente': accontiVersatiAnnoPrecedente,
+        'codiceAteco': _codiceAteco,
+        'nettoTargetMensile': _nettoTargetMensile,
+        'fatturatoStimatoAnnuo': _fatturatoStimatoAnnuo,
+        'mesiAttiviIncasso': _mesiAttiviIncasso,
+        'spesoBisogni': _spesoBisogni,
+        'spesoSvago': _spesoSvago,
+        'spesoRisparmi': _spesoRisparmi,
+        'fatturatoTotale': _fatturatoTotale,
+        'accounts': _accounts.map((a) => a.toJson()).toList(),
+        'transactions': _transactions.map((t) => t.toJson()).toList(),
+        'fattureDaIncassare': _fattureDaIncassare,
+        'fattureIncassate': _fattureIncassate,
+        'lastUpdate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Errore salvataggio Cloud: $e');
     }
   }
 
@@ -708,7 +734,7 @@ class WalletProvider extends ChangeNotifier {
     bool isRecurrent = false, 
     String? frequenza,        
     String? giornoRicorrenza, 
-    DateTime? dataFineRicorrenza, // 🟢 Accetta dataFineRicorrenza
+    DateTime? dataFineRicorrenza,
   }) {
     final DateTime dataUso = date ?? DateTime.now();
 
@@ -729,7 +755,7 @@ class WalletProvider extends ChangeNotifier {
       isRecurrent: isRecurrent,
       frequenza: frequenza,
       giornoRicorrenza: giornoRicorrenza,
-      dataFineRicorrenza: dataFineRicorrenza, // 🟢 Salva il campo nel modello
+      dataFineRicorrenza: dataFineRicorrenza,
     );
 
     _transactions.insert(0, newTx);
