@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:image_picker/image_picker.dart';
-
 import '../data/auth_provider.dart';
 import '../data/wallet_provider.dart';
 import '../main.dart';
 import '3_4_PI_pro_upgrade.dart';
 import '1_main_menu.dart';
+import '../widgets_shared/app_image_picker.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -28,22 +28,22 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  // 📍 INIZIO MODIFICA: Funzione Scelta Foto (0_profile_screen.dart)
   // 📸 FUNZIONE CARICAMENTO FOTO PROFILO
   Future<void> _selezionaFotoProfilo(BuildContext context) async {
     try {
-      final picker = ImagePicker();
-      final XFile? immagine = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 80,
+      // Usa la modale condivisa al posto del picker diretto
+      final XFile? immagine = await AppImagePickerSheet.mostra(
+        context,
+        titolo: 'Aggiorna Foto Profilo',
       );
 
+      // Se l'utente ha scattato/scelto una foto (non ha chiuso la modale)
       if (immagine != null) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           await user.updatePhotoURL(immagine.path);
-          await user.reload();
+          await user.reload(); // Forza l'aggiornamento
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Foto profilo aggiornata con successo!')),
@@ -55,6 +55,7 @@ class ProfileScreen extends StatelessWidget {
       debugPrint('Errore caricamento foto: $e');
     }
   }
+// 📍 FINE MODIFICA: Funzione Scelta Foto
 
   // 🗑️ FUNZIONE ELIMINAZIONE ACCOUNT
   Future<void> _confermaEliminazioneAccount(BuildContext context, AuthProvider authProvider) async {
@@ -121,10 +122,10 @@ class ProfileScreen extends StatelessWidget {
     final double headerHeight = 220 + topPadding;
 
     // 🎨 OPZIONE 3: TITANIO FREDDO & CIANO NEONE (HI-TECH MINIMAL)
-    const Color coloreSfondo = Color(0xFF12181B); // Grigio titanio freddo
-    const Color coloreCard   = Color(0xFF1F2428); // Ardesia fredda
-    const Color coloreCiano  = Color(0xFF06B6D4); // Ciano Neone
-    const Color coloreOro    = Color(0xFFF59E0B); // Accent PRO
+    const Color coloreSfondo  = Color(0xFF12181B); // Titanio Freddo
+    const Color coloreCard    = Color(0xFF1F2428); // Ardesia Scura
+    const Color coloreOttanio = Color(0xFF2DD4BF); // Brand Accent (Verde Ottanio)
+    const Color coloreOro     = Color(0xFFF59E0B); // Accent PRO (Oro Amber)
 
     return Scaffold(
       backgroundColor: coloreSfondo,
@@ -189,18 +190,18 @@ class ProfileScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: coloreCard.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: walletProvider.isProUser 
-                            ? coloreOro 
-                            : coloreCiano.withOpacity(0.3),
+                            ? coloreOro.withOpacity(0.5) 
+                            : Colors.white.withOpacity(0.08),
                         width: walletProvider.isProUser ? 1.5 : 1.0,
                       ),
                       boxShadow: walletProvider.isProUser
                           ? [
                               BoxShadow(
-                                color: coloreOro.withOpacity(0.18),
-                                blurRadius: 14,
+                                color: coloreOro.withOpacity(0.15),
+                                blurRadius: 16,
                                 spreadRadius: 1,
                               )
                             ]
@@ -217,20 +218,20 @@ class ProfileScreen extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: walletProvider.isProUser ? coloreOro : coloreCiano,
+                                    color: walletProvider.isProUser ? coloreOro : coloreOttanio,
                                     width: 2,
                                   ),
                                 ),
                                 child: CircleAvatar(
                                   radius: 26,
-                                  backgroundColor: (walletProvider.isProUser ? coloreOro : coloreCiano).withOpacity(0.15),
+                                  backgroundColor: (walletProvider.isProUser ? coloreOro : coloreOttanio).withOpacity(0.15),
                                   backgroundImage: FirebaseAuth.instance.currentUser?.photoURL != null
                                       ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
                                       : null,
                                   child: FirebaseAuth.instance.currentUser?.photoURL == null
                                       ? Icon(
                                           Icons.person_rounded,
-                                          color: walletProvider.isProUser ? coloreOro : coloreCiano,
+                                          color: walletProvider.isProUser ? coloreOro : coloreOttanio,
                                           size: 30,
                                         )
                                       : null,
@@ -242,7 +243,7 @@ class ProfileScreen extends StatelessWidget {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: walletProvider.isProUser ? coloreOro : coloreCiano,
+                                    color: walletProvider.isProUser ? coloreOro : coloreOttanio,
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -260,24 +261,40 @@ class ProfileScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  if (walletProvider.isProUser) ...[
-                                    const Icon(Icons.workspace_premium_rounded, color: coloreOro, size: 15),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  Text(
-                                    walletProvider.isProUser ? 'PRO ACCOUNT' : 'ACCOUNT BASE',
-                                    style: TextStyle(
-                                      color: walletProvider.isProUser ? coloreOro : coloreCiano,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                    ),
+                              // 🏷️ PILL BADGE TRASLUCIDA STILE HOME/WALLET
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: (walletProvider.isProUser ? coloreOro : coloreOttanio).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: (walletProvider.isProUser ? coloreOro : coloreOttanio).withOpacity(0.3),
                                   ),
-                                ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      walletProvider.isProUser 
+                                          ? Icons.workspace_premium_rounded 
+                                          : Icons.verified_user_rounded,
+                                      color: walletProvider.isProUser ? coloreOro : coloreOttanio,
+                                      size: 12,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      walletProvider.isProUser ? 'PRO ACCOUNT' : 'ACCOUNT BASE',
+                                      style: TextStyle(
+                                        color: walletProvider.isProUser ? coloreOro : coloreOttanio,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               Text(
                                 userEmail,
                                 style: const TextStyle(
@@ -296,8 +313,9 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
+                  // 📍 INIZIO MODIFICA: Sezioni Profilo (0_profile_screen.dart)
                   // 👑 SEZIONE PIANO & FISCO
-                  _buildSectionHeader('ABBONAMENTO & FISCO', coloreCiano),
+                  _buildSectionHeader('ABBONAMENTO & FISCO', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
                     _buildListTile(
@@ -316,10 +334,10 @@ class ProfileScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1, indent: 60),
+                    Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 60),
                     _buildListTile(
                       icon: Icons.pie_chart_outline_rounded,
-                      iconColor: coloreCiano,
+                      iconColor: coloreOttanio,
                       title: 'Profilo Fiscale & ATECO',
                       subtitle: 'ATECO: ${walletProvider.codiceAteco} • Coeff: ${(walletProvider.coeffRedditivita * 100).toInt()}%',
                       onTap: () {
@@ -328,42 +346,42 @@ class ProfileScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  ], coloreCard, coloreCiano),
+                  ], coloreCard),
 
                   const SizedBox(height: 28),
 
                   // ⚖️ SEZIONE LEGALE & PRIVACY
-                  _buildSectionHeader('LEGALE & PRIVACY', coloreCiano),
+                  _buildSectionHeader('LEGALE & PRIVACY', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
                     _buildListTile(
                       icon: Icons.shield_outlined,
-                      iconColor: coloreCiano,
+                      iconColor: coloreOttanio,
                       title: 'Privacy Policy',
                       subtitle: 'Informativa sul trattamento dati',
                       isExternal: true,
                       onTap: () => _apriLink(context, 'https://www.iubenda.com/privacy-policy/94892300'),
                     ),
-                    const Divider(color: Colors.white10, height: 1, indent: 60),
+                    Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 60),
                     _buildListTile(
                       icon: Icons.description_outlined,
-                      iconColor: coloreCiano,
+                      iconColor: coloreOttanio,
                       title: 'Termini e Condizioni',
                       subtitle: 'Condizioni generali di servizio',
                       isExternal: true,
                       onTap: () => _apriLink(context, 'https://www.iubenda.com/privacy-policy/94892300/cookie-policy'),
                     ),
-                  ], coloreCard, coloreCiano),
+                  ], coloreCard),
 
                   const SizedBox(height: 28),
 
                   // 🧪 STRUMENTI SVILUPPO
-                  _buildSectionHeader('STRUMENTI DI SVILUPPO', coloreCiano),
+                  _buildSectionHeader('STRUMENTI DI SVILUPPO', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
                     _buildListTile(
                       icon: Icons.bug_report_outlined,
-                      iconColor: coloreCiano,
+                      iconColor: coloreOttanio,
                       title: 'Apri Test Sandbox',
                       subtitle: 'Reset dati, simulatore PRO e test offline',
                       onTap: () {
@@ -373,7 +391,8 @@ class ProfileScreen extends StatelessWidget {
                         );
                       },
                     ),
-                  ], coloreCard, coloreCiano),
+                  ], coloreCard),
+// 📍 FINE MODIFICA: Sezioni Profilo
 
                   const SizedBox(height: 36),
 
@@ -434,28 +453,29 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 🎨 HELPER COMPONENTS
+  // 📍 INIZIO MODIFICA: Helper Components (0_profile_screen.dart -> in fondo alla classe)
+  // 🎨 HELPER COMPONENTS UNIFORMATI
   Widget _buildSectionHeader(String title, Color color) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         title,
         style: TextStyle(
-          color: color.withOpacity(0.8),
+          color: Colors.white54,
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
+          letterSpacing: 1.1,
         ),
       ),
     );
   }
 
-  Widget _buildCardGroup(List<Widget> children, Color coloreCard, Color coloreBordo) {
+  Widget _buildCardGroup(List<Widget> children, Color coloreCard) {
     return Container(
       decoration: BoxDecoration(
         color: coloreCard.withOpacity(0.92),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: coloreBordo.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(children: children),
     );

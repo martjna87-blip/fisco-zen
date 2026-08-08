@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
+<!-- 📍 INIZIO MODIFICA: Permessi Android (AndroidManifest.xml) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+<!-- 📍 FINE MODIFICA: Permessi Android -->
+    <application    <application
         android:label="FiscON"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

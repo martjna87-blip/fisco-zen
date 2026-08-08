@@ -148,6 +148,11 @@ class WalletProvider with ChangeNotifier {
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
 
   bool _isProUser = false;
+  // 🎁 METODO PER ATTIVARE IL PIANO PRO GRATUITO
+  void impostaStatoPro(bool valore) {
+    _isProUser = valore;
+    notifyListeners();
+  }
   bool get isProUser => _isProUser;
 
   String _codiceAteco = '62.02.00';
