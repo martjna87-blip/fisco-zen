@@ -1199,4 +1199,15 @@ class WalletProvider with ChangeNotifier {
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }
+  // 📍 INIZIO MODIFICA: Metodi Attivazione PRO (lib/data/wallet_provider.dart)
+  void attivaPro() {
+    _isProUser = true;
+    notifyListeners();
+  }
+
+  void disattivaPro() {
+    _isProUser = false;
+    notifyListeners();
+  }
+// 📍 FINE MODIFICA: Metodi Attivazione PRO
 }

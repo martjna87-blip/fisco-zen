@@ -7,6 +7,7 @@ import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_datepicker.dart';
+import '../widgets_shared/app_image_picker.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -226,87 +227,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
-  void _scansionaScontrinoModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF18181B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Text(
-              'Scansiona Scontrino / Ticket',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            InkWell(
-              onTap: () {
-                Navigator.pop(ctx);
-                _processaImmagineScontrino(ImageSource.camera);
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.camera_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                    SizedBox(width: 12),
-                    Text('Scatta Foto da Fotocamera', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: () {
-                Navigator.pop(ctx);
-                _processaImmagineScontrino(ImageSource.gallery);
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.photo_library_rounded, color: Color(0xFF2DD4BF), size: 20),
-                    SizedBox(width: 12),
-                    Text('Scegli da Galleria', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _processaImmagineScontrino(ImageSource source) async {
+  Future<void> _avviaScansioneIntelligente() async {
     try {
-      final XFile? image = await _picker.pickImage(source: source);
+      final XFile? image = await AppImagePickerSheet.mostra(
+        context,
+        titolo: 'Scansiona Documento',
+      );
+
       if (image == null) return;
 
       setState(() => _isAnalyzing = true);
@@ -336,7 +263,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     } catch (e) {
       setState(() => _isAnalyzing = false);
       if (mounted) {
-        AppNotifications.mostraInAlto(context, 'Impossibile aprire la fotocamera: $e', type: NotificationType.error);
+        AppNotifications.mostraInAlto(context, 'Impossibile caricare immagine: $e', type: NotificationType.error);
       }
     }
   }
@@ -1612,7 +1539,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       color: const Color(0xFF2DD4BF).withOpacity(0.15),
                       shape: const CircleBorder(),
                       child: InkWell(
-                        onTap: _scansionaScontrinoModal,
+                        onTap: _avviaScansioneIntelligente, // 👈 MODIFICA QUI
                         borderRadius: BorderRadius.circular(30),
                         child: const Padding(
                           padding: EdgeInsets.all(10.0),

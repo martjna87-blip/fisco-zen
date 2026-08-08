@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/auth_provider.dart';
 import '../data/wallet_provider.dart';
 import '../main.dart';
-import '3_4_PI_pro_upgrade.dart';
+import '0_1_pro_upgrade.dart';
 import '1_main_menu.dart';
 import '../widgets_shared/app_image_picker.dart';
 
