@@ -1,18 +1,19 @@
+// 📍 INIZIO CODICE COMPLETO: lib/screens/1_main_menu.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/wallet_provider.dart';
-import '../data/notifications_provider.dart'; // 👈 1. NUOVO PROVIDER NOTIFICHE
+import '../data/notifications_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '1_onboarding_wizard.dart';
 import 'main_dashboard_wrapper.dart';
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
-import '4_notifications_screen.dart'; // 👈 2. NUOVA SCHERMATA CENTRO NOTIFICHE
-import '../widgets_shared/app_speed_dial_menu.dart'; // 👈 3. NUOVO SPEED DIAL ANIMATO
-import '3_2_PI_registra_fattura.dart'; // 👈 4. FORM REGISTRAZIONE FATTURA RAPIDA
+import '4_notifications_screen.dart'; 
+import '../widgets_shared/app_speed_dial_menu.dart'; 
+import '3_2_PI_registra_fattura.dart'; 
 import '0_profile_screen.dart';
 
 class MainMenu extends StatefulWidget {
@@ -44,10 +45,10 @@ class _MainMenuState extends State<MainMenu> {
         codiceAtecoIniziale: widget.codiceAtecoIniziale,
         coefficienteIniziale: widget.coefficienteIniziale,
         aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
-      ),
-      const ProfiloSandboxScreen(), // 🟢 2° ELEMENTO: Ora apre i comandi di Test / Sandbox
-      const NotificationsScreen(),
-      const ProfileScreen(),        // 4° ELEMENTO: Profilo Utente & GDPR
+      ),                          // 1° ELEMENTO (Index 0): Dashboard / P.IVA
+      const WalletScreen(),        // 2° ELEMENTO (Index 1): Gestione Wallet & Conti
+      const NotificationsScreen(), // 3° ELEMENTO (Index 2): Centro Notifiche
+      const ProfileScreen(),       // 4° ELEMENTO (Index 3): Profilo Utente & GDPR
     ];
 
     return Scaffold(
@@ -79,7 +80,7 @@ class _MainMenuState extends State<MainMenu> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(icon: Icons.dashboard_outlined, index: 0, label: 'Home'),
+                _buildNavItem(icon: Icons.receipt_long_rounded, index: 0, label: 'P.IVA'),
                 _buildNavItem(icon: Icons.account_balance_wallet_outlined, index: 1, label: 'Wallet'),
                 _buildCenterAddButton(context),
                 _buildNavItem(icon: Icons.notifications_none_rounded, index: 2, label: 'Avvisi'),
@@ -98,7 +99,7 @@ class _MainMenuState extends State<MainMenu> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          _currentIndex = index; // 🟢 Imposta direttamente l'indice selezionato (0, 1, 2, 3)
+          _currentIndex = index;
         });
       },
       behavior: HitTestBehavior.opaque,
@@ -112,7 +113,6 @@ class _MainMenuState extends State<MainMenu> {
         child: index == 2
             ? Builder(
                 builder: (context) {
-                  // 🔴 BADGE NOTIFICHE NON LETTE SULLA CAMPANELLA
                   final int nonLette = context.watch<NotificationsProvider>().nonLetteCount;
                   return Badge(
                     isLabelVisible: nonLette > 0,
@@ -138,11 +138,9 @@ class _MainMenuState extends State<MainMenu> {
   Widget _buildCenterAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // 🚀 APRE IL NUOVO MENU VELOCE SPEED DIAL AD AVVENTAGLIO
         AppSpeedDialMenu.mostra(
           context: context,
           onNuovaFattura: () {
-            // 📄 APRE SUBITO IL DIALOG DI REGISTRAZIONE FATTURA P.IVA (ALLINEATO A MOVIMENTI)
             AppPopupWrapper.mostra(
               context: context,
               child: RegistraFatturaSheet(
@@ -156,14 +154,12 @@ class _MainMenuState extends State<MainMenu> {
             );
           },
           onNuovaEntrata: () {
-            // 💰 APRE I MOVIMENTI SELEZIONANDO LA SCHEDA "ENTRATA"
             AppPopupWrapper.mostra(
               context: context,
               child: const AddMovementSheet(initialTab: 'entrata'),
             );
           },
           onNuovaUscita: () {
-            // 💸 APRE I MOVIMENTI SELEZIONANDO LA SCHEDA "USCITA"
             AppPopupWrapper.mostra(
               context: context,
               child: const AddMovementSheet(initialTab: 'uscita'),
@@ -384,3 +380,4 @@ class ProfiloSandboxScreen extends StatelessWidget {
     );
   }
 }
+// 📍 FINE CODICE COMPLETO: lib/screens/1_main_menu.dart

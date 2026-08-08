@@ -1,4 +1,4 @@
-// 📍 INIZIO CODICE NUOVO FILE: lib/screens/0_2_tax_profile.dart
+// 📍 INIZIO CODICE COMPLETO: lib/screens/0_2_tax_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -8,6 +8,13 @@ import '../widgets_shared/fluid_wave_painter.dart';
 
 class TaxProfileScreen extends StatefulWidget {
   const TaxProfileScreen({super.key});
+
+  static String formattaEuro(double valore) {
+    List<String> parti = valore.toStringAsFixed(2).split('.');
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String interiFormattati = parti[0].replaceAllMapped(reg, (Match m) => '${m[1]}.');
+    return '$interiFormattati,${parti[1]} €';
+  }
 
   @override
   State<TaxProfileScreen> createState() => _TaxProfileScreenState();
@@ -23,7 +30,6 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
   final Color coloreOro = const Color(0xFFF59E0B);
   final Color coloreBlu = const Color(0xFF3B82F6);
 
-  // 📚 DATABASE ATECO INTEGRATO CON COEFFICIENTI FISSI
   static final List<Map<String, dynamic>> _databaseAteco = [
     {'codice': '85.52.09', 'descrizione': 'Formazione culturale e corsi', 'coef': 0.78},
     {'codice': '62.01.00', 'descrizione': 'Sviluppo software e programmazione', 'coef': 0.78},
@@ -33,6 +39,11 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     {'codice': '47.91.10', 'descrizione': 'Commercio al dettaglio (E-commerce)', 'coef': 0.67},
     {'codice': '56.10.11', 'descrizione': 'Ristoranti, Pizzerie, Bar', 'coef': 0.40},
     {'codice': '96.02.01', 'descrizione': 'Saloni di barbiere e parrucchiere', 'coef': 0.40},
+  ];
+
+  static final List<String> _nomiMesi = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
 
   @override
@@ -50,14 +61,6 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     super.dispose();
   }
 
-  // 🛠️ FORMATTATORE VALUTA ITALIANO CON DECIMALICOERENTI IN TUTTA L'APP
-  static String formattaEuro(double valore) {
-    List<String> parti = valore.toStringAsFixed(2).split('.');
-    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    String interiFormattati = parti[0].replaceAllMapped(reg, (Match m) => '${m[1]}.');
-    return '$interiFormattati,${parti[1]} €';
-  }
-
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
@@ -65,9 +68,10 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
 
     final double fatturatoReale = walletProvider.fatturatoTotale;
     final double fatturatoStimato = walletProvider.fatturatoStimato;
-    
-    final double percReale = (fatturatoReale / 85000.0).clamp(0.0, 1.0);
-    final double percStimata = (fatturatoStimato / 85000.0).clamp(0.0, 1.0);
+    final double sogliaLimiteReale = walletProvider.sogliaForfettarioReale;
+
+    final double percReale = (fatturatoReale / sogliaLimiteReale).clamp(0.0, 1.0);
+    final double percStimata = (fatturatoStimato / sogliaLimiteReale).clamp(0.0, 1.0);
 
     final int annoApertura = walletProvider.annoAperturaPiva ?? annoCorrente;
     final int anniTrascorsi = (annoCorrente - annoApertura) + 1;
@@ -82,6 +86,8 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     final double accontoAnnoSuccessivo = tasseAnnoCorrenteReali * 1.0;
     final double accontiGiaVersati = walletProvider.accontiVersati;
     final double totaleF24Stimato = (tasseAnnoCorrenteReali + accontoAnnoSuccessivo - accontiGiaVersati).clamp(0.0, double.infinity);
+
+    final bool isNuovaApertura = annoApertura == annoCorrente;
 
     return Scaffold(
       backgroundColor: coloreSfondo,
@@ -134,7 +140,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
 
                   const SizedBox(height: 16),
 
-                  // 📊 SOGLIA FORFETTARIO (85.000,00 €)
+                  // 📊 SOGLIA FORFETTARIO RAGGUAGLIATA CON BADGE CLICCABILE
                   _buildCardWrapper(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,27 +148,45 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('SOGLIA FORFETTARIO (${formattaEuro(85000)})', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: fatturatoReale > 85000 ? Colors.redAccent.withOpacity(0.15) : coloreOttanio.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                fatturatoReale > 85000 ? '⚠️ Fuori Soglia' : '✅ In Regola',
-                                style: TextStyle(color: fatturatoReale > 85000 ? Colors.redAccent : coloreOttanio, fontSize: 11, fontWeight: FontWeight.bold),
+                            Text('SOGLIA FORFETTARIO (${TaxProfileScreen.formattaEuro(sogliaLimiteReale)})', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                            GestureDetector(
+                              onTap: () => _mostraSpiegazioneSoglia(context, fatturatoReale, sogliaLimiteReale),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: fatturatoReale > sogliaLimiteReale ? Colors.redAccent.withOpacity(0.15) : coloreOttanio.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: fatturatoReale > sogliaLimiteReale ? Colors.redAccent.withOpacity(0.4) : coloreOttanio.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      fatturatoReale > sogliaLimiteReale ? '⚠️ Fuori Soglia' : '✅ In Regola',
+                                      style: TextStyle(color: fatturatoReale > sogliaLimiteReale ? Colors.redAccent : coloreOttanio, fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.info_outline_rounded, color: fatturatoReale > sogliaLimiteReale ? Colors.redAccent : coloreOttanio, size: 12),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
+                        if (isNuovaApertura) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Soglia calcolata in proporzione ai mesi attivi (${_nomiMesi[(walletProvider.meseAperturaPiva ?? 1) - 1]} - Dicembre)',
+                            style: TextStyle(color: coloreOttanio, fontSize: 11, fontWeight: FontWeight.w500),
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Incassato Reale (Fatture):', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                            Text(formattaEuro(fatturatoReale), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text(TaxProfileScreen.formattaEuro(fatturatoReale), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -182,7 +206,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Proiezione Stimata Anno:', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                            Text(formattaEuro(fatturatoStimato), style: TextStyle(color: coloreOro, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text(TaxProfileScreen.formattaEuro(fatturatoStimato), style: TextStyle(color: coloreOro, fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -262,7 +286,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(formattaEuro(accontiGiaVersati), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  Text(TaxProfileScreen.formattaEuro(accontiGiaVersati), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 2),
                                   const Text('Acconti già versati nell\'F24 dell\'anno scorso', style: TextStyle(color: Colors.white38, fontSize: 11)),
                                 ],
@@ -314,17 +338,17 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                             ),
                             child: Column(
                               children: [
-                                _buildF24Riga('Tasse Reali (Fatture Incassate)', '+ ${formattaEuro(tasseAnnoCorrenteReali)}'),
+                                _buildF24Riga('Tasse Reali (Fatture Incassate)', '+ ${TaxProfileScreen.formattaEuro(tasseAnnoCorrenteReali)}'),
                                 const SizedBox(height: 6),
-                                _buildF24Riga('Acconto Stimato Anno Successivo (100%)', '+ ${formattaEuro(accontoAnnoSuccessivo)}'),
+                                _buildF24Riga('Acconto Stimato Anno Successivo (100%)', '+ ${TaxProfileScreen.formattaEuro(accontoAnnoSuccessivo)}'),
                                 const SizedBox(height: 6),
-                                _buildF24Riga('Detrazione Acconti Anno Scorso', '- ${formattaEuro(accontiGiaVersati)}', isDetrazione: true),
+                                _buildF24Riga('Detrazione Acconti Anno Scorso', '- ${TaxProfileScreen.formattaEuro(accontiGiaVersati)}', isDetrazione: true),
                                 const Divider(color: Colors.white24, height: 16),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text('TOTALE F24 AD OGGI:', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                    Text(formattaEuro(totaleF24Stimato), style: TextStyle(color: coloreOttanio, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    Text(TaxProfileScreen.formattaEuro(totaleF24Stimato), style: TextStyle(color: coloreOttanio, fontSize: 16, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ],
@@ -337,7 +361,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
 
                   const SizedBox(height: 24),
 
-                  // ✏️ PULSANTE MODIFICA COMPLETA
+                  // ✏️ PULSANTE MODIFICA
                   SizedBox(
                     width: double.infinity,
                     height: 54,
@@ -405,6 +429,102 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     }
   }
 
+  // 📍 POPUP SPIEGAZIONE SOGLIA CON TASTO X A SINISTRA
+  void _mostraSpiegazioneSoglia(BuildContext context, double incassato, double soglia) {
+    final bool superato = incassato > soglia;
+
+    AppPopupWrapper.mostra(
+      context: context,
+      child: Material(
+        color: const Color(0xFF1F2428),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(superato ? Icons.warning_amber_rounded : Icons.verified_user_rounded, color: superato ? Colors.redAccent : coloreOttanio, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            superato ? 'Attenzione: Soglia Superata' : 'Regime Forfettario in Regola',
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('Cosa prevede la legge per le soglie del Forfettario:', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              
+              _buildSogliaRuleRow(
+                '1. Soglia Ragguagliata (${TaxProfileScreen.formattaEuro(soglia)})',
+                'Se superi questa cifra entro i 100.000,00 €, rimani in Forfettario fino a fine anno, ma dal 1° Gennaio dell\'anno successivo passerai al Regime Ordinario.',
+                coloreOro,
+              ),
+              const SizedBox(height: 12),
+              _buildSogliaRuleRow(
+                '2. Soglia Critica (100.000,00 €)',
+                'Se superi i 100.000,00 € durante l\'anno, l\'uscita dal Forfettario è immediata: da quella fattura dovrai applicare l\'IVA ed esser tassato in Regime Ordinario.',
+                Colors.redAccent,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: coloreOttanio,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Ho Capito', style: TextStyle(color: Color(0xFF12181B), fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSogliaRuleRow(String titolo, String spiegazione, Color colore) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colore.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titolo, style: TextStyle(color: colore, fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(spiegazione, style: const TextStyle(color: Colors.white60, fontSize: 11, height: 1.3)),
+        ],
+      ),
+    );
+  }
+
+  // 📍 MODALE MODIFICA COMPLETA CON TASTO X A SINISTRA
   void _apriModaleModificaCompleta(BuildContext context, WalletProvider provider) {
     Map<String, dynamic> atecoSelezionato = _databaseAteco.firstWhere(
       (element) => provider.codiceAteco.startsWith(element['codice'].toString()),
@@ -417,6 +537,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     final TextEditingController annoCtrl = TextEditingController(text: (provider.annoAperturaPiva ?? DateTime.now().year).toString());
 
     double tempImposta = provider.aliquotaImposta;
+    int tempMeseApertura = provider.meseAperturaPiva ?? 1;
     bool mostraListaAteco = false;
     String queryFiltro = '';
 
@@ -429,6 +550,9 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
           padding: const EdgeInsets.all(20.0),
           child: StatefulBuilder(
             builder: (context, setModalState) {
+              final int annoInserito = int.tryParse(annoCtrl.text) ?? DateTime.now().year;
+              final bool isAnnoCorrente = annoInserito == DateTime.now().year;
+
               final listaFiltrata = _databaseAteco.where((item) {
                 final q = queryFiltro.toLowerCase().replaceAll('.', '').trim();
                 return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(q) ||
@@ -440,36 +564,30 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 📍 INIZIO MODIFICA: Tasto X sulla Sinistra
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Aggiorna Dati Fiscali P.IVA',
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Seleziona il tuo ATECO: il coefficiente verrà calcolato in automatico.',
-                              style: TextStyle(color: Colors.white54, fontSize: 11),
-                            ),
-                          ],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Aggiorna Dati Fiscali P.IVA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('Seleziona il tuo ATECO e l\'anno di apertura per calcolare le soglie reali.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
                     _buildInputLabel('CODICE ATECO & MANSIONE PRINCIPALE'),
                     GestureDetector(
                       onTap: () => setModalState(() => mostraListaAteco = !mostraListaAteco),
@@ -590,12 +708,47 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildInputLabel('ANNO APERTURA P.IVA'),
-                              _buildModalTextField(annoCtrl, '2024', isNumber: true),
+                              _buildModalTextField(
+                                annoCtrl,
+                                '2024',
+                                isNumber: true,
+                                onChanged: (val) => setModalState(() {}),
+                              ),
                             ],
                           ),
                         ),
                       ],
                     ),
+
+                    if (isAnnoCorrente) ...[
+                      const SizedBox(height: 14),
+                      _buildInputLabel('MESE APERTURA (PER RAGGUAGLIO SOGLIA 85.000 €)'),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: tempMeseApertura,
+                            dropdownColor: const Color(0xFF1F2428),
+                            isExpanded: true,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            items: List.generate(12, (index) {
+                              return DropdownMenuItem<int>(
+                                value: index + 1,
+                                child: Text(_nomiMesi[index]),
+                              );
+                            }),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => tempMeseApertura = val);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 14),
                     _buildInputLabel('ALIQUOTA IMPOSTA SOSTITUTIVA'),
@@ -664,6 +817,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                             accontiVersati: acconti,
                             fatturatoStimato: fatturato,
                             annoAperturaPiva: anno,
+                            meseAperturaPiva: tempMeseApertura,
                           );
 
                           Navigator.pop(context);
@@ -698,11 +852,12 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildModalTextField(TextEditingController controller, String hint, {bool isNumber = false, String? suffix}) {
+  Widget _buildModalTextField(TextEditingController controller, String hint, {bool isNumber = false, String? suffix, Function(String)? onChanged}) {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: const TextStyle(color: Colors.white, fontSize: 13),
+      onChanged: onChanged,
       decoration: InputDecoration(
         filled: true,
         fillColor: Colors.black.withOpacity(0.3),
@@ -716,4 +871,4 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     );
   }
 }
-// 📍 FINE CODICE NUOVO FILE: lib/screens/0_2_tax_profile.dart
+// 📍 FINE CODICE COMPLETO: lib/screens/0_2_tax_profile.dart

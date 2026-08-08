@@ -1,3 +1,4 @@
+// 📍 INIZIO CODICE COMPLETO: lib/screens/0_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,9 +8,10 @@ import '../data/auth_provider.dart';
 import '../data/wallet_provider.dart';
 import '../main.dart';
 import '0_1_pro_upgrade.dart';
-import '1_main_menu.dart';
-import '../widgets_shared/app_image_picker.dart';
 import '0_2_tax_profile.dart';
+import '../widgets_shared/app_image_picker.dart';
+import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/fluid_wave_painter.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -29,22 +31,18 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  // 📍 INIZIO MODIFICA: Funzione Scelta Foto (0_profile_screen.dart)
-  // 📸 FUNZIONE CARICAMENTO FOTO PROFILO
   Future<void> _selezionaFotoProfilo(BuildContext context) async {
     try {
-      // Usa la modale condivisa al posto del picker diretto
       final XFile? immagine = await AppImagePickerSheet.mostra(
         context,
         titolo: 'Aggiorna Foto Profilo',
       );
 
-      // Se l'utente ha scattato/scelto una foto (non ha chiuso la modale)
       if (immagine != null) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           await user.updatePhotoURL(immagine.path);
-          await user.reload(); // Forza l'aggiornamento
+          await user.reload();
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Foto profilo aggiornata con successo!')),
@@ -56,9 +54,7 @@ class ProfileScreen extends StatelessWidget {
       debugPrint('Errore caricamento foto: $e');
     }
   }
-// 📍 FINE MODIFICA: Funzione Scelta Foto
 
-  // 🗑️ FUNZIONE ELIMINAZIONE ACCOUNT
   Future<void> _confermaEliminazioneAccount(BuildContext context, AuthProvider authProvider) async {
     final confermato = await showDialog<bool>(
       context: context,
@@ -122,11 +118,10 @@ class ProfileScreen extends StatelessWidget {
     final double topPadding = MediaQuery.of(context).padding.top;
     final double headerHeight = 220 + topPadding;
 
-    // 🎨 OPZIONE 3: TITANIO FREDDO & CIANO NEONE (HI-TECH MINIMAL)
-    const Color coloreSfondo  = Color(0xFF12181B); // Titanio Freddo
-    const Color coloreCard    = Color(0xFF1F2428); // Ardesia Scura
-    const Color coloreOttanio = Color(0xFF2DD4BF); // Brand Accent (Verde Ottanio)
-    const Color coloreOro     = Color(0xFFF59E0B); // Accent PRO (Oro Amber)
+    const Color coloreSfondo  = Color(0xFF12181B);
+    const Color coloreCard    = Color(0xFF1F2428);
+    const Color coloreOttanio = Color(0xFF2DD4BF);
+    const Color coloreOro     = Color(0xFFF59E0B);
 
     return Scaffold(
       backgroundColor: coloreSfondo,
@@ -135,12 +130,13 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+        automaticallyImplyLeading: false, // 🚫 FRECCIA ELIMINATA COMPLETAMENTE
         title: const Text(
           'Profilo & Impostazioni',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 18,
             shadows: [Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2))],
           ),
         ),
@@ -148,7 +144,6 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // 🖼️ IMMAGINE DI SFONDO
           Container(
             height: headerHeight,
             decoration: const BoxDecoration(
@@ -162,7 +157,6 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           
-          // 🌫️ GRADIENTE DI SFUMATURA FREDDA
           Container(
             height: headerHeight,
             decoration: BoxDecoration(
@@ -178,7 +172,6 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
 
-          // 📜 CONTENUTO PRINCIPALE
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -186,7 +179,6 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 👤 CARD ACCOUNT (DINAMICA PRO / BASE)
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -262,7 +254,6 @@ class ProfileScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 🏷️ PILL BADGE TRASLUCIDA STILE HOME/WALLET
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
@@ -314,8 +305,6 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
-                  // 📍 INIZIO MODIFICA: Sezioni Profilo (0_profile_screen.dart)
-                  // 👑 SEZIONE PIANO & FISCO
                   _buildSectionHeader('ABBONAMENTO & FISCO', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
@@ -336,8 +325,6 @@ class ProfileScreen extends StatelessWidget {
                       },
                     ),
                     Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 60),
-                    // 📍 INIZIO MODIFICA: Collegamento Profilo Fiscale (0_profile_screen.dart)
-                    // 📍 INIZIO MODIFICA: Collegamento Nuova Schermata (0_profile_screen.dart)
                     _buildListTile(
                       icon: Icons.pie_chart_outline_rounded,
                       iconColor: coloreOttanio,
@@ -354,7 +341,6 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
-                  // ⚖️ SEZIONE LEGALE & PRIVACY
                   _buildSectionHeader('LEGALE & PRIVACY', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
@@ -379,7 +365,6 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
-                  // 🧪 STRUMENTI SVILUPPO
                   _buildSectionHeader('STRUMENTI DI SVILUPPO', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
@@ -396,11 +381,9 @@ class ProfileScreen extends StatelessWidget {
                       },
                     ),
                   ], coloreCard),
-// 📍 FINE MODIFICA: Sezioni Profilo
 
                   const SizedBox(height: 36),
 
-                  // 🚪 LOGOUT
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -432,7 +415,6 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // 🗑️ ELIMINA ACCOUNT
                   Center(
                     child: TextButton.icon(
                       icon: const Icon(Icons.delete_forever_rounded, color: Colors.white38, size: 18),
@@ -457,14 +439,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 📍 INIZIO MODIFICA: Helper Components (0_profile_screen.dart -> in fondo alla classe)
-  // 🎨 HELPER COMPONENTS UNIFORMATI
   Widget _buildSectionHeader(String title, Color color) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white54,
           fontSize: 11,
           fontWeight: FontWeight.bold,
@@ -520,6 +500,209 @@ class ProfileScreen extends StatelessWidget {
         size: 18,
       ),
       onTap: onTap,
+    );
+  }
+}
+
+class ProfiloSandboxScreen extends StatefulWidget {
+  const ProfiloSandboxScreen({super.key});
+
+  @override
+  State<ProfiloSandboxScreen> createState() => _ProfiloSandboxScreenState();
+}
+
+class _ProfiloSandboxScreenState extends State<ProfiloSandboxScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _waveController;
+
+  final Color coloreSfondo = const Color(0xFF080B0C);
+  final Color coloreCard = const Color(0xFF101618);
+  final Color coloreOttanio = const Color(0xFF2DD4BF);
+  final Color coloreRosso = const Color(0xFFEF4444);
+  final Color coloreArancio = const Color(0xFFF59E0B);
+
+  @override
+  void initState() {
+    super.initState();
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 18),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _waveController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final walletProvider = context.watch<WalletProvider>();
+
+    return Scaffold(
+      backgroundColor: coloreSfondo,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.15)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+        title: const Text(
+          'Profilo & Test Sandbox',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, child) {
+                return CustomPaint(painter: FluidWavePainter(animationValue: _waveController.value));
+              },
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Strumenti di controllo per simulare il comportamento dell\'app.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const SizedBox(height: 20),
+
+                  _buildSandboxCard(
+                    icon: Icons.refresh_rounded,
+                    iconColor: coloreRosso,
+                    title: 'Azzera Conti e Fatture',
+                    subtitle: 'Mantiene intatto il tuo profilo ATECO',
+                    onTap: () async {
+                      await walletProvider.resetSoloMovimentieFatture();
+                      if (context.mounted) {
+                        AppNotifications.mostraInAlto(
+                          context,
+                          'Movimenti e fatture azzerati! 🔄',
+                          type: NotificationType.success,
+                        );
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSandboxCard(
+                    icon: Icons.restart_alt_rounded,
+                    iconColor: coloreArancio,
+                    title: 'Reset Totale (Primo Avvio)',
+                    subtitle: 'Riavvia il questionario iniziale da zero',
+                    onTap: () async {
+                      await walletProvider.resetTuttiIDati();
+                      if (context.mounted) {
+                        AppNotifications.mostraInAlto(
+                          context,
+                          'Reset completo effettuato! ⚠️',
+                          type: NotificationType.warning,
+                        );
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSandboxCard(
+                    icon: Icons.workspace_premium_rounded,
+                    iconColor: walletProvider.isProUser ? coloreOttanio : Colors.white54,
+                    title: walletProvider.isProUser
+                        ? 'Piano Attivo: FiscON PRO 👑'
+                        : 'Piano Attivo: FiscON FREE 🔒',
+                    subtitle: 'Tocca per passare da Free a Pro per i tuoi test',
+                    onTap: () {
+                      walletProvider.toggleProUser();
+                      AppNotifications.mostraInAlto(
+                        context,
+                        walletProvider.isProUser
+                            ? 'Passato a Piano PRO! 🚀'
+                            : 'Passato a Piano FREE 🔒',
+                        type: NotificationType.success,
+                      );
+                    },
+                  ),
+
+                  const Spacer(),
+
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: coloreOttanio.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified_outlined, color: coloreOttanio, size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Versione V5.0 Stabile',
+                            style: TextStyle(color: coloreOttanio, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSandboxCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: coloreCard.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        onTap: onTap,
+      ),
     );
   }
 }

@@ -497,20 +497,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     sottotitolo: 'Gestione P.IVA',
                   ),
                 ),
-                Positioned(
+                // 📍 BADGE ATECO DINAMICO E REATTIVO AL PROVIDER
+Positioned(
   top: topPadding + 10,
   right: 16,
   child: FilledButton.icon(
     onPressed: () {
       AppNotifications.mostraInAlto(
         context,
-        'Profilo ATECO attivo: ${(_coefficienteRedditivita * 100).toInt()}% • Gestibile in Impostazioni Profilo',
+        'Profilo ATECO attivo: ${walletProvider.codiceAteco} • Gestibile in Profilo & Impostazioni',
         type: NotificationType.success,
       );
     },
     icon: const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2DD4BF)),
     label: Text(
-      'ATECO (${(_coefficienteRedditivita * 100).toInt()}%)',
+      'ATECO ${walletProvider.codiceAteco.split(' - ').first.trim()} (${(walletProvider.coeffRedditivita * 100).toInt()}%)',
       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
     ),
     style: FilledButton.styleFrom(

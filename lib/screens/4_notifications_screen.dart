@@ -1,6 +1,10 @@
+// 📍 INIZIO CODICE COMPLETO: lib/screens/4_notifications_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/notifications_provider.dart';
+import '../data/wallet_provider.dart'; // 👈 Import aggiunto
+import '../widgets_shared/app_popup_wrapper.dart';
+import '3_1_PI_incasso_fatture.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -16,14 +20,14 @@ class NotificationsScreen extends StatelessWidget {
   Color _coloreTipo(AppNotificationType type) {
     switch (type) {
       case AppNotificationType.success:
-        return const Color(0xFF10B981); // Verde
+        return const Color(0xFF10B981);
       case AppNotificationType.warning:
-        return const Color(0xFFF59E0B); // Arancio
+        return const Color(0xFFF59E0B);
       case AppNotificationType.error:
-        return const Color(0xFFEF4444); // Rosso
+        return const Color(0xFFEF4444);
       case AppNotificationType.info:
       default:
-        return const Color(0xFF3B82F6); // Blu
+        return const Color(0xFF3B82F6);
     }
   }
 
@@ -39,6 +43,162 @@ class NotificationsScreen extends StatelessWidget {
       default:
         return Icons.notifications_rounded;
     }
+  }
+
+  void _mostraDettaglioNotifica(BuildContext context, AppNotificationItem n) {
+    final colore = _coloreTipo(n.type);
+    final icona = _iconaTipo(n.type);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colore.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icona, color: colore, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n.titolo,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formattaTempo(n.data),
+                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: Text(
+                  n.messaggio,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 🎯 ACTION BUTTON DINAMICO IN BASE AL TIPO DI NOTIFICA
+              if (n.actionType == 'INCASSO_FATTURE' || 
+                  n.id.startsWith('ritardo_') || 
+                  n.titolo.toLowerCase().contains('fattura')) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2DD4BF),
+                      foregroundColor: const Color(0xFF0F172A),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                    label: const Text(
+                      'Verifica e Incassa Fattura',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    onPressed: () {
+                      final walletProvider = context.read<WalletProvider>();
+                      
+                      Navigator.pop(context);
+                      AppPopupWrapper.mostra(
+                        context: context,
+                        child: IncassoFattureSheet(
+                          coefficienteRedditivita: walletProvider.coeffRedditivita,
+                          aliquotaImposta: walletProvider.aliquotaImposta,
+                          aliquotaInps: walletProvider.aliquotaInps, // 👈 L'INPS che chiedeva il terminale!
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Chiudi',
+                      style: TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2DD4BF),
+                      foregroundColor: const Color(0xFF0F172A),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Ho capito',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -76,13 +236,11 @@ class NotificationsScreen extends StatelessWidget {
         ),
         actions: [
           if (lista.isNotEmpty) ...[
-            // Segna tutte come lette
             IconButton(
               tooltip: 'Segna tutte come lette',
               icon: const Icon(Icons.done_all_rounded, color: Color(0xFF2DD4BF), size: 20),
               onPressed: () => context.read<NotificationsProvider>().segnaTutteComeLette(),
             ),
-            // Svuota storico
             IconButton(
               tooltip: 'Svuota notifiche',
               icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white38, size: 20),
@@ -130,7 +288,10 @@ class NotificationsScreen extends StatelessWidget {
                     child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
                   ),
                   child: InkWell(
-                    onTap: () => context.read<NotificationsProvider>().segnaComeLetta(n.id),
+                    onTap: () {
+                      context.read<NotificationsProvider>().segnaComeLetta(n.id);
+                      _mostraDettaglioNotifica(context, n);
+                    },
                     borderRadius: BorderRadius.circular(18),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -216,3 +377,4 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 }
+// 📍 FINE CODICE COMPLETO

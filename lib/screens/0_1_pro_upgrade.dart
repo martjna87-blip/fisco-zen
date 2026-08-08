@@ -42,7 +42,7 @@ class _ProUpgradeSheetState extends State<ProUpgradeSheet> {
     // Mostriamo un feedback di grande impatto
     AppNotifications.mostraInAlto(
       context, 
-      'Benvenuta in FiscON PRO! 🎉 Tutte le funzioni avanzate sono ora sbloccate.',
+      'Benvenuto in FiscON PRO! 🎉 Accesso illimitato attivato per la Fase di Lancio',
       type: NotificationType.success,
     );
   }
@@ -274,7 +274,7 @@ class _ProUpgradeSheetState extends State<ProUpgradeSheet> {
                               child: CircularProgressIndicator(color: Color(0xFF12181B), strokeWidth: 3),
                             )
                           : const Text(
-                              'Attiva Mese di Prova (0€)',
+                              'Attiva PRO Gratis (Offerta Lancio)',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                     ),

@@ -1,4 +1,6 @@
+// 📍 INIZIO CODICE COMPLETO: lib/data/notifications_provider.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets_shared/app_notifications.dart';
 
 enum AppNotificationType { info, success, warning, error }
@@ -24,16 +26,56 @@ class AppNotificationItem {
 }
 
 class NotificationsProvider extends ChangeNotifier {
-  final List<AppNotificationItem> _notifiche = [
-    AppNotificationItem(
-      id: 'welcome_1',
-      titolo: 'Benvenuto in FiscOn! 🎉',
-      messaggio: 'Il tuo centro notifiche è attivo. Qui troverai avvisi su tasse, scadenze e fatture in ritardo.',
-      data: DateTime.now().subtract(const Duration(minutes: 5)),
-      type: AppNotificationType.info,
-      letta: false,
-    ),
-  ];
+  final List<AppNotificationItem> _notifiche = [];
+
+  NotificationsProvider() {
+    _inizializzaNotifiche();
+  }
+
+  // 🎯 GESTIONE BENVERNUTO UNICO & INATTIVITÀ PROLUNGATA
+  Future<void> _inizializzaNotifiche() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Controllo Primo Accesso (Mostra il benvenuto 1 sola volta)
+    final bool benvenutoMostrato = prefs.getBool('welcome_shown') ?? false;
+
+    if (!benvenutoMostrato) {
+      _notifiche.add(
+        AppNotificationItem(
+          id: 'welcome_1',
+          titolo: 'Benvenuto in FiscOn! 🎉',
+          messaggio: 'Il tuo centro notifiche è attivo. Qui troverai avvisi su tasse, scadenze e fatture in ritardo.',
+          data: DateTime.now(),
+          type: AppNotificationType.info,
+          letta: false,
+        ),
+      );
+      await prefs.setBool('welcome_shown', true);
+    }
+
+    // 2. Controllo Inattività Prolungata (> 30 giorni)
+    final String? ultimoAccessoStr = prefs.getString('ultimo_accesso');
+    final DateTime ora = DateTime.now();
+
+    if (ultimoAccessoStr != null) {
+      final DateTime ultimoAccesso = DateTime.parse(ultimoAccessoStr);
+      if (ora.difference(ultimoAccesso).inDays >= 30) {
+        _notifiche.add(
+          AppNotificationItem(
+            id: 'welcome_back_${ora.millisecondsSinceEpoch}',
+            titolo: 'Bentornato su FiscON! 👋',
+            messaggio: 'È da un po\' che non aggiorni i tuoi dati. Dai un\'occhiata alle fatture e alla riserva tasse.',
+            data: ora,
+            type: AppNotificationType.info,
+            letta: false,
+          ),
+        );
+      }
+    }
+
+    await prefs.setString('ultimo_accesso', ora.toIso8601String());
+    notifyListeners();
+  }
 
   List<AppNotificationItem> get notifiche => List.unmodifiable(_notifiche);
 
@@ -199,3 +241,4 @@ class NotificationsProvider extends ChangeNotifier {
     }
   }
 }
+// 📍 FINE CODICE COMPLETO: lib/data/notifications_provider.dart

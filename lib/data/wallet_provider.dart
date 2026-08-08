@@ -4,11 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// 🛡️ 1. ENUM PER I RUOLI DI SISTEMA INDELEBILI
 enum AccountRole {
-  principal,  // Conto Operativo Principale
-  taxReserve, // Salvadanaio Riserva Tasse
-  standard,   // Conto o Carta Libera (creabile/eliminabile dall'utente)
+  principal,  
+  taxReserve, 
+  standard,   
 }
 
 class AccountModel {
@@ -209,6 +208,19 @@ class WalletProvider with ChangeNotifier {
 
   int? _annoAperturaPiva = 2024;
   int? get annoAperturaPiva => _annoAperturaPiva;
+
+  int? _meseAperturaPiva = 1;
+  int? get meseAperturaPiva => _meseAperturaPiva;
+
+  // 🧮 CALCOLO SOGLIA RAGGUAGLIATA AD ANNO
+  double get sogliaForfettarioReale {
+    final int annoCorrente = DateTime.now().year;
+    if (_annoAperturaPiva == annoCorrente && _meseAperturaPiva != null) {
+      final int mesiAttivi = (12 - _meseAperturaPiva! + 1).clamp(1, 12);
+      return (85000.0 / 12.0) * mesiAttivi;
+    }
+    return 85000.0;
+  }
 
   bool isPartitaIVA = true;
 
@@ -623,6 +635,7 @@ class WalletProvider with ChangeNotifier {
       _fatturatoStimatoAnnuo = prefs.getDouble('fatturatoStimatoAnnuo') ?? 35000.0;
       _mesiAttiviIncasso = prefs.getInt('mesiAttiviIncasso') ?? 10;
       _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2024;
+      _meseAperturaPiva = prefs.getInt('meseAperturaPiva') ?? 1;
 
       _spesoBisogni = prefs.getDouble('spesoBisogni') ?? 0.0;
       _spesoSvago = prefs.getDouble('spesoSvago') ?? 0.0;
@@ -684,6 +697,9 @@ class WalletProvider with ChangeNotifier {
       if (_annoAperturaPiva != null) {
         await prefs.setInt('annoAperturaPiva', _annoAperturaPiva!);
       }
+      if (_meseAperturaPiva != null) {
+        await prefs.setInt('meseAperturaPiva', _meseAperturaPiva!);
+      }
 
       await prefs.setDouble('spesoBisogni', _spesoBisogni);
       await prefs.setDouble('spesoSvago', _spesoSvago);
@@ -716,6 +732,7 @@ class WalletProvider with ChangeNotifier {
         'fatturatoStimatoAnnuo': _fatturatoStimatoAnnuo,
         'mesiAttiviIncasso': _mesiAttiviIncasso,
         'annoAperturaPiva': _annoAperturaPiva,
+        'meseAperturaPiva': _meseAperturaPiva,
         'spesoBisogni': _spesoBisogni,
         'spesoSvago': _spesoSvago,
         'spesoRisparmi': _spesoRisparmi,
@@ -1188,7 +1205,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 📝 METODO UNICO PER SALVARE E AGGIORNARE IL PROFILO FISCALE
   void salvaProfiloFiscale({
     required String codiceAteco,
     required double coeffRedditivitaVal,
@@ -1198,6 +1214,7 @@ class WalletProvider with ChangeNotifier {
     double fatturatoStimato = 35000.0,
     int mesiAttivi = 12,
     int? annoAperturaPiva,
+    int? meseAperturaPiva,
   }) {
     _codiceAteco = codiceAteco;
     _coefficienteRedditivita = coeffRedditivitaVal;
@@ -1216,6 +1233,9 @@ class WalletProvider with ChangeNotifier {
 
     if (annoAperturaPiva != null) {
       _annoAperturaPiva = annoAperturaPiva;
+    }
+    if (meseAperturaPiva != null) {
+      _meseAperturaPiva = meseAperturaPiva;
     }
 
     _salvaDatiInLocalStorage();
@@ -1236,6 +1256,7 @@ class WalletProvider with ChangeNotifier {
       fatturatoStimato: _fatturatoStimatoAnnuo,
       mesiAttivi: _mesiAttiviIncasso,
       annoAperturaPiva: _annoAperturaPiva,
+      meseAperturaPiva: _meseAperturaPiva,
     );
   }
 
