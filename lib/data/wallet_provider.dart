@@ -135,7 +135,6 @@ class TransactionModel {
 }
 
 class WalletProvider with ChangeNotifier {
-  // 🟢 ISTANZA FIRESTORE E IDENTIFICATIVO UTENTE
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? get _userId => FirebaseAuth.instance.currentUser?.uid;
 
@@ -148,33 +147,85 @@ class WalletProvider with ChangeNotifier {
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
 
   bool _isProUser = false;
-  // 🎁 METODO PER ATTIVARE IL PIANO PRO GRATUITO
+  bool get isProUser => _isProUser;
+
   void impostaStatoPro(bool valore) {
     _isProUser = valore;
     notifyListeners();
   }
-  bool get isProUser => _isProUser;
 
+  void attivaPro() {
+    _isProUser = true;
+    notifyListeners();
+  }
+
+  void disattivaPro() {
+    _isProUser = false;
+    notifyListeners();
+  }
+
+  void toggleProUser() {
+    _isProUser = !_isProUser;
+    notifyListeners();
+  }
+
+  // 🏛️ PARAMETRI FISCALI UNIFICATI
   String _codiceAteco = '62.02.00';
   String get codiceAteco => _codiceAteco;
+
   double _coefficienteRedditivita = 0.78;
+  double coeffRedditivita = 0.78;
+
+  double _aliquotaImposta = 0.05;
+  double aliquotaImposta = 0.05;
+
+  double _aliquotaInps = 0.2607;
+  double aliquotaInps = 0.2607;
+
   String _tipoCassa = 'gestioneSeparata';
   bool _isStartup = true;
-  
+
   String _tipoLavoroDipendente = 'nessuno';
+  String? get tipoLavoroDipendente => _tipoLavoroDipendente;
+
   bool _ralSupera30k = false;
   bool _scontoInps35 = false;
-
   bool _isPrimoAnnoAssoluto = false;
-  double _accontoImpostaVersato = 0.0;
-  double _accontoInpsVersato = 0.0;
+
+  double accontiVersatiAnnoPrecedente = 0.0;
+  double _accontiVersati = 0.0;
+  double get accontiVersati => _accontiVersati;
+
   double _contributiInpsPagatiAnnoCorrente = 0.0;
 
   double _nettoTargetMensile = 2000.0;
   double _speseFisseMensili = 800.0;
+
   double _fatturatoStimatoAnnuo = 35000.0;
+  double get fatturatoStimato => _fatturatoStimatoAnnuo;
+
   int _mesiAttiviIncasso = 10;
   int get mesiAttivi => _mesiAttiviIncasso;
+
+  int? _annoAperturaPiva = 2024;
+  int? get annoAperturaPiva => _annoAperturaPiva;
+
+  bool isPartitaIVA = true;
+
+  double get aliquotaFiscaleReale {
+    final imponibile = coeffRedditivita;                 
+    final saldoInps = imponibile * aliquotaInps;         
+    final saldoImposta = imponibile * aliquotaImposta;   
+    final accontoInps = saldoInps * 0.80;                
+    final accontoImposta = saldoImposta * 1.00;          
+    return saldoInps + saldoImposta + accontoInps + accontoImposta;
+  }
+
+  void setPartitaIVA(bool value) {
+    isPartitaIVA = value;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
 
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,
@@ -191,8 +242,8 @@ class WalletProvider with ChangeNotifier {
     double stimaInpsAnnuo = 0.0;
     
     if (_tipoCassa == 'gestioneSeparata') {
-      final aliquotaInps = (_tipoLavoroDipendente != 'nessuno') ? 0.24 : 0.2607;
-      stimaInpsAnnuo = imponibileLordo * aliquotaInps;
+      final aliquotaInpsVal = (_tipoLavoroDipendente != 'nessuno') ? 0.24 : 0.2607;
+      stimaInpsAnnuo = imponibileLordo * aliquotaInpsVal;
     } else if (_tipoCassa == 'commercianti' || _tipoCassa == 'artigiani') {
       final isEsenzioneFissi = (_tipoLavoroDipendente == 'fullTime' || _tipoLavoroDipendente == 'partTimeSuperiore50');
       
@@ -207,8 +258,8 @@ class WalletProvider with ChangeNotifier {
       stimaInpsAnnuo = imponibileLordo * 0.15;
     }
 
-    final aliquotaImposta = _isStartup ? 0.05 : 0.15;
-    final stimaImpostaAnnuo = imponibileNettoTasse * aliquotaImposta;
+    final aliquotaImpostaVal = _isStartup ? 0.05 : 0.15;
+    final stimaImpostaAnnuo = imponibileNettoTasse * aliquotaImpostaVal;
     final totaleTasseAnnuo = stimaInpsAnnuo + stimaImpostaAnnuo;
     final nettoRealeAnnuo = fatturato - totaleTasseAnnuo;
     final stipendioMensile12Mesi = nettoRealeAnnuo / 12;
@@ -259,28 +310,6 @@ class WalletProvider with ChangeNotifier {
       'motivazione': motivazione,
       'fatturatoLordoNecessarioForTarget': fatturatoLordoNecessarioForTarget,
     };
-  }
-
-  bool isPartitaIVA = true; 
-  double accontiVersatiAnnoPrecedente = 100.0; 
-  
-  double coeffRedditivita = 0.78; 
-  double aliquotaImposta = 0.05;  
-  double aliquotaInps = 0.2607;   
-
-  double get aliquotaFiscaleReale {
-    final imponibile = coeffRedditivita;                 
-    final saldoInps = imponibile * aliquotaInps;         
-    final saldoImposta = imponibile * aliquotaImposta;   
-    final accontoInps = saldoInps * 0.80;                
-    final accontoImposta = saldoImposta * 1.00;          
-    return saldoInps + saldoImposta + accontoInps + accontoImposta;
-  }
-
-  void setPartitaIVA(bool value) {
-    isPartitaIVA = value;
-    _salvaDatiInLocalStorage();
-    notifyListeners();
   }
 
   double get patrimonioNetto => _accounts.fold(0.0, (sum, item) => sum + item.amount);
@@ -578,14 +607,22 @@ class WalletProvider with ChangeNotifier {
 
       isPartitaIVA = prefs.getBool('isPartitaIVA') ?? true;
       coeffRedditivita = prefs.getDouble('coeffRedditivita') ?? 0.78;
+      _coefficienteRedditivita = coeffRedditivita;
+
       aliquotaImposta = prefs.getDouble('aliquotaImposta') ?? 0.05;
+      _aliquotaImposta = aliquotaImposta;
+
       aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
-      accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 100.0;
+      _aliquotaInps = aliquotaInps;
+
+      accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 0.0;
+      _accontiVersati = accontiVersatiAnnoPrecedente;
 
       _codiceAteco = prefs.getString('codiceAteco') ?? '62.02.00';
       _nettoTargetMensile = prefs.getDouble('nettoTargetMensile') ?? 2000.0;
       _fatturatoStimatoAnnuo = prefs.getDouble('fatturatoStimatoAnnuo') ?? 35000.0;
       _mesiAttiviIncasso = prefs.getInt('mesiAttiviIncasso') ?? 10;
+      _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2024;
 
       _spesoBisogni = prefs.getDouble('spesoBisogni') ?? 0.0;
       _spesoSvago = prefs.getDouble('spesoSvago') ?? 0.0;
@@ -644,6 +681,9 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('nettoTargetMensile', _nettoTargetMensile);
       await prefs.setDouble('fatturatoStimatoAnnuo', _fatturatoStimatoAnnuo);
       await prefs.setInt('mesiAttiviIncasso', _mesiAttiviIncasso);
+      if (_annoAperturaPiva != null) {
+        await prefs.setInt('annoAperturaPiva', _annoAperturaPiva!);
+      }
 
       await prefs.setDouble('spesoBisogni', _spesoBisogni);
       await prefs.setDouble('spesoSvago', _spesoSvago);
@@ -656,14 +696,12 @@ class WalletProvider with ChangeNotifier {
       await prefs.setString('fattureIncassate', jsonEncode(_fattureIncassate));
       await prefs.setString('skippedPredictions', jsonEncode(_skippedPredictions));
 
-      // 🟢 SALVATAGGIO AUTOMATICO SU CLOUD FIRESTORE
       await _salvaDatiSuCloud();
     } catch (e) {
       debugPrint('Errore durante il salvataggio: $e');
     }
   }
 
-  // 🟢 FUNZIONE PER IL BACKUP DEI DATI SU FIRESTORE
   Future<void> _salvaDatiSuCloud() async {
     if (_userId == null) return;
     try {
@@ -677,6 +715,7 @@ class WalletProvider with ChangeNotifier {
         'nettoTargetMensile': _nettoTargetMensile,
         'fatturatoStimatoAnnuo': _fatturatoStimatoAnnuo,
         'mesiAttiviIncasso': _mesiAttiviIncasso,
+        'annoAperturaPiva': _annoAperturaPiva,
         'spesoBisogni': _spesoBisogni,
         'spesoSvago': _spesoSvago,
         'spesoRisparmi': _spesoRisparmi,
@@ -691,10 +730,6 @@ class WalletProvider with ChangeNotifier {
       debugPrint('Errore salvataggio Cloud: $e');
     }
   }
-
-  // ==========================================
-  // 🧮 MOTORE DI CALCOLO DINAMICO TASSE
-  // ==========================================
 
   double get totaleTasseDovute {
     return _fattureIncassate.fold(
@@ -1153,31 +1188,55 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleProUser() {
-    _isProUser = !_isProUser;
-    notifyListeners();
-  }
-
+  // 📝 METODO UNICO PER SALVARE E AGGIORNARE IL PROFILO FISCALE
   void salvaProfiloFiscale({
     required String codiceAteco,
     required double coeffRedditivitaVal,
     required double aliquotaImpostaVal,
-    required double accontiVersati,
-    required double nettoTarget,
-    required double fatturatoStimato,
-    required int mesiAttivi,
+    double accontiVersati = 0.0,
+    double nettoTarget = 2000.0,
+    double fatturatoStimato = 35000.0,
+    int mesiAttivi = 12,
+    int? annoAperturaPiva,
   }) {
     _codiceAteco = codiceAteco;
     _coefficienteRedditivita = coeffRedditivitaVal;
     coeffRedditivita = coeffRedditivitaVal;
+
+    _aliquotaImposta = aliquotaImpostaVal;
     aliquotaImposta = aliquotaImpostaVal;
+    _isStartup = (aliquotaImpostaVal == 0.05);
+
     accontiVersatiAnnoPrecedente = accontiVersati;
+    _accontiVersati = accontiVersati;
+
     _nettoTargetMensile = nettoTarget;
     _fatturatoStimatoAnnuo = fatturatoStimato;
     _mesiAttiviIncasso = mesiAttivi;
 
+    if (annoAperturaPiva != null) {
+      _annoAperturaPiva = annoAperturaPiva;
+    }
+
     _salvaDatiInLocalStorage();
     notifyListeners();
+  }
+
+  void aggiornaProfiloFiscale({
+    required String nuovoAteco,
+    required double nuovoCoeff,
+    required double nuovaImposta,
+  }) {
+    salvaProfiloFiscale(
+      codiceAteco: nuovoAteco,
+      coeffRedditivitaVal: nuovoCoeff,
+      aliquotaImpostaVal: nuovaImposta,
+      accontiVersati: _accontiVersati,
+      nettoTarget: _nettoTargetMensile,
+      fatturatoStimato: _fatturatoStimatoAnnuo,
+      mesiAttivi: _mesiAttiviIncasso,
+      annoAperturaPiva: _annoAperturaPiva,
+    );
   }
 
   Future<void> resetSoloMovimentieFatture() async {
@@ -1199,15 +1258,4 @@ class WalletProvider with ChangeNotifier {
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }
-  // 📍 INIZIO MODIFICA: Metodi Attivazione PRO (lib/data/wallet_provider.dart)
-  void attivaPro() {
-    _isProUser = true;
-    notifyListeners();
-  }
-
-  void disattivaPro() {
-    _isProUser = false;
-    notifyListeners();
-  }
-// 📍 FINE MODIFICA: Metodi Attivazione PRO
 }

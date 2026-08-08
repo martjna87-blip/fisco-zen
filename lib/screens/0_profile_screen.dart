@@ -9,6 +9,7 @@ import '../main.dart';
 import '0_1_pro_upgrade.dart';
 import '1_main_menu.dart';
 import '../widgets_shared/app_image_picker.dart';
+import '0_2_tax_profile.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -335,14 +336,17 @@ class ProfileScreen extends StatelessWidget {
                       },
                     ),
                     Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 60),
+                    // 📍 INIZIO MODIFICA: Collegamento Profilo Fiscale (0_profile_screen.dart)
+                    // 📍 INIZIO MODIFICA: Collegamento Nuova Schermata (0_profile_screen.dart)
                     _buildListTile(
                       icon: Icons.pie_chart_outline_rounded,
                       iconColor: coloreOttanio,
                       title: 'Profilo Fiscale & ATECO',
                       subtitle: 'ATECO: ${walletProvider.codiceAteco} • Coeff: ${(walletProvider.coeffRedditivita * 100).toInt()}%',
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Modifica profilo fiscale in arrivo!')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TaxProfileScreen()),
                         );
                       },
                     ),
