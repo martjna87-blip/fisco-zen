@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+  <string>FiscON richiede l'accesso alla galleria per impostare la tua foto profilo.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>FiscON richiede l'accesso alla fotocamera per scattare la tua foto profilo.</string>
 </dict>
 </plist>
