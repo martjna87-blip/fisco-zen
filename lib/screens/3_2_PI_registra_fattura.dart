@@ -719,7 +719,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                                           shape: BoxShape.circle,
                                           border: Border.all(color: const Color(0xFF18181B), width: 2),
                                         ),
-                                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 10),
+                                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 12),
                                       ),
                                     ),
                                 ],
