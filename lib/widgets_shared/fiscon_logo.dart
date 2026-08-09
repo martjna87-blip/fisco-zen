@@ -1,75 +1,81 @@
-// FILE: lib/widgets_shared/fiscon_logo.dart
-
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class FiscOnLogo extends StatelessWidget {
-  final double fontSize;
+  final double? fontSize;
+  final double? imageHeight;
   final String? sottotitolo;
 
   const FiscOnLogo({
     super.key,
-    this.fontSize = 22,
+    this.fontSize,
+    this.imageHeight,
     this.sottotitolo,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Calcolo proporzioni ottiche perfette per allinearsi alle lettere maiuscole
-    final double oSize = fontSize * 0.82;
-    final double strokeWidth = fontSize * 0.15; // Spessore grassetto identico al testo
+    final double effectiveFontSize = fontSize ?? (imageHeight != null ? imageHeight! * (52 / 170) : 22.0);
+    final double effectiveHeight = imageHeight ?? (effectiveFontSize * (170 / 52));
+
+    // Dimensioni proporzionali per lo slot visivo
+    final double symbolSlotWidth = effectiveHeight * (48 / 170);
+    final double imageLeftOffset = -effectiveHeight * (60 / 170);
+    final double imageTopOffset = -effectiveHeight * (60 / 170); // 👈 Bilanciato al centro del font
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 1. "Fisc" IN BIANCO GRASSETTO
+        // 1. Testo "Fisc"
         Text(
           'Fisc',
           style: TextStyle(
             color: Colors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
-            height: 1.0,
-          ),
-        ),
-
-        // 2. LA "O" DI ACCENSIONE VETTORIALE (Zero spazi vuoti ai lati)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 1.5),
-          child: CustomPaint(
-            size: Size(oSize, oSize),
-            painter: _PowerOPainter(
-              color: const Color(0xFF2DD4BF),
-              strokeWidth: strokeWidth,
-            ),
-          ),
-        ),
-
-        // 3. LA "N" IN VERDE CIANO LUMINOSO
-        Text(
-          'N',
-          style: TextStyle(
-            color: const Color(0xFF2DD4BF),
-            fontSize: fontSize,
+            fontSize: effectiveFontSize,
             fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
+            letterSpacing: -1.5,
             height: 1.0,
-            shadows: [
-              Shadow(
-                color: const Color(0xFF2DD4BF).withOpacity(0.4),
-                blurRadius: 8,
+          ),
+        ),
+
+        // 2. Simbolo "O" (Ingombro verticale ridotto per pareggiare il font)
+        SizedBox(
+          width: symbolSlotWidth,
+          height: effectiveFontSize, // 👈 Bloccato a 22px invece di 72px
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: imageLeftOffset,
+                top: imageTopOffset,
+                width: effectiveHeight,
+                height: effectiveHeight,
+                child: Image.asset(
+                  'assets/fiscon_symbol.png',
+                  fit: BoxFit.contain,
+                ),
               ),
             ],
           ),
         ),
 
-        // 🏷️ SOTTOTITOLO OPZIONALE ("P.IVA" o "Wallet")
+        // 3. Testo "N"
+        Text(
+          'N',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: effectiveFontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1.5,
+            height: 1.0,
+          ),
+        ),
+
+        // 4. Sottotitolo ("Gestione P.IVA", "Portafoglio Personale")
         if (sottotitolo != null) ...[
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.12),
               borderRadius: BorderRadius.circular(6),
@@ -77,9 +83,9 @@ class FiscOnLogo extends StatelessWidget {
             ),
             child: Text(
               sottotitolo!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white70,
-                fontSize: 10,
+                fontSize: effectiveFontSize * 0.45,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
@@ -89,52 +95,4 @@ class FiscOnLogo extends StatelessWidget {
       ],
     );
   }
-}
-
-// 🎨 PITTORE VETTORIALE PER UNA "O" DI ACCENSIONE PERFETTA
-class _PowerOPainter extends CustomPainter {
-  final Color color;
-  final double strokeWidth;
-
-  _PowerOPainter({required this.color, required this.strokeWidth});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final Offset center = Offset(size.width / 2, size.height / 2);
-    final double radius = (size.width - strokeWidth) / 2;
-
-    // 1. Disegna l'arco del cerchio aperto in alto (da ore 1 a ore 11 in senso orario)
-    const double startAngle = -math.pi / 2 + 0.48; // Ore ~1:00
-    const double sweepAngle = 2 * math.pi - (0.48 * 2); // Fino a ore ~11:00
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      paint,
-    );
-
-    // 2. Disegna il trattino verticale di accensione in alto al centro
-    final Paint linePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(
-      Offset(size.width / 2, 0),
-      Offset(size.width / 2, size.height * 0.46),
-      linePaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

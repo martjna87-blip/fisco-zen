@@ -26,12 +26,20 @@ dependencies:
   firebase_crashlytics: ^4.3.10
   url_launcher: ^6.3.2
 
+# ⚙️ CONFIGURAZIONE ICONA APP
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/app_icon.png"
+  remove_alpha_ios: true
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/ateco.json
+    - assets/

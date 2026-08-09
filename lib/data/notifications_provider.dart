@@ -1,4 +1,5 @@
 // 📍 INIZIO CODICE COMPLETO: lib/data/notifications_provider.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets_shared/app_notifications.dart';
@@ -23,20 +24,69 @@ class AppNotificationItem {
     this.actionType,
     this.letta = false,
   });
+
+  // 📦 Metodo per convertire la notifica in JSON da salvare
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'titolo': titolo,
+      'messaggio': messaggio,
+      'data': data.toIso8601String(),
+      'type': type.name,
+      'actionType': actionType,
+      'letta': letta,
+    };
+  }
+
+  // 🔓 Metodo per ricostruire la notifica dal JSON salvato
+  factory AppNotificationItem.fromJson(Map<String, dynamic> json) {
+    return AppNotificationItem(
+      id: json['id'] ?? '',
+      titolo: json['titolo'] ?? '',
+      messaggio: json['messaggio'] ?? '',
+      data: DateTime.tryParse(json['data'] ?? '') ?? DateTime.now(),
+      type: AppNotificationType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => AppNotificationType.info,
+      ),
+      actionType: json['actionType'],
+      letta: json['letta'] ?? false,
+    );
+  }
 }
 
 class NotificationsProvider extends ChangeNotifier {
   final List<AppNotificationItem> _notifiche = [];
+  bool _isInitialized = false;
 
   NotificationsProvider() {
     _inizializzaNotifiche();
   }
 
-  // 🎯 GESTIONE BENVERNUTO UNICO & INATTIVITÀ PROLUNGATA
+  // 💾 Salva l'intera lista delle notifiche nella memoria permanente
+  Future<void> _salvaNotificheLocali() async {
+    if (!_isInitialized) return;
+    final prefs = await SharedPreferences.getInstance();
+    final String jsonString = jsonEncode(_notifiche.map((n) => n.toJson()).toList());
+    await prefs.setString('notifiche_salvate_v1', jsonString);
+  }
+
+  // 🔄 Carica le notifiche all'avvio e gestisce benvenuto/bentornato
   Future<void> _inizializzaNotifiche() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Controllo Primo Accesso (Mostra il benvenuto 1 sola volta)
+    // 1. Carica lo storico notifiche salvate
+    final String? salvate = prefs.getString('notifiche_salvate_v1');
+    if (salvate != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(salvate);
+        _notifiche.addAll(decoded.map((item) => AppNotificationItem.fromJson(item)).toList());
+      } catch (e) {
+        debugPrint('Errore nel parsing delle notifiche: $e');
+      }
+    }
+
+    // 2. Controllo Primo Accesso (Mostra il benvenuto 1 sola volta)
     final bool benvenutoMostrato = prefs.getBool('welcome_shown') ?? false;
 
     if (!benvenutoMostrato) {
@@ -53,7 +103,7 @@ class NotificationsProvider extends ChangeNotifier {
       await prefs.setBool('welcome_shown', true);
     }
 
-    // 2. Controllo Inattività Prolungata (> 30 giorni)
+    // 3. Controllo Inattività Prolungata (> 30 giorni)
     final String? ultimoAccessoStr = prefs.getString('ultimo_accesso');
     final DateTime ora = DateTime.now();
 
@@ -73,7 +123,16 @@ class NotificationsProvider extends ChangeNotifier {
       }
     }
 
+    // 🧹 AUTO-PULIZIA: Elimina le notifiche più vecchie di 30 giorni per non intasare la memoria
+    final limiteVecchio = ora.subtract(const Duration(days: 30));
+    _notifiche.removeWhere((n) => n.data.isBefore(limiteVecchio));
+
+    // 4. Salva la data di accesso corrente e aggiorna
     await prefs.setString('ultimo_accesso', ora.toIso8601String());
+    
+    _isInitialized = true;
+    _notifiche.sort((a, b) => b.data.compareTo(a.data)); // Ordina dalla più recente
+    await _salvaNotificheLocali();
     notifyListeners();
   }
 
@@ -121,6 +180,7 @@ class NotificationsProvider extends ChangeNotifier {
       actionType: actionType,
     );
     _notifiche.insert(0, nuova);
+    _salvaNotificheLocali();
     notifyListeners();
   }
 
@@ -128,30 +188,41 @@ class NotificationsProvider extends ChangeNotifier {
     final index = _notifiche.indexWhere((n) => n.id == id);
     if (index != -1 && !_notifiche[index].letta) {
       _notifiche[index].letta = true;
+      _salvaNotificheLocali();
       notifyListeners();
     }
   }
 
   void segnaTutteComeLette() {
+    bool modificate = false;
     for (var n in _notifiche) {
-      n.letta = true;
+      if (!n.letta) {
+        n.letta = true;
+        modificate = true;
+      }
     }
-    notifyListeners();
+    if (modificate) {
+      _salvaNotificheLocali();
+      notifyListeners();
+    }
   }
 
   void eliminaNotifica(String id) {
     _notifiche.removeWhere((n) => n.id == id);
+    _salvaNotificheLocali();
     notifyListeners();
   }
 
   void svuotaTutto() {
     _notifiche.clear();
+    _salvaNotificheLocali();
     notifyListeners();
   }
 
   void rimuoviNotificaFattura(String idFattura) {
     final String notifId = 'ritardo_$idFattura';
     _notifiche.removeWhere((n) => n.id == notifId);
+    _salvaNotificheLocali();
     notifyListeners();
   }
 
@@ -237,6 +308,8 @@ class NotificationsProvider extends ChangeNotifier {
     }
 
     if (modificato) {
+      _notifiche.sort((a, b) => b.data.compareTo(a.data));
+      _salvaNotificheLocali();
       notifyListeners();
     }
   }

@@ -11,12 +11,14 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
+  final _nomeController = TextEditingController(); // 👈 Aggiunto per il nome
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLogin = true; // Permette di alternare tra Login e Registrazione
 
   @override
   void dispose() {
+    _nomeController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -24,11 +26,18 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final email = _emailController.text;
-    final password = _passwordController.text;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    // Il nome potrai passarlo al provider se decidi di salvarlo nel database
+    // final nome = _nomeController.text.trim(); 
 
     if (email.isEmpty || password.isEmpty) {
       _showError("Per favore, inserisci email e password.");
+      return;
+    }
+
+    if (!_isLogin && _nomeController.text.trim().isEmpty) {
+      _showError("Per favore, inserisci un nome o ragione sociale.");
       return;
     }
 
@@ -42,6 +51,7 @@ class _AuthScreenState extends State<AuthScreen> {
       error = await authProvider.signUpWithEmail(
         email: email,
         password: password,
+        // nome: nome, // Decommenta se nel tuo AuthProvider aggiungi il parametro nome
       );
     }
 
@@ -55,6 +65,7 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
   }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -79,13 +90,48 @@ class _AuthScreenState extends State<AuthScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Icona e Titolo FiscON
-                const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 64,
-                  color: Color(0xFF2DD4BF),
-                ),
+                
+              // 🖼️ LOGO FISCON (Misura grande + Centrato)
+Transform.translate(
+  offset: const Offset(60.0, 0.0),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      const Text(
+        'Fisc',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 52,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -1.5,
+        ),
+      ),
+      Transform.translate(
+        offset: const Offset(-60.0, -3.0),
+        child: Image.asset(
+          'assets/fiscon_symbol.png',
+          height: 170,
+          fit: BoxFit.contain,
+        ),
+      ),
+      Transform.translate(
+        offset: const Offset(-120.0, 0.0),
+        child: const Text(
+          'N',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 52,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1.5,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
                 const SizedBox(height: 16),
+                
                 Text(
                   _isLogin ? "Bentornato su FiscON" : "Crea il tuo profilo",
                   textAlign: TextAlign.center,
@@ -108,7 +154,28 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Campo Email
+                // 📝 Campo Nome (Visibile SOLO in registrazione)
+                if (!_isLogin) ...[
+                  TextField(
+                    controller: _nomeController,
+                    keyboardType: TextInputType.name,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: "Nome o Ragione Sociale",
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      prefixIcon: const Icon(Icons.person_outline, color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF1E1E2C),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 📧 Campo Email
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -127,7 +194,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Campo Password
+                // 🔒 Campo Password
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
@@ -146,7 +213,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 28),
 
-                // Pulsante principale Accedi / Registrati
+                // 🔘 Pulsante principale Accedi / Registrati
                 SizedBox(
                   height: 54,
                   child: ElevatedButton(
@@ -179,7 +246,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Tasto per alternare Login e Registrazione
+                // 🔄 Tasto per alternare Login e Registrazione
                 TextButton(
                   onPressed: () {
                     setState(() {
