@@ -6,6 +6,7 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_datepicker.dart';
+import '../screens/0_1_pro_upgrade.dart';
 
 // 🇮🇹 FORMATTATORE IN TEMPO REALE PER VALUTA ITALIANA (1.000,00)
 class ItalianCurrencyFormatter extends TextInputFormatter {
@@ -72,6 +73,11 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   final _clienteController = TextEditingController();
   final _importoController = TextEditingController();
   final _searchAtecoController = TextEditingController();
+
+  final _pivaClienteController = TextEditingController();
+  final _codiceSdiController = TextEditingController();
+  final _descrizioneController = TextEditingController();
+  bool _inviaSdi = false;
 
   DateTime _dataSelezionata = DateTime.now();
   bool _isAtecoEspanso = false;
@@ -147,6 +153,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     _clienteController.dispose();
     _importoController.dispose();
     _searchAtecoController.dispose();
+    _pivaClienteController.dispose();
+    _codiceSdiController.dispose();
+    _descrizioneController.dispose();
     super.dispose();
   }
 
@@ -334,8 +343,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       importo: importo,
       data: dataFormattata,
       numero: numero.isNotEmpty ? numero : null,
-      coefAteco: _atecoCoef,          // 👈 ATECO DELLA FATTURA
-      importoTasseStimate: totaleF24, // 👈 TASSE CALCOLATE
+      coefAteco: _atecoCoef,          
+      importoTasseStimate: totaleF24, 
+      inviaSdi: _inviaSdi,
+      pivaCliente: _pivaClienteController.text.trim(),
+      codiceSdiPec: _codiceSdiController.text.trim(),
+      descrizione: _descrizioneController.text.trim(),
     );
 
     if (widget.onFatturaSalvata != null) {
@@ -365,14 +378,64 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'INSERIMENTO MANUALE',
-              style: TextStyle(
-                color: Colors.white54,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
-              ),
+            // 📸 INTESTAZIONE CON GANCO FOTOCAMERA OCR (Stile Canva PRO)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'INSERIMENTO MANUALE',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    final wallet = Provider.of<WalletProvider>(context, listen: false);
+                    if (!wallet.canUseOCR) {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
+                    } else {
+                      AppNotifications.mostraInAlto(context, 'Scansione in attivazione... 📸');
+                    }
+                  },
+                  child: Consumer<WalletProvider>(
+                    builder: (context, wallet, child) {
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            // 👈 QUESTO MARGINE CREA LO SPAZIO FISICO PER IL BADGE
+                            margin: const EdgeInsets.only(top: 8, right: 8), 
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.document_scanner_rounded, color: Colors.white70, size: 16),
+                          ),
+                          // 👑 Coroncina ARANCIONE visibile se NON hai il Pro
+                          if (!wallet.canUseOCR)
+                            Positioned(
+                              top: 0, // 👈 Ora sta a zero, appoggiato sul margine creato sopra
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF18181B), width: 2),
+                                ),
+                                child: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 12),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Row(
@@ -612,6 +675,82 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                         ],
                       ),
                     ),
+                  ],
+                ],
+              ),
+            ),
+
+            // ⚡ TOGGLE FATTURAZIONE ELETTRONICA SDI (FASCIA PREMIUM)
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white12,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Consumer<WalletProvider>(
+                            builder: (context, wallet, child) {
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Padding(
+                                    // 👈 SPAZIO FISICO PER IL BADGE FUCSIA
+                                    padding: const EdgeInsets.only(top: 8, right: 10), 
+                                    child: Icon(Icons.send_rounded, color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white54, size: 18),
+                                  ),
+                                  if (!wallet.canSendSDI)
+                                    Positioned(
+                                      top: 0,
+                                      right: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFD946EF),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: const Color(0xFF18181B), width: 2),
+                                        ),
+                                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 10),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Invia allo SDI', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Switch(
+                        value: _inviaSdi,
+                        activeColor: const Color(0xFF2DD4BF),
+                        onChanged: (val) {
+                          final wallet = Provider.of<WalletProvider>(context, listen: false);
+                          if (!wallet.canSendSDI && val) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => ProUpgradeSheet(funzionalita: 'Fatturazione Elettronica SDI')));
+                          } else {
+                            setState(() => _inviaSdi = val);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  if (_inviaSdi) ...[
+                    const Divider(color: Colors.white12, height: 16),
+                    TextField(controller: _pivaClienteController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('P.IVA / Codice Fiscale Cliente', Icons.badge_outlined)),
+                    const SizedBox(height: 8),
+                    TextField(controller: _codiceSdiController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('Codice SDI (7 cifre) o PEC', Icons.mark_email_read_outlined)),
+                    const SizedBox(height: 8),
+                    TextField(controller: _descrizioneController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('Descrizione Prestazione', Icons.description_outlined)),
                   ],
                 ],
               ),

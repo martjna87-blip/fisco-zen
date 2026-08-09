@@ -8,6 +8,7 @@ import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_image_picker.dart';
+import '../screens/0_1_pro_upgrade.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -1535,16 +1536,47 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 if (isSpesa)
                   Positioned(
                     right: 0,
-                    child: Material(
-                      color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        onTap: _avviaScansioneIntelligente, // 👈 MODIFICA QUI
-                        borderRadius: BorderRadius.circular(30),
-                        child: const Padding(
-                          padding: EdgeInsets.all(10.0),
-                          child: Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF2DD4BF), size: 20),
-                        ),
+                    child: GestureDetector(
+                      onTap: () {
+                        final wallet = Provider.of<WalletProvider>(context, listen: false);
+                        if (!wallet.canUseOCR) {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione Scontrini (OCR)')));
+                        } else {
+                          _avviaScansioneIntelligente();
+                        }
+                      },
+                      child: Consumer<WalletProvider>(
+                        builder: (context, wallet, child) {
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                // 👈 MARGINE ANCHE QUI
+                                margin: const EdgeInsets.only(top: 8, right: 8),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.document_scanner_rounded, color: Colors.white70, size: 20),
+                              ),
+                              if (!wallet.canUseOCR)
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF59E0B),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFF18181B), width: 2),
+                                    ),
+                                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 12),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),

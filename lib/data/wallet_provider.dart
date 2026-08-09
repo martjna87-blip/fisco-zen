@@ -9,6 +9,7 @@ enum AccountRole {
   taxReserve, 
   standard,   
 }
+enum UserTier { free, pro, premium }
 
 class AccountModel {
   final String id;
@@ -145,27 +146,54 @@ class WalletProvider with ChangeNotifier {
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
 
-  bool _isProUser = false;
-  bool get isProUser => _isProUser;
+  UserTier _userTier = UserTier.free;
+  UserTier get userTier => _userTier;
 
+  bool get isFree => _userTier == UserTier.free;
+  bool get isPro => _userTier == UserTier.pro;
+  bool get isPremium => _userTier == UserTier.premium;
+
+  bool get isProUser => _userTier != UserTier.free; // Mantiene la compatibilità con il vecchio codice
+  bool get canUseOCR => _userTier == UserTier.pro || _userTier == UserTier.premium;
+  bool get canSendSDI => _userTier == UserTier.premium;
+
+  void setUserTier(UserTier tier) {
+    _userTier = tier;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+  void cycleUserTier() {
+    if (_userTier == UserTier.free) {
+      _userTier = UserTier.pro;
+    } else if (_userTier == UserTier.pro) {
+      _userTier = UserTier.premium;
+    } else {
+      _userTier = UserTier.free;
+    }
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+  // 🔄 METODI DI RETROCOMPATIBILITÀ (Per non rompere le altre schermate)
   void impostaStatoPro(bool valore) {
-    _isProUser = valore;
+    _userTier = valore ? UserTier.pro : UserTier.free;
+    _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
   void attivaPro() {
-    _isProUser = true;
+    _userTier = UserTier.pro;
+    _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
   void disattivaPro() {
-    _isProUser = false;
+    _userTier = UserTier.free;
+    _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
   void toggleProUser() {
-    _isProUser = !_isProUser;
-    notifyListeners();
+    cycleUserTier(); 
   }
 
   // 🏛️ PARAMETRI FISCALI UNIFICATI
@@ -838,6 +866,10 @@ class WalletProvider with ChangeNotifier {
     String? numero,
     double? coefAteco,
     double? importoTasseStimate,
+    bool inviaSdi = false,
+    String? pivaCliente,
+    String? codiceSdiPec,
+    String? descrizione,
   }) {
     final String numCalcolato = (numero != null && numero.trim().isNotEmpty)
         ? numero.trim()
@@ -851,6 +883,11 @@ class WalletProvider with ChangeNotifier {
       'numero': numCalcolato,
       'coefAteco': coefAteco ?? coeffRedditivita,
       'importoTasseStimate': importoTasseStimate ?? (importo * aliquotaFiscaleReale),
+      'inviaSdi': inviaSdi,
+      'pivaCliente': pivaCliente ?? '',
+      'codiceSdiPec': codiceSdiPec ?? '',
+      'descrizione': descrizione ?? '',
+      'statoSdi': inviaSdi ? 'in_coda' : 'bozza_interna',
     });
 
     _salvaDatiInLocalStorage();

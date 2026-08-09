@@ -1,4 +1,3 @@
-// 📍 INIZIO CODICE: lib/screens/3_4_PI_pro_upgrade.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -7,361 +6,409 @@ import '../widgets_shared/app_notifications.dart';
 class ProUpgradeSheet extends StatefulWidget {
   final String funzionalita;
 
-  const ProUpgradeSheet({super.key, required this.funzionalita});
+  const ProUpgradeSheet({
+    super.key,
+    required this.funzionalita,
+  });
 
   @override
   State<ProUpgradeSheet> createState() => _ProUpgradeSheetState();
 }
 
 class _ProUpgradeSheetState extends State<ProUpgradeSheet> {
-  bool _isAnnualSelected = true; // Di default spingiamo l'annuale
-  bool _isLoading = false;
+  late UserTier _selectedTier;
+  bool _isAnnualSelected = true; // Di default proponiamo l'annuale (più conveniente)
 
-  // 🎨 Palette FiscON
-  final Color coloreSfondo = const Color(0xFF12181B); // Titanio
-  final Color coloreCard = const Color(0xFF1F2428); // Ardesia
-  final Color coloreOro = const Color(0xFFF59E0B); // Amber PRO
-  final Color coloreOttanio = const Color(0xFF2DD4BF); // Brand
-
-  void _simulaAttivazionePro() async {
-    setState(() => _isLoading = true);
-
-    // Simuliamo l'elaborazione del sistema (es. collegamento con Apple/Google in futuro)
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-
-    // Sblocchiamo le funzioni PRO nel Provider
-    final provider = context.read<WalletProvider>();
-    provider.attivaPro();
-
-    setState(() => _isLoading = false);
-
-    Navigator.pop(context);
-    
-    // Mostriamo un feedback di grande impatto
-    AppNotifications.mostraInAlto(
-      context, 
-      'Benvenuto in FiscON PRO! 🎉 Accesso illimitato attivato per la Fase di Lancio',
-      type: NotificationType.success,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _selectedTier = widget.funzionalita.contains('SDI') ? UserTier.premium : UserTier.pro;
   }
 
   @override
   Widget build(BuildContext context) {
-    final walletProvider = context.watch<WalletProvider>();
-    final bool giaPro = walletProvider.isProUser;
-
-    // Se l'utente è già PRO, mostriamo una schermata di gestione
-    if (giaPro) {
-      return Scaffold(
-        backgroundColor: coloreSfondo,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: coloreOro.withOpacity(0.15), shape: BoxShape.circle),
-                child: Icon(Icons.workspace_premium_rounded, color: coloreOro, size: 64),
-              ),
-              const SizedBox(height: 24),
-              const Text('Sei già un utente PRO', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Hai sbloccato tutte le potenzialità di FiscON.', style: TextStyle(color: Colors.white54, fontSize: 14)),
-              const SizedBox(height: 32),
-              OutlinedButton(
-                onPressed: () {
-                  context.read<WalletProvider>().disattivaPro();
-                  Navigator.pop(context);
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.redAccent),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Simula Disdetta Abbonamento', style: TextStyle(color: Colors.redAccent)),
-              )
-            ],
-          ),
-        ),
-      );
-    }
+    final bool isPremium = _selectedTier == UserTier.premium;
+    final Color mainColor = isPremium ? const Color(0xFFD946EF) : const Color(0xFFF59E0B);
+    final String tierName = isPremium ? "PREMIUM" : "PRO";
 
     return Scaffold(
-      backgroundColor: coloreSfondo,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: coloreOro.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: coloreOro.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.workspace_premium_rounded, color: coloreOro, size: 14),
-              const SizedBox(width: 6),
-              Text('FiscON PRO', style: TextStyle(color: coloreOro, fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // 🌟 HEADER PROMOZIONALE
-                    const Text(
-                      'Sblocca il tuo potenziale',
-                      style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, height: 1.2),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Attiva ora il piano PRO per accedere a "${widget.funzionalita}".\nApprofitta dell\'Offerta Lancio: provalo gratis e senza vincoli.',
-                      style: const TextStyle(color: Colors.white54, fontSize: 14, height: 1.4),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // 🏷️ SELETTORE PIANI (MENSILE / ANNUALE)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildPlanCard(
-                            isAnnual: false,
-                            title: 'Mensile',
-                            price: '9,99€',
-                            subtitle: 'Fatturato mensilmente',
-                            isSelected: !_isAnnualSelected,
-                            onTap: () => setState(() => _isAnnualSelected = false),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildPlanCard(
-                            isAnnual: true,
-                            title: 'Annuale',
-                            price: '99,00€',
-                            subtitle: 'Risparmi il 17%',
-                            isSelected: _isAnnualSelected,
-                            isPromo: true,
-                            onTap: () => setState(() => _isAnnualSelected = true),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 🎁 REFERRAL CARD (PORTA UN AMICO)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: coloreCard.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: coloreOttanio.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: coloreOttanio.withOpacity(0.15), shape: BoxShape.circle),
-                            child: Icon(Icons.card_giftcard_rounded, color: coloreOttanio, size: 24),
-                          ),
-                          const SizedBox(width: 16),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Guadagna 3 Mesi Gratis!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Invita un amico: se attiva il piano Annuale, ricevi 3 mesi aggiuntivi in omaggio sul tuo account.',
-                                  style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.3),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // 💳 METODO DI PAGAMENTO (MOCKUP PER OFFERTA LANCIO)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('METODO DI PAGAMENTO (RINNOVI FUTURI)', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: coloreCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.credit_card_rounded, color: Colors.white54, size: 28),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Nessuna carta richiesta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                SizedBox(height: 2),
-                                Text('Fase di lancio: accesso gratuito', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.check_circle_rounded, color: coloreOttanio, size: 20),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-
-            // 🚀 BOTTOM BAR CON CTA
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      backgroundColor: const Color(0xFF0A0A0F),
+      body: Stack(
+        children: [
+          // ✨ EFFETTO GLOW (LUCE SOFFUSA SULLO SFONDO)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            top: -100,
+            right: isPremium ? -50 : null,
+            left: !isPremium ? -50 : null,
+            child: Container(
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
-                color: coloreSfondo,
-                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _simulaAttivazionePro,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: coloreOttanio,
-                        foregroundColor: coloreSfondo,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(color: Color(0xFF12181B), strokeWidth: 3),
-                            )
-                          : const Text(
-                              'Attiva PRO Gratis (Offerta Lancio)',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                    ),
-                  ),
-                  // 📍 INIZIO MODIFICA: Testo Rassicurazione Bottom (0_1_pro_upgrade.dart)
-                  const SizedBox(height: 12),
-                  Text(
-                    'Accesso gratuito garantito per tutta la "Fase di Lancio".\nNessun rinnovo automatico a sorpresa: sarai tu a decidere se abbonarti in futuro o tornare al piano base.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, height: 1.4),
-                    textAlign: TextAlign.center,
-                  ),
-// 📍 FINE MODIFICA: Testo Rassicurazione Bottom
+                shape: BoxShape.circle,
+                color: mainColor.withOpacity(0.12),
+                boxShadow: [
+                  BoxShadow(color: mainColor.withOpacity(0.12), blurRadius: 120, spreadRadius: 40)
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                // 🔙 APP BAR
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 28),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 💎 TITOLO CON GRADIENTE
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Colors.white, Color(0xFFE0E0E0)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ).createShader(bounds),
+                          child: const Text(
+                            'Sblocca il tuo\npotenziale.',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                              height: 1.1,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Scegli il piano giusto per te. Fase di lancio: accesso illimitato totalmente gratuito.',
+                          style: TextStyle(color: Colors.white54, fontSize: 15, height: 1.4),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // 🟡 CARD 1: FISCON PRO
+                        _buildExpandableCard(
+                          tier: UserTier.pro,
+                          title: 'FiscON PRO',
+                          icon: Icons.workspace_premium_rounded, // 👑 Icona universale PRO
+                          monthlyPrice: '4,99€',
+                          annualPrice: '49,00€',
+                          color: const Color(0xFFF59E0B),
+                          isSelected: _selectedTier == UserTier.pro,
+                          badgeText: 'CONSIGLIATO',
+                          features: [
+                            'Lettura ricevute con Fotocamera (OCR)',
+                            'Gestione Riserva Tasse F24 illimitata',
+                            'Previsione e pianificazione mensile'
+                          ],
+                          onTap: () {
+                            if (_selectedTier != UserTier.pro) {
+                              setState(() {
+                                _selectedTier = UserTier.pro;
+                                _isAnnualSelected = true; // Resetta sull'annuale quando cambi piano
+                              });
+                            }
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+
+                        // 🟣 CARD 2: FISCON PREMIUM
+                        _buildExpandableCard(
+                          tier: UserTier.premium,
+                          title: 'FiscON PREMIUM',
+                          icon: Icons.workspace_premium_rounded, // 👑 Icona universale PREMIUM
+                          monthlyPrice: '9,99€',
+                          annualPrice: '99,00€',
+                          color: const Color(0xFFD946EF),
+                          isSelected: _selectedTier == UserTier.premium,
+                          badgeText: 'FATTURA ELETTRONICA',
+                          features: [
+                            'Tutte le funzioni del piano PRO',
+                            'Emissione Fatture SDI Illimitate',
+                            'Ricezione ciclo passivo e Conservazione'
+                          ],
+                          onTap: () {
+                            if (_selectedTier != UserTier.premium) {
+                              setState(() {
+                                _selectedTier = UserTier.premium;
+                                _isAnnualSelected = true;
+                              });
+                            }
+                          },
+                        ),
+                        
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 🔘 BOTTOM CALL TO ACTION (CTA) E GESTIONE ABBONAMENTO
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0A0F),
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFF0A0A0F).withOpacity(0.9), blurRadius: 20, offset: const Offset(0, -10))
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.card_giftcard_rounded, color: mainColor.withOpacity(0.8), size: 14),
+                          const SizedBox(width: 6),
+                          const Text('Promo Lancio: Nessun pagamento richiesto oggi.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: double.infinity,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(color: mainColor.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4))
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Provider.of<WalletProvider>(context, listen: false).setUserTier(_selectedTier);
+                            Navigator.pop(context);
+                            AppNotifications.mostraInAlto(
+                              context,
+                              'Piano $tierName attivato gratis! 🎉',
+                              type: NotificationType.success,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: mainColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Attiva $tierName Gratis',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                      // 🔻 OPZIONE PER ANNULLARE L'ISCRIZIONE (Visibile solo se hai già un piano attivo)
+                      if (Provider.of<WalletProvider>(context).userTier != UserTier.free) ...[
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () {
+                            Provider.of<WalletProvider>(context, listen: false).setUserTier(UserTier.free);
+                            Navigator.pop(context);
+                            AppNotifications.mostraInAlto(
+                              context,
+                              'Abbonamento annullato. Sei tornato al piano Base.',
+                              type: NotificationType.warning,
+                            );
+                          },
+                          child: const Text(
+                            'Annulla iscrizione (Torna al piano Base)',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // 🃏 WIDGET PER LE CARD DEI PIANI
-  Widget _buildPlanCard({
-    required bool isAnnual,
+  // 💳 COSTRUTTORE DELLA CARD ESPANDIBILE (STILE APP STORE / BLINKIST)
+  Widget _buildExpandableCard({
+    required UserTier tier,
     required String title,
-    required String price,
-    required String subtitle,
+    required IconData icon,
+    required String monthlyPrice,
+    required String annualPrice,
+    required Color color,
     required bool isSelected,
-    bool isPromo = false,
+    String? badgeText,
+    required List<String> features,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? coloreOro.withOpacity(0.08) : coloreCard,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? color.withOpacity(0.05) : const Color(0xFF14141E),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? coloreOro : Colors.white.withOpacity(0.08),
+            color: isSelected ? color.withOpacity(0.8) : Colors.white.withOpacity(0.05),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // HEADER DELLA CARD
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isSelected ? coloreOro : Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? color.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: isSelected ? color : Colors.white54, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
-                if (isPromo)
+                if (badgeText != null && isSelected)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: coloreOro,
-                      borderRadius: BorderRadius.circular(6),
+                      color: color.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('PROMO', style: TextStyle(color: Color(0xFF12181B), fontSize: 9, fontWeight: FontWeight.bold)),
+                    child: Text(badgeText, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                if (!isSelected)
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white38, width: 2),
+                    ),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              price,
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isPromo && isSelected ? coloreOro : Colors.white38,
-                fontSize: 11,
-                fontWeight: isPromo && isSelected ? FontWeight.w600 : FontWeight.normal,
+            
+            // SE LA CARD E' SELEZIONATA, ESPANDI I DETTAGLI E I PREZZI
+            if (isSelected) ...[
+              const SizedBox(height: 20),
+              
+              // SELETTORE INTERNO MENSILE / ANNUALE (Elegante)
+              Row(
+                children: [
+                  // OPZIONE MENSILE
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isAnnualSelected = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: !_isAnnualSelected ? color.withOpacity(0.1) : Colors.black.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: !_isAnnualSelected ? color.withOpacity(0.5) : Colors.transparent),
+                        ),
+                        child: Column(
+                          children: [
+                            Text('Mensile', style: TextStyle(color: !_isAnnualSelected ? Colors.white : Colors.white54, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Text(monthlyPrice, style: TextStyle(color: !_isAnnualSelected ? Colors.white : Colors.white54, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // OPZIONE ANNUALE (Evidenziata)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isAnnualSelected = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _isAnnualSelected ? color.withOpacity(0.1) : Colors.black.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _isAnnualSelected ? color.withOpacity(0.5) : Colors.transparent),
+                        ),
+                        child: Column(
+                          children: [
+                            Text('Annuale', style: TextStyle(color: _isAnnualSelected ? Colors.white : Colors.white54, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Text(annualPrice, style: TextStyle(color: _isAnnualSelected ? Colors.white : Colors.white54, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 20),
+              Divider(color: Colors.white.withOpacity(0.05), height: 1),
+              const SizedBox(height: 20),
+              
+              // LISTA FUNZIONALITÀ
+              ...features.map((feat) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          child: const Icon(Icons.check_rounded, color: Colors.black, size: 12),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            feat,
+                            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+            
+            // SE LA CARD *NON* E' SELEZIONATA, MOSTRA SOLO UN PREZZO DI PARTENZA DISCRETO
+            if (!isSelected) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(left: 48), // Allineato col testo
+                child: Text(
+                  'A partire da $monthlyPrice / mese',
+                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ),
+            ]
           ],
         ),
       ),
     );
   }
 }
-// 📍 FINE CODICE: lib/screens/3_4_PI_pro_upgrade.dart

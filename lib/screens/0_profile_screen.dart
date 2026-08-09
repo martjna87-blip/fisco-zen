@@ -632,18 +632,16 @@ class _ProfiloSandboxScreenState extends State<ProfiloSandboxScreen> with Single
 
                   _buildSandboxCard(
                     icon: Icons.workspace_premium_rounded,
-                    iconColor: walletProvider.isProUser ? coloreOttanio : Colors.white54,
-                    title: walletProvider.isProUser
-                        ? 'Piano Attivo: FiscON PRO 👑'
-                        : 'Piano Attivo: FiscON FREE 🔒',
-                    subtitle: 'Tocca per passare da Free a Pro per i tuoi test',
+                    iconColor: coloreOttanio,
+                    title: walletProvider.isPremium 
+                        ? 'Piano Attivo: PREMIUM 👑' 
+                        : (walletProvider.isPro ? 'Piano Attivo: PRO 🚀' : 'Piano Attivo: BASE 🔒'),
+                    subtitle: 'Tocca per ciclare: BASE ➔ PRO ➔ PREMIUM',
                     onTap: () {
-                      walletProvider.toggleProUser();
+                      walletProvider.cycleUserTier();
                       AppNotifications.mostraInAlto(
                         context,
-                        walletProvider.isProUser
-                            ? 'Passato a Piano PRO! 🚀'
-                            : 'Passato a Piano FREE 🔒',
+                        'Cambiato in: ${walletProvider.userTier.name.toUpperCase()} 🔄',
                         type: NotificationType.success,
                       );
                     },
