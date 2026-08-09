@@ -14,13 +14,11 @@ class FiscOnLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Calcolo della dimensione del testo (es. 22 in Home, 52 in Login)
     final double effectiveFontSize = fontSize ?? (imageHeight != null ? imageHeight! * (52 / 170) : 22.0);
-    final double effectiveHeight = imageHeight ?? (effectiveFontSize * (170 / 52));
 
-    // Dimensioni proporzionali per lo slot visivo
-    final double symbolSlotWidth = effectiveHeight * (48 / 170);
-    final double imageLeftOffset = -effectiveHeight * (60 / 170);
-    final double imageTopOffset = -effectiveHeight * (60 / 170); // 👈 Bilanciato al centro del font
+    // L'altezza del simbolo è bloccata al 115% del testo per non ingrandirsi mai più delle lettere
+    final double symbolHeight = effectiveFontSize * 1.15;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -33,29 +31,18 @@ class FiscOnLogo extends StatelessWidget {
             color: Colors.white,
             fontSize: effectiveFontSize,
             fontWeight: FontWeight.w900,
-            letterSpacing: -1.5,
+            letterSpacing: -1.2,
             height: 1.0,
           ),
         ),
 
-        // 2. Simbolo "O" (Ingombro verticale ridotto per pareggiare il font)
-        SizedBox(
-          width: symbolSlotWidth,
-          height: effectiveFontSize, // 👈 Bloccato a 22px invece di 72px
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: imageLeftOffset,
-                top: imageTopOffset,
-                width: effectiveHeight,
-                height: effectiveHeight,
-                child: Image.asset(
-                  'assets/fiscon_symbol.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ],
+        // 2. Simbolo "O" proporzionato
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: effectiveFontSize * 0.02),
+          child: Image.asset(
+            'assets/fiscon_symbol.png',
+            height: symbolHeight,
+            fit: BoxFit.contain,
           ),
         ),
 
@@ -66,12 +53,12 @@ class FiscOnLogo extends StatelessWidget {
             color: Colors.white,
             fontSize: effectiveFontSize,
             fontWeight: FontWeight.w900,
-            letterSpacing: -1.5,
+            letterSpacing: -1.2,
             height: 1.0,
           ),
         ),
 
-        // 4. Sottotitolo ("Gestione P.IVA", "Portafoglio Personale")
+        // 4. Sottotitolo opzionale
         if (sottotitolo != null) ...[
           const SizedBox(width: 8),
           Container(

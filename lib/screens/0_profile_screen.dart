@@ -618,10 +618,16 @@ class _ProfiloSandboxScreenState extends State<ProfiloSandboxScreen> with Single
                           'Reset completo effettuato! ⚠️',
                           type: NotificationType.warning,
                         );
+
+                        // 👈 AGGIUNGI QUESTE RIGHE PER FAR RIPARTIRE L'ONBOARDING:
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SplashScreen()),
+                          (route) => false,
+                        );
                       }
                     },
                   ),
-
                   const SizedBox(height: 12),
 
                   _buildSandboxCard(

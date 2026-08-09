@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/auth_provider.dart';
+import '../widgets_shared/fiscon_logo.dart'; // 👈 IMPORT AGGIUNTO
 import '../main.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -11,10 +12,10 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _nomeController = TextEditingController(); // 👈 Aggiunto per il nome
+  final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLogin = true; // Permette di alternare tra Login e Registrazione
+  bool _isLogin = true;
 
   @override
   void dispose() {
@@ -28,8 +29,6 @@ class _AuthScreenState extends State<AuthScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    // Il nome potrai passarlo al provider se decidi di salvarlo nel database
-    // final nome = _nomeController.text.trim(); 
 
     if (email.isEmpty || password.isEmpty) {
       _showError("Per favore, inserisci email e password.");
@@ -51,14 +50,12 @@ class _AuthScreenState extends State<AuthScreen> {
       error = await authProvider.signUpWithEmail(
         email: email,
         password: password,
-        // nome: nome, // Decommenta se nel tuo AuthProvider aggiungi il parametro nome
       );
     }
 
     if (error != null && mounted) {
       _showError(error);
     } else if (mounted) {
-      // Reindirizza alla SplashScreen per entrare nell'app
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SplashScreen()),
@@ -91,46 +88,13 @@ class _AuthScreenState extends State<AuthScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 
-              // 🖼️ LOGO FISCON (Misura grande + Centrato)
-Transform.translate(
-  offset: const Offset(60.0, 0.0),
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      const Text(
-        'Fisc',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 52,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -1.5,
-        ),
-      ),
-      Transform.translate(
-        offset: const Offset(-60.0, -3.0),
-        child: Image.asset(
-          'assets/fiscon_symbol.png',
-          height: 170,
-          fit: BoxFit.contain,
-        ),
-      ),
-      Transform.translate(
-        offset: const Offset(-120.0, 0.0),
-        child: const Text(
-          'N',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 52,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1.5,
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-                const SizedBox(height: 16),
+                // 🖼️ LOGO FISCON (Pulito, proporzionato e centrato)
+                const Center(
+                  child: FiscOnLogo(
+                    fontSize: 42, // 👈 Se lo vuoi più grande o più piccolo, cambia questo valore!
+                  ),
+                ),
+                const SizedBox(height: 24),
                 
                 Text(
                   _isLogin ? "Bentornato su FiscON" : "Crea il tuo profilo",
