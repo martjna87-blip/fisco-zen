@@ -25,7 +25,6 @@ class _WalletScreenState extends State<WalletScreen> {
   // 🎨 REGOLATORE COMANDO COLORI
   final Color coloreSfondo = const Color(0xFF1C1917);
   final Color coloreCard   = const Color(0xFF292524);
-  bool _isBussolaEspansa = false; // 👈 Aggiungiamo lo stato (di base è chiusa)
 
   // 📅 STATI PER IL SELETTORE TEMPORALE DELLA RIPARTIZIONE SPESE
   DateTime _dataFiltroRipartizione = DateTime(2026, 8);
@@ -173,9 +172,8 @@ class _WalletScreenState extends State<WalletScreen> {
             Stack(
               alignment: Alignment.center,
               children: [
-                // 1. IMMAGINE DI SFONDO (Più alta per scendere dietro alla bussola)
                 Container(
-                  height: headerHeight + 100, // 👈 Allungato
+                  height: headerHeight,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
@@ -186,43 +184,21 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ),
                 ),
-                
-                // GRADIENTE Mimetico (Il trucco per far sparire il "taglio")
                 Container(
-                  height: headerHeight + 100, // 👈 Stessa altezza
+                  height: headerHeight,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: const [0.0, 0.4, 0.85, 1.0], // 👈 IL SEGRETO: Le percentuali di sfumatura
                       colors: [
-                        coloreSfondo.withOpacity(0.0), // Inizia totalmente trasparente
-                        coloreSfondo.withOpacity(0.5), // A metà scurisce
-                        coloreSfondo, // All'85% dello spazio diventa GIÀ del colore di sfondo solido
-                        coloreSfondo, // Al 100% rimane solido, annullando il bordo netto!
+                        Colors.transparent,
+                        coloreSfondo.withOpacity(0.5),
+                        coloreSfondo,
                       ],
                     ),
                   ),
                 ),
 
-               // 2. ✨ EFFETTO GLOW (Luce Bianca Premium - Glassmorphism)
-                Positioned(
-                  top: -60,
-                  left: -50,
-                  child: Container(
-                    width: 250,
-                    height: 250,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.12), // 👈 Bianco al 12%
-                      boxShadow: [
-                        BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 100, spreadRadius: 40)
-                      ],
-                    ),
-                  ),
-                ),
-
-                // 3. LOGO Fisco Zen
                 Positioned(
                   top: topPadding + 12,
                   left: 20,
@@ -232,7 +208,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                // 4. TASTO RIEPILOGO
                 Positioned(
                   top: topPadding + 10,
                   right: 16,
@@ -249,7 +224,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.1), // 👈 Un pelo più visibile
+                      backgroundColor: Colors.white.withOpacity(0.12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -257,14 +232,12 @@ class _WalletScreenState extends State<WalletScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      elevation: 0,
                     ),
                   ),
                 ),
 
-                // 5. CARD PATRIMONIO NETTO (Vetro più definito e luminoso)
                 Padding(
-                  padding: EdgeInsets.only(top: topPadding + 10),
+                  padding: EdgeInsets.only(top: topPadding + 18),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -278,37 +251,29 @@ class _WalletScreenState extends State<WalletScreen> {
                             descrizione: 'Somma totale dei saldi di tutti i tuoi conti correnti e del salvadanaio tasse.',
                           );
                         },
-                        borderRadius: BorderRadius.circular(28),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08), // 👈 Schiarito da 0.03 a 0.08 per dare il vero effetto vetro!
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1), // 👈 Bordo più definito
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, spreadRadius: -5)
-                            ],
-                          ),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Text(
                                 'PATRIMONIO NETTO',
                                 style: TextStyle(
-                                  color: Colors.white70, // 👈 Più leggibile
+                                  color: Colors.white54,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 1.5,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
                                 _formattaInt(patrimonioNetto),
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1.5,
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -1,
                                 ),
                               ),
                             ],
@@ -316,7 +281,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
                       if (mostraPiva)
                         SingleChildScrollView(
@@ -324,7 +289,6 @@ class _WalletScreenState extends State<WalletScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // PILLOLA LIQUIDITÀ (Verde)
                               InkWell(
                                 onTap: () {},
                                 onLongPress: () {
@@ -337,26 +301,19 @@ class _WalletScreenState extends State<WalletScreen> {
                                     formula: 'Conti Liquidi − Tasse − Cuscinetto No-Lavoro',
                                   );
                                 },
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: const Color(0xFF10B981).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                      ),
-                                      const SizedBox(width: 6),
+                                      const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
+                                      const SizedBox(width: 4),
                                       Text(
                                         _formattaInt(nettoRealeSpendibile),
                                         style: const TextStyle(
@@ -372,39 +329,31 @@ class _WalletScreenState extends State<WalletScreen> {
 
                               const SizedBox(width: 8),
 
-                              // PILLOLA TASSE (Blu/Viola - Ora con lo Scudo!)
                               InkWell(
                                 onTap: () {},
                                 onLongPress: () {
                                   AppPopupWrapper.mostraInfo(
                                     context: context,
-                                    icon: Icons.shield_outlined, // 👈 Scudo!
+                                    icon: Icons.savings_rounded,
                                     color: const Color(0xFF3B82F6),
                                     titolo: 'Riserva Tasse Calcolata',
                                     descrizione: 'È la stima totale delle tasse dovute sulle fatture incassate (Imposta Sostitutiva + INPS).',
                                     formula: 'Stima Fiscale ATECO + Contributi',
                                   );
                                 },
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF3B82F6).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: const Color(0xFF3B82F6).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 12), // 👈 Scudo Vuoto!
-                                      ),
-                                      const SizedBox(width: 6),
+                                      const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 14),
+                                      const SizedBox(width: 4),
                                       Text(
                                         _formattaInt(tasseTotaliCalcolate),
                                         style: const TextStyle(
@@ -415,17 +364,21 @@ class _WalletScreenState extends State<WalletScreen> {
                                       ),
                                       const SizedBox(width: 8),
 
-                                      // TASTO ACCANTONA DENTRO LA PILLOLA
                                       InkWell(
                                         onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
                                         borderRadius: BorderRadius.circular(12),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                           decoration: BoxDecoration(
                                             color: isTasseCoperte
                                                 ? const Color(0xFF10B981).withOpacity(0.2)
                                                 : const Color(0xFF3B82F6),
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isTasseCoperte
+                                                  ? const Color(0xFF10B981)
+                                                  : const Color(0xFF3B82F6),
+                                            ),
                                           ),
                                           child: isTasseCoperte
                                               ? const Row(
@@ -457,92 +410,80 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
 
-            // ✨ INIZIO DEL TRUCCO ✨
-            Transform.translate(
-              offset: const Offset(0, -50), 
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 0),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
 
-                    // 1. I TRE BOTTONI IN PRIMA LINEA (Subito sotto il saldo!)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.add_circle_outline_rounded,
-                            title: 'Movimenti',
-                            value: 'Entrata / Uscita',
-                            iconColor: const Color(0xFF10B981), // 🟢 Verde
-                            valueColor: const Color(0xFF10B981),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: const AddMovementSheet(initialTab: 'riepilogo'),
-                              );
-                            },
-                          ),
+                  _buildRipartizioneSpeseCard(
+                    spesoBisogni: spesoRealeBisogni,
+                    spesoSvago: spesoRealeSvago,
+                    spesoRisparmio: spesoRealeRisparmio,
+                    totaleSpeseReali: totaleSpeseReali,
+                    targetBisogni: targetBisogni,
+                    targetSvago: targetSvago,
+                    targetRisparmio: targetRisparmio,
+                    entrateRiferimento: entrateRiferimento,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.add_circle_outline_rounded,
+                          title: 'Movimenti',
+                          value: 'Entrata / Uscita',
+                          onTap: () {
+                            AppPopupWrapper.mostra(
+                              context: context,
+                              child: const AddMovementSheet(initialTab: 'riepilogo'),
+                            );
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.account_balance_wallet_outlined,
-                            title: 'Gestione\nConti',
-                            value: '${walletProvider.accounts.length} Attivi',
-                            iconColor: const Color(0xFFF59E0B), // 🟠 Arancio
-                            valueColor: const Color(0xFFF59E0B),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: ManageAccountsSheet(isPiva: widget.isPiva),
-                              );
-                            },
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.account_balance_wallet_outlined,
+                          title: 'Gestione\nConti',
+                          value: '${walletProvider.accounts.length} Attivi',
+                          onTap: () {
+                            AppPopupWrapper.mostra(
+                              context: context,
+                              child: ManageAccountsSheet(isPiva: widget.isPiva),
+                            );
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.pie_chart_outline_rounded,
-                            title: 'Pianificazione\nSpese',
-                            value: 'Budget',
-                            iconColor: const Color(0xFF8B5CF6), // 🟣 Viola
-                            valueColor: const Color(0xFF8B5CF6),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: const PianoSpesaSheet(),
-                              );
-                            },
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMiniCard(
+                          icon: Icons.pie_chart_outline_rounded,
+                          title: 'Pianificazione\nSpese',
+                          value: 'Budget',
+                          onTap: () {
+                            AppPopupWrapper.mostra(
+                              context: context,
+                              child: const PianoSpesaSheet(),
+                            );
+                          },
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
 
-                    const SizedBox(height: 16), // 👈 Spazio tra bottoni e bussola
-
-                    // 2. LA BUSSOLA SPESE (Scivolata in seconda posizione)
-                    _buildRipartizioneSpeseCard(
-                      spesoBisogni: spesoRealeBisogni,
-                      spesoSvago: spesoRealeSvago,
-                      spesoRisparmio: spesoRealeRisparmio,
-                      totaleSpeseReali: totaleSpeseReali,
-                      targetBisogni: targetBisogni,
-                      targetSvago: targetSvago,
-                      targetRisparmio: targetRisparmio,
-                      entrateRiferimento: entrateRiferimento,
-                    ),
-
-                    const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   if (mostraPiva) ...[
                     GestureDetector(
                       onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
                       child: SerbatoioTasseWidget(
-                        // 👈 MAGIA: Passiamo il colore trasparente! Così si fonde col nero della pagina
-                        cardColor: Colors.transparent, 
+                        cardColor: coloreCard,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -637,7 +578,6 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
-            ),
           ],
         ),
       ),
@@ -669,250 +609,223 @@ class _WalletScreenState extends State<WalletScreen> {
     final String testoBadgeHeader = haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio';
     final Color coloreBadgeHeader = haSforamenti ? const Color(0xFFEF4444) : const Color(0xFF10B981);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+    return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: coloreCard.withOpacity(0.92),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300), // Effetto tendina fluido!
-        curve: Curves.easeInOut,
-        alignment: Alignment.topCenter,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ✨ 1. HEADER CLICCABILE
-            GestureDetector(
-              behavior: HitTestBehavior.opaque, // 👈 LA MAGIA: Rende cliccabile TUTTA la riga, anche lo spazio vuoto!
-              onTap: () {
-                setState(() {
-                  _isBussolaEspansa = !_isBussolaEspansa; // Apre/Chiude
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 4), // 👈 Dà un po' più di spessore per il tocco del dito
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.explore_rounded, color: Color(0xFF2DD4BF), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Bussola Spese (50/30/20)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: coloreBadgeHeader.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  testoBadgeHeader,
+                  style: TextStyle(
+                    color: coloreBadgeHeader,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () => _cambiaPeriodoRipartizione(-1),
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF), size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    etichettaPeriodo,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => _cambiaPeriodoRipartizione(1),
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF), size: 18),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.explore_rounded, color: Color(0xFF2DD4BF), size: 18),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bussola Spese (50/30/20)',
+                    InkWell(
+                      onTap: () => setState(() => _isVistaAnnuale = false),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: !_isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Mese',
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
+                            color: !_isVistaAnnuale ? Colors.black : Colors.white54,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white54,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: coloreBadgeHeader.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        testoBadgeHeader,
-                        style: TextStyle(
-                          color: coloreBadgeHeader,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    InkWell(
+                      onTap: () => setState(() => _isVistaAnnuale = true),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Anno',
+                          style: TextStyle(
+                            color: _isVistaAnnuale ? Colors.black : Colors.white54,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
+          ),
 
-            // ✨ 2. IL CORPO DELLA BUSSOLA (Visibile solo se aperta)
-            if (_isBussolaEspansa) ...[
-              const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => _cambiaPeriodoRipartizione(-1),
-                        borderRadius: BorderRadius.circular(6),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2.0),
-                          child: Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF), size: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        etichettaPeriodo,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
-                      InkWell(
-                        onTap: () => _cambiaPeriodoRipartizione(1),
-                        borderRadius: BorderRadius.circular(6),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2.0),
-                          child: Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF), size: 18),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                    ),
-                    child: Row(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              height: 6,
+              color: Colors.white10,
+              child: entrateRiferimento > 0
+                  ? Row(
                       children: [
-                        InkWell(
-                          onTap: () => setState(() => _isVistaAnnuale = false),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: !_isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Mese',
-                              style: TextStyle(
-                                color: !_isVistaAnnuale ? Colors.black : Colors.white54,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        if (spesoBisogni > 0)
+                          Expanded(
+                            flex: (spesoBisogni / entrateRiferimento * 1000).toInt().clamp(1, 1000),
+                            child: Container(color: const Color(0xFF2DD4BF)),
                           ),
-                        ),
-                        InkWell(
-                          onTap: () => setState(() => _isVistaAnnuale = true),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Anno',
-                              style: TextStyle(
-                                color: _isVistaAnnuale ? Colors.black : Colors.white54,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        if (spesoSvago > 0)
+                          Expanded(
+                            flex: (spesoSvago / entrateRiferimento * 1000).toInt().clamp(1, 1000),
+                            child: Container(color: const Color(0xFFF59E0B)),
                           ),
-                        ),
+                        if (margineRisparmioReale > 0)
+                          Expanded(
+                            flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt().clamp(1, 1000),
+                            child: Container(color: const Color(0xFF3B82F6)),
+                          ),
                       ],
-                    ),
-                  ),
-                ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          _buildRigaConfrontoRealeTarget(
+            titolo: 'Spese Fisse & Bisogni',
+            targetPct: 50,
+            valoreReale: spesoBisogni,
+            valoreRiferimento: targetBisogni,
+            colore: const Color(0xFF2DD4BF),
+          ),
+          const SizedBox(height: 8),
+          _buildRigaConfrontoRealeTarget(
+            titolo: 'Spese Variabili & Libero',
+            targetPct: 30,
+            valoreReale: spesoSvago,
+            valoreRiferimento: targetSvago,
+            colore: const Color(0xFFF59E0B),
+          ),
+          const SizedBox(height: 8),
+          _buildRigaConfrontoRealeTarget(
+            titolo: 'Risparmi & Futuro',
+            targetPct: 20,
+            valoreReale: margineRisparmioReale,
+            valoreRiferimento: targetRisparmio,
+            colore: const Color(0xFF3B82F6),
+            isRisparmio: true,
+          ),
+
+          const SizedBox(height: 12),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                haSforamenti ? Icons.info_outline_rounded : Icons.lightbulb_outline_rounded,
+                color: haSforamenti ? const Color(0xFFF59E0B) : const Color(0xFF2DD4BF),
+                size: 14,
               ),
-
-              const SizedBox(height: 12),
-
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  height: 6,
-                  color: Colors.white10,
-                  child: entrateRiferimento > 0
-                      ? Row(
-                          children: [
-                            if (spesoBisogni > 0)
-                              Expanded(
-                                flex: (spesoBisogni / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFF10B981)), // Verde
-                              ),
-                            if (spesoSvago > 0)
-                              Expanded(
-                                flex: (spesoSvago / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFFF59E0B)), // Arancio
-                              ),
-                            if (margineRisparmioReale > 0)
-                              Expanded(
-                                flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFF8B5CF6)), // Viola
-                              ),
-                          ],
-                        )
-                      : const SizedBox.shrink(),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  risparmioEroso
+                      ? 'Attenzione: le spese stanno riducendo la quota da preservare per il futuro.'
+                      : (haSforamenti
+                          ? 'Consiglio: riduci le spese variabili per rientrare nei parametri.'
+                          : 'Ottimo! Stai preservando oltre il 20% delle entrate per il tuo futuro.'),
+                  style: TextStyle(
+                    color: haSforamenti ? const Color(0xFFF59E0B) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-
-              const SizedBox(height: 14),
-
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Spese Fisse & Bisogni',
-                targetPct: 50,
-                valoreReale: spesoBisogni,
-                valoreRiferimento: targetBisogni,
-                colore: const Color(0xFF10B981),
-              ),
-              const SizedBox(height: 8),
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Spese Variabili & Libero',
-                targetPct: 30,
-                valoreReale: spesoSvago,
-                valoreRiferimento: targetSvago,
-                colore: const Color(0xFFF59E0B),
-              ),
-              const SizedBox(height: 8),
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Risparmi & Futuro',
-                targetPct: 20,
-                valoreReale: margineRisparmioReale,
-                valoreRiferimento: targetRisparmio,
-                colore: const Color(0xFF8B5CF6),
-                isRisparmio: true,
-              ),
-
-              const SizedBox(height: 12),
-              Divider(color: Colors.white.withOpacity(0.06), height: 1),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    haSforamenti ? Icons.info_outline_rounded : Icons.lightbulb_outline_rounded,
-                    color: haSforamenti ? const Color(0xFFF59E0B) : const Color(0xFF2DD4BF),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      risparmioEroso
-                          ? 'Attenzione: le spese stanno riducendo la quota da preservare per il futuro.'
-                          : (haSforamenti
-                              ? 'Consiglio: riduci le spese variabili per rientrare nei parametri.'
-                              : 'Ottimo! Stai preservando oltre il 20% delle entrate per il tuo futuro.'),
-                      style: TextStyle(
-                        color: haSforamenti ? const Color(0xFFF59E0B) : Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ], // <-- Fine blocco if(_isBussolaEspansa)
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -998,64 +911,54 @@ class _WalletScreenState extends State<WalletScreen> {
     Color? iconColor,
     Color? valueColor,
   }) {
-    final baseAccent = iconColor ?? Colors.white70;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110, // ✅ Altezza fissa e uguale per tutti i quadranti
+        height: 102,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: iconColor != null 
-              ? Color.alphaBlend(iconColor.withOpacity(0.08), coloreCard.withOpacity(0.92))
-              : coloreCard.withOpacity(0.92),
+          color: coloreCard.withOpacity(0.92),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: iconColor != null 
-                ? iconColor.withOpacity(0.25) 
+                ? iconColor.withOpacity(0.3) 
                 : Colors.white.withOpacity(0.08),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [ // ❌ Tolto MainAxisSize.min
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: baseAccent.withOpacity(0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: baseAccent, size: 20),
-            ),
-            
-            const Spacer(), // ✨ IL TRUCCO: Assorbe lo spazio vuoto in modo elastico!
-            
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-                height: 1.15,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            
-            const SizedBox(height: 4),
-            
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: TextStyle(
-                  color: valueColor ?? Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(icon, color: iconColor ?? Colors.white70, size: 24),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    height: 1.15,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-              ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: valueColor ?? Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
