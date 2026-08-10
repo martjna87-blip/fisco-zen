@@ -1,22 +1,18 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 
-class SerbatoioTasseWidget extends StatefulWidget {
+class SerbatoioTasseWidget extends StatelessWidget {
   final Color cardColor;
-  final bool isCollapsible;
-  final bool initiallyExpanded;
 
   const SerbatoioTasseWidget({
     super.key,
     this.cardColor = const Color(0xFF292524),
-    this.isCollapsible = true,
-    this.initiallyExpanded = false,
   });
 
+  // 🇮🇹 HELPER PER CIFRE INTERE CON PUNTO MIGLIAIA (es. 1.116 €)
   static String _formattaInt(double importo) {
     final int intVal = importo.round();
     return intVal.toString().replaceAllMapped(
@@ -25,6 +21,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
     );
   }
 
+  // 🇮🇹 HELPER VALUTA DECIMALE ITALIANA (es. 1.115,75 €)
   static String _formattaValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
@@ -34,31 +31,42 @@ class SerbatoioTasseWidget extends StatefulWidget {
     return '$intPart,${parti[1]} €';
   }
 
+  // 🛡️ HELPER PARSING SICURO (Riconosce 11.2 come 11,20 € ed evita che diventi 112 €!)
   static double _parseImportoSicuro(String text) {
     if (text.trim().isEmpty) return 0.0;
     String pulito = text.trim().replaceAll(' ', '').replaceAll('€', '');
     
+    // 1. Se contiene SIA punto che virgola (es. 1.000,50 o 1,000.50)
     if (pulito.contains('.') && pulito.contains(',')) {
       if (pulito.lastIndexOf(',') > pulito.lastIndexOf('.')) {
+        // Standard italiano: 1.000,50 -> rimuovi punto, virgola diventa punto decimale
         pulito = pulito.replaceAll('.', '').replaceAll(',', '.');
       } else {
+        // Standard anglosassone (es. 1,000.50) -> rimuovi virgola
         pulito = pulito.replaceAll(',', '');
       }
-    } else if (pulito.contains('.')) {
+    } 
+    // 2. Se contiene SOLO il punto (es. 11.2 o 11.25 o 1.000)
+    else if (pulito.contains('.')) {
       final parti = pulito.split('.');
+      // Se dopo l'ultimo punto ci sono 1 o 2 cifre (es. 11.2 o 11.25), l'utente intende un decimale!
       if (parti.last.length == 1 || parti.last.length == 2) {
         final dec = parti.removeLast();
         pulito = '${parti.join('')}.$dec';
       } else {
+        // Se ci sono 3 cifre (es. 1.000 o 15.000), è un separatore di migliaia
         pulito = pulito.replaceAll('.', '');
       }
-    } else {
+    } 
+    // 3. Se contiene SOLO la virgola (es. 11,2 o 1000,50)
+    else {
       pulito = pulito.replaceAll(',', '.');
     }
 
     return double.tryParse(pulito) ?? 0.0;
   }
 
+  // 🎨 WIDGET BARRA AVANZAMENTO PROPORZIONALE REALE PER IL POP-UP
   static Widget _buildBarraAvanzamentoSmart(int percentualeInt) {
     if (percentualeInt < 100) {
       final int flexRiempito = percentualeInt.clamp(0, 100);
@@ -74,7 +82,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
               if (flexRiempito > 0)
                 Expanded(
                   flex: flexRiempito,
-                  child: Container(color: const Color(0xFFF59E0B)),
+                  child: Container(color: const Color(0xFFF59E0B)), // 🟠 Arancione
                 ),
               if (flexVuoto > 0)
                 Expanded(
@@ -99,12 +107,12 @@ class SerbatoioTasseWidget extends StatefulWidget {
           children: [
             Expanded(
               flex: flexVerde,
-              child: Container(color: const Color(0xFF10B981)),
+              child: Container(color: const Color(0xFF10B981)), // 🟢 Verde 100%
             ),
             if (flexCiano > 0)
               Expanded(
                 flex: flexCiano,
-                child: Container(color: const Color(0xFF06B6D4)),
+                child: Container(color: const Color(0xFF06B6D4)), // 🩵 Ciano Cuscinetto Extra
               ),
           ],
         ),
@@ -112,6 +120,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
     );
   }
 
+  // 🚀 UNICA FONTE DI VERITÀ UTILIZZANDO IL DESIGN SYSTEM STANDARDIZZATO
   static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF292524)}) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
@@ -144,6 +153,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
       orElse: () => accounts.length > 1 ? accounts[1] : accounts[0],
     );
 
+    // 🏦 CONTI SELEZIONABILI (Tutti tranne il Salvadanaio Tasse stesso)
     final contiDisponibili = accounts
         .where((a) => a.id != salvadanaioTasse.id)
         .toList();
@@ -158,6 +168,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
 
     bool modalitaAccantona = true;
 
+    // 🇮🇹 Inizializza il campo con la virgola italiana
     final TextEditingController importoController = TextEditingController(
       text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2).replaceAll('.', ',') : '',
     );
@@ -166,6 +177,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
+          // 🛡️ UTILIZZA IL PARSER SICURO PER LEGGERE IL CAMPO TESTO
           final double importoInserito = _parseImportoSicuro(importoController.text);
           
           final double nuovaRiservaTotale = modalitaAccantona
@@ -188,11 +200,12 @@ class SerbatoioTasseWidget extends StatefulWidget {
 
           return AppSecondaryPopup(
             backgroundColor: cardColor,
-            icon: modalitaAccantona ? Icons.shield_outlined : Icons.lock_open_rounded,
+            icon: modalitaAccantona ? Icons.shield_rounded : Icons.lock_open_rounded,
             iconColor: coloreAttuale,
             titolo: modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse',
             testoConferma: modalitaAccantona ? 'Metti al Sicuro' : 'Sblocca Cifra',
             onConferma: () {
+              // 🚨 ALERT SE IMPORTO NON VALIDO, VUOTO O ZERO
               if (importoInserito <= 0) {
                 AppNotifications.mostraInAlto(
                   context,
@@ -256,6 +269,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // TAB SELETTORE ACCANTONA / SBLOCCA
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
@@ -352,7 +366,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
                         if (extraCuscinetto > 0)
                           Text(
                             '+${_formattaInt(extraCuscinetto)} € Cuscinetto',
-                            style: const TextStyle(color: Color(0xFF06B6D4), fontSize: 11, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: Color(0xFF06B6D4), fontSize: 11, fontWeight: FontWeight.bold), // 🩵 Ciano
                           ),
                       ],
                     ),
@@ -363,6 +377,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
 
                 const SizedBox(height: 16),
 
+                // 🏦 MENU TENDINA CONTO SORGENTE / DESTINAZIONE SIMMETRICO
                 if (modalitaAccantona) ...[
                   DropdownButtonFormField<String>(
                     value: contoSorgenteAccantonaId,
@@ -448,30 +463,6 @@ class SerbatoioTasseWidget extends StatefulWidget {
   }
 
   @override
-  State<SerbatoioTasseWidget> createState() => _SerbatoioTasseWidgetState();
-}
-
-class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with SingleTickerProviderStateMixin {
-  late bool _isEspanso;
-  late AnimationController _waveController;
-
-  @override
-  void initState() {
-    super.initState();
-    _isEspanso = widget.initiallyExpanded;
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2800),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _waveController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
 
@@ -485,7 +476,7 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
 
     final double mancanteReale = (tasseTotaliCalcolate - riservaAccantonata).clamp(0.0, double.infinity);
 
-    final double percentualeRatio = tasseTotaliCalcolate > 0.01
+    final double percentuale = tasseTotaliCalcolate > 0.01
         ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
         : (riservaAccantonata > 0 ? 1.0 : 0.0);
 
@@ -505,257 +496,169 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
         ? const Color(0xFF10B981) 
         : const Color(0xFFF59E0B);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+    final double avanzamentoBluExtra = percentualeTextInt > 100
+        ? ((percentualeTextInt - 100) / 100).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: widget.cardColor.withOpacity(0.92),
+        color: cardColor.withOpacity(0.92),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        alignment: Alignment.topCenter,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 📌 1. HEADER CON AZIONI SEPARATE
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      if (widget.isCollapsible) {
-                        setState(() {
-                          _isEspanso = !_isEspanso;
-                        });
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 18),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Serbatoio Riserva Tasse',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                        ),
-                        if (widget.isCollapsible) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            _isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white54,
-                            size: 16,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                InkWell(
-                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: widget.cardColor),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$percentualeTextInt% Coperto',
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // 📌 2. CONTENUTO ESPANDIBILE (SFERA CON ONDA LIQUIDA ANIMATA)
-            if (!widget.isCollapsible || _isEspanso) ...[
-              const SizedBox(height: 18),
-
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: widget.cardColor),
-                child: Center(
-                  child: SizedBox(
-                    width: 130,
-                    height: 130,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipOval(
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            color: Colors.black.withOpacity(0.3),
-                            child: AnimatedBuilder(
-                              animation: _waveController,
-                              builder: (context, child) {
-                                return CustomPaint(
-                                  painter: _LiquidWavePainter(
-                                    animationValue: _waveController.value,
-                                    percentage: percentualeRatio,
-                                    fillColor: statusColor,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.18),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: statusColor.withOpacity(0.15),
-                                blurRadius: 15,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'IN SALVADANAIO',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              '${SerbatoioTasseWidget._formattaInt(riservaAccantonata)} €',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 6)],
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              'su ${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w500,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-              Divider(color: Colors.white.withOpacity(0.06), height: 1),
-              const SizedBox(height: 14),
-              Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 📌 1. HEADER
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
                 children: [
-                  Icon(
-                    mancanteReale > 0 ? Icons.info_outline_rounded : Icons.check_circle_outline_rounded,
-                    color: mancanteReale > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      mancanteReale > 0
-                          ? 'Consiglio: accantona i ${SerbatoioTasseWidget._formattaInt(mancanteReale)} € mancanti per metterti al sicuro.'
-                          : (cuscinettoExtraVal > 0
-                              ? 'Ottimo! Hai +${SerbatoioTasseWidget._formattaInt(cuscinettoExtraVal)} € di cuscinetto extra protetto.'
-                              : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta.'),
-                      style: TextStyle(
-                        color: mancanteReale > 0 ? const Color(0xFFF59E0B) : Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Icon(Icons.shield_rounded, color: Color(0xFF3B82F6), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Serbatoio Riserva Tasse',
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
+              InkWell(
+                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: cardColor),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$percentualeTextInt% Coperto',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 📌 2. CERCHIO DI PROGRESSO
+          Center(
+            child: SizedBox(
+              width: 114,
+              height: 114,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 108,
+                    height: 108,
+                    child: CircularProgressIndicator(
+                      value: 1.0,
+                      strokeWidth: 8,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.08)),
+                    ),
+                  ),
+
+                  SizedBox(
+                    width: 108,
+                    height: 108,
+                    child: CircularProgressIndicator(
+                      value: percentuale,
+                      strokeWidth: 8,
+                      strokeCap: StrokeCap.round,
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                    ),
+                  ),
+
+                  if (avanzamentoBluExtra > 0)
+                    SizedBox(
+                      width: 88,
+                      height: 88,
+                      child: CircularProgressIndicator(
+                        value: avanzamentoBluExtra,
+                        strokeWidth: 6,
+                        strokeCap: StrokeCap.round,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF06B6D4)), // 🩵 Ciano Cuscinetto Extra
+                      ),
+                    ),
+
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'IN SALVADANAIO',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${_formattaInt(riservaAccantonata)} €',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'su ${_formattaInt(tasseTotaliCalcolate)} €',
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 📌 3. SUGGERIMENTO CONVERSAZIONALE INFERIORE
+          const SizedBox(height: 14),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                mancanteReale > 0 ? Icons.info_outline_rounded : Icons.check_circle_outline_rounded,
+                color: mancanteReale > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                size: 14,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  mancanteReale > 0
+                      ? 'Consiglio: accantona i ${_formattaInt(mancanteReale)} € mancanti per metterti al sicuro.'
+                      : (cuscinettoExtraVal > 0
+                          ? 'Ottimo! Hai +${_formattaInt(cuscinettoExtraVal)} € di cuscinetto extra protetto.'
+                          : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta.'),
+                  style: TextStyle(
+                    color: mancanteReale > 0 ? const Color(0xFFF59E0B) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
-  }
-}
-
-// 🎨 PAINTER DELL'ONDA LIQUIDA ANIMATA (Definito a livello globale)
-class _LiquidWavePainter extends CustomPainter {
-  final double animationValue;
-  final double percentage;
-  final Color fillColor;
-
-  _LiquidWavePainter({
-    required this.animationValue,
-    required this.percentage,
-    required this.fillColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (percentage <= 0.0) return;
-
-    final path = Path();
-    final double clampedPct = percentage.clamp(0.0, 1.0);
-    final double baseHeight = size.height * (1.0 - clampedPct);
-    final double waveAmplitude = (clampedPct > 0.02 && clampedPct < 0.98) ? 4.0 : 0.0;
-
-    path.moveTo(0, baseHeight);
-
-    for (double x = 0; x <= size.width; x++) {
-      final double y = baseHeight +
-          math.sin((x / size.width * 2 * math.pi) + (animationValue * 2 * math.pi)) * waveAmplitude;
-      path.lineTo(x, y);
-    }
-
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          fillColor.withOpacity(0.85),
-          fillColor.withOpacity(0.35),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _LiquidWavePainter oldDelegate) {
-    return oldDelegate.animationValue != animationValue ||
-        oldDelegate.percentage != percentage ||
-        oldDelegate.fillColor != fillColor;
   }
 }

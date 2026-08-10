@@ -538,12 +538,10 @@ class _WalletScreenState extends State<WalletScreen> {
                     const SizedBox(height: 16),
 
                   if (mostraPiva) ...[
-                    GestureDetector(
-                      onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
-                      child: SerbatoioTasseWidget(
-                        // 👈 MAGIA: Passiamo il colore trasparente! Così si fonde col nero della pagina
-                        cardColor: Colors.transparent, 
-                      ),
+                    SerbatoioTasseWidget(
+                      cardColor: coloreCard, // Usa il colore standard della card
+                      isCollapsible: true,   // Abilita la tendina
+                      initiallyExpanded: false, // Parte chiuso
                     ),
                     const SizedBox(height: 16),
                   ],
