@@ -168,6 +168,7 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: coloreSfondo,
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 50), // 👈 Margine di sicurezza per svincolare i movimenti dalla Bottom Bar
         child: Column(
           children: [
             Stack(
@@ -280,14 +281,9 @@ class _WalletScreenState extends State<WalletScreen> {
                         },
                         borderRadius: BorderRadius.circular(28),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08), // 👈 Schiarito da 0.03 a 0.08 per dare il vero effetto vetro!
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1), // 👈 Bordo più definito
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, spreadRadius: -5)
-                            ],
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          decoration: const BoxDecoration(
+                            color: Colors.transparent, // 👈 Trasparente, niente sfondo o vetro
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -295,7 +291,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               const Text(
                                 'PATRIMONIO NETTO',
                                 style: TextStyle(
-                                  color: Colors.white70, // 👈 Più leggibile
+                                  color: Colors.white54,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 1.5,
@@ -468,57 +464,59 @@ class _WalletScreenState extends State<WalletScreen> {
                     const SizedBox(height: 0),
 
                     // 1. I TRE BOTTONI IN PRIMA LINEA (Subito sotto il saldo!)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.add_circle_outline_rounded,
-                            title: 'Movimenti',
-                            value: 'Entrata / Uscita',
-                            iconColor: const Color(0xFF10B981), // 🟢 Verde
-                            valueColor: const Color(0xFF10B981),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: const AddMovementSheet(initialTab: 'riepilogo'),
-                              );
-                            },
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildMiniCard(
+                              icon: Icons.add_circle_outline_rounded,
+                              title: 'Movimenti',
+                              value: 'Entrata / Uscita',
+                              iconColor: const Color(0xFF10B981),
+                              valueColor: Colors.white,
+                              onTap: () {
+                                AppPopupWrapper.mostra(
+                                  context: context,
+                                  child: const AddMovementSheet(initialTab: 'riepilogo'),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.account_balance_wallet_outlined,
-                            title: 'Gestione\nConti',
-                            value: '${walletProvider.accounts.length} Attivi',
-                            iconColor: const Color(0xFFF59E0B), // 🟠 Arancio
-                            valueColor: const Color(0xFFF59E0B),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: ManageAccountsSheet(isPiva: widget.isPiva),
-                              );
-                            },
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMiniCard(
+                              icon: Icons.account_balance_wallet_outlined,
+                              title: 'Gestione\nConti',
+                              value: '${walletProvider.accounts.length} Attivi',
+                              iconColor: const Color(0xFFF59E0B),
+                              valueColor: Colors.white,
+                              onTap: () {
+                                AppPopupWrapper.mostra(
+                                  context: context,
+                                  child: ManageAccountsSheet(isPiva: widget.isPiva),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMiniCard(
-                            icon: Icons.pie_chart_outline_rounded,
-                            title: 'Pianificazione\nSpese',
-                            value: 'Budget',
-                            iconColor: const Color(0xFF8B5CF6), // 🟣 Viola
-                            valueColor: const Color(0xFF8B5CF6),
-                            onTap: () {
-                              AppPopupWrapper.mostra(
-                                context: context,
-                                child: const PianoSpesaSheet(),
-                              );
-                            },
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMiniCard(
+                              icon: Icons.pie_chart_outline_rounded,
+                              title: 'Pianificazione\nSpese',
+                              value: 'Budget',
+                              iconColor: const Color(0xFF8B5CF6),
+                              valueColor: Colors.white,
+                              onTap: () {
+                                AppPopupWrapper.mostra(
+                                  context: context,
+                                  child: const PianoSpesaSheet(),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 16), // 👈 Spazio tra bottoni e bussola
@@ -541,7 +539,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     SerbatoioTasseWidget(
                       cardColor: coloreCard, // Usa il colore standard della card
                       isCollapsible: true,   // Abilita la tendina
-                      initiallyExpanded: false, // Parte chiuso
+                      initiallyExpanded: true, // 🟢 Parte già aperto all'avvio!
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -554,27 +552,40 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  ...walletProvider.accounts.map((acc) {
-                    // 🛡️ Legato all'ID/Ruolo strutturale, NON al nome modificabile!
-                    final bool isSerbatoioTasse = acc.role == AccountRole.taxReserve || acc.id == '3';
+                  Container(
+                    decoration: BoxDecoration(
+                      color: coloreCard.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Column(
+                      children: walletProvider.accounts.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final acc = entry.value;
+                        final bool isLast = index == walletProvider.accounts.length - 1;
 
-                    final IconData iconaConto = isSerbatoioTasse
-                        ? Icons.shield_outlined // 🛡️ Scudo per il Salvadanaio Tasse
-                        : (acc.id == '1'
-                            ? Icons.account_balance_rounded
-                            : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded));
+                        final bool isSerbatoioTasse = acc.role == AccountRole.taxReserve || acc.id == '3';
+                        final IconData iconaConto = isSerbatoioTasse
+                            ? Icons.shield_outlined
+                            : (acc.id == '1'
+                                ? Icons.account_balance_rounded
+                                : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded));
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: _buildAccountCard(
-                        icon: iconaConto,
-                        title: acc.title,
-                        subtitle: acc.subtitle,
-                        amount: _formattaValuta(acc.amount),
-                        color: acc.color,
-                      ),
-                    );
-                  }),
+                        return Column(
+                          children: [
+                            _buildAccountCard(
+                              icon: iconaConto,
+                              title: acc.title,
+                              subtitle: acc.subtitle,
+                              amount: _formattaValuta(acc.amount),
+                              color: acc.color,
+                            ),
+                            if (!isLast) Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 16, endIndent: 16),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -634,13 +645,65 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     )
                   else
-                    ...movimentiFiltrati.map((tx) => _buildTransactionTile(
-                          icon: tx.isIncome ? Icons.arrow_downward_rounded : Icons.shopping_bag_outlined,
+                    ...(() {
+                      final List<Map<String, dynamic>> movimentiUnici = [];
+                      final Set<String> chiaviProcessate = {};
+
+                      for (int i = 0; i < movimentiFiltrati.length; i++) {
+                        final tx = movimentiFiltrati[i];
+                        final String catLower = (tx.category ?? '').toLowerCase();
+                        final String titleLower = (tx.title ?? '').toLowerCase();
+
+                        final bool isTrasferimento = catLower.contains('giroconto') ||
+                            titleLower.contains('giroconto') ||
+                            titleLower.contains('accantonamento') ||
+                            titleLower.contains('sblocco') ||
+                            titleLower.contains('riserva');
+
+                        if (isTrasferimento) {
+                          final String chiave = '${tx.date.year}_${tx.date.month}_${tx.date.day}_${tx.date.hour}_${tx.date.minute}_${tx.amount.abs().toStringAsFixed(2)}';
+
+                          if (chiaviProcessate.contains(chiave)) {
+                            final idx = movimentiUnici.indexWhere((m) => m['chiave'] == chiave);
+                            if (idx != -1) {
+                              if (tx.isIncome) {
+                                movimentiUnici[idx]['toAccountId'] = tx.accountId;
+                              } else {
+                                movimentiUnici[idx]['fromAccountId'] = tx.accountId;
+                              }
+                            }
+                            continue;
+                          }
+
+                          chiaviProcessate.add(chiave);
+                          movimentiUnici.add({
+                            'chiave': chiave,
+                            'tx': tx,
+                            'fromAccountId': !tx.isIncome ? tx.accountId : null,
+                            'toAccountId': tx.isIncome ? tx.accountId : null,
+                          });
+                        } else {
+                          movimentiUnici.add({
+                            'chiave': 'tx_$i',
+                            'tx': tx,
+                            'fromAccountId': tx.accountId,
+                            'toAccountId': null,
+                          });
+                        }
+                      }
+
+                      return movimentiUnici.map((item) {
+                        final tx = item['tx'];
+                        return _buildTransactionTile(
                           title: tx.title,
                           subtitle: tx.subtitle,
-                          amount: '${tx.isIncome ? '+' : '-'}${_formattaValuta(tx.amount)}',
+                          amount: _formattaValuta(tx.amount),
                           isIncome: tx.isIncome,
-                        )),
+                          fromAccountId: item['fromAccountId'] as String?,
+                          toAccountId: item['toAccountId'] as String?,
+                        );
+                      });
+                    })(),
                 ],
               ),
             ),
@@ -706,7 +769,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.explore_rounded, color: Color(0xFF2DD4BF), size: 18),
+                        const Icon(Icons.explore_rounded, color: Color(0xFF8B5CF6), size: 18), // 🟣 Viola Neon/Pianificazione
                         const SizedBox(width: 8),
                         const Text(
                           'Bussola Spese (50/30/20)',
@@ -1005,61 +1068,62 @@ class _WalletScreenState extends State<WalletScreen> {
     Color? iconColor,
     Color? valueColor,
   }) {
-    final baseAccent = iconColor ?? Colors.white70;
+    final accentColor = iconColor ?? const Color(0xFF2DD4BF);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110, // ✅ Altezza fissa e uguale per tutti i quadranti
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: iconColor != null 
-              ? Color.alphaBlend(iconColor.withOpacity(0.08), coloreCard.withOpacity(0.92))
-              : coloreCard.withOpacity(0.92),
-          borderRadius: BorderRadius.circular(18),
+          color: coloreCard.withOpacity(0.4), // 🥷 Sfondo scuro e minimale (niente colore di fondo invasivo)
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: iconColor != null 
-                ? iconColor.withOpacity(0.25) 
-                : Colors.white.withOpacity(0.08),
+            color: accentColor.withOpacity(0.35), // 💡 Bordo sottile con il colore tematico
+            width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withOpacity(0.08), // ✨ Leggerissimo bagliore neon sul bordo
+              blurRadius: 12,
+              spreadRadius: -2,
+            )
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [ // ❌ Tolto MainAxisSize.min
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: baseAccent.withOpacity(0.15),
-                shape: BoxShape.circle,
+                color: accentColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: baseAccent, size: 20),
+              child: Icon(icon, color: accentColor, size: 22),
             ),
-            
-            const Spacer(), // ✨ IL TRUCCO: Assorbe lo spazio vuoto in modo elastico!
-            
+            const SizedBox(height: 10),
             Text(
               title,
               style: const TextStyle(
                 color: Colors.white70,
-                fontSize: 12,
+                fontSize: 11,
                 height: 1.15,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            
             const SizedBox(height: 4),
-            
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 value,
-                style: TextStyle(
-                  color: valueColor ?? Colors.white,
+                style: const TextStyle(
+                  color: Colors.white, // Testo candido, pulito ed elegante
                   fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
                 ),
                 maxLines: 1,
               ),
@@ -1077,63 +1141,16 @@ class _WalletScreenState extends State<WalletScreen> {
     required String amount,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: coloreCard.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-              ],
-            ),
-          ),
-          Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransactionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String amount,
-    required bool isIncome,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: coloreCard.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isIncome ? const Color(0xFF10B981).withOpacity(0.12) : Colors.white10,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: isIncome ? const Color(0xFF10B981) : Colors.white70, size: 18),
-          ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1144,16 +1161,161 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
           ),
-          Text(
-            amount,
-            style: TextStyle(
-              color: isIncome ? const Color(0xFF10B981) : Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
+          Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
+    );
+  }
+
+  Widget _buildTransactionTile({
+    required String title,
+    required String subtitle,
+    required String amount,
+    required bool isIncome,
+    String? fromAccountId,
+    String? toAccountId,
+    String? fallbackAccountName,
+    IconData icon = Icons.receipt_long_rounded,
+  }) {
+    final walletProvider = context.watch<WalletProvider>();
+
+    String getNomeConto(String? id, String defaultName) {
+      if (id != null && id.isNotEmpty) {
+        final matches = walletProvider.accounts.where((acc) => acc.id == id);
+        if (matches.isNotEmpty && matches.first.title.isNotEmpty) {
+          return matches.first.title;
+        }
+      }
+      return defaultName;
+    }
+
+    String dataStr = subtitle;
+    if (subtitle.contains('-')) {
+      dataStr = subtitle.split('-').first.trim();
+    } else if (subtitle.contains('•')) {
+      dataStr = subtitle.split('•').first.trim();
+    }
+
+    final String titoloPulito = title.replaceAll('⚠️', '').replaceAll('🛡️', '').trim();
+    final String titleLower = titoloPulito.toLowerCase();
+    final String importoPuro = amount.replaceAll('+', '').replaceAll('-', '').trim();
+
+    IconData iconaFinale = icon;
+    Color coloreIcona = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    Color coloreImporto = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+
+    String titoloBreve = titoloPulito;
+    String importoFormattato = isIncome ? '+$importoPuro' : '-$importoPuro';
+    String rigaDettaglio = subtitle;
+
+    // 1. 🛡️ ACCANTONAMENTO TASSE (Scudo Blu)
+    if (titleLower.contains('accantonamento') || titleLower.contains('ricezione riserva') || titleLower.contains('versamento riserva')) {
+      iconaFinale = Icons.shield_rounded;
+      coloreIcona = const Color(0xFF3B82F6);
+      coloreImporto = const Color(0xFF3B82F6);
+      titoloBreve = 'Accantonamento Tasse';
+      importoFormattato = importoPuro;
+
+      final String da = getNomeConto(fromAccountId, fallbackAccountName ?? 'Conto Liquido');
+      final String a = getNomeConto(toAccountId, 'Salvadanaio Tasse');
+      rigaDettaglio = '$dataStr • Da $da ➔ $a';
+
+    // 2. 🔓 SBLOCCO RISERVA TASSE (Scudo Giallo)
+    } else if (titleLower.contains('rientro') || titleLower.contains('prelievo da riserva') || titleLower.contains('sblocco')) {
+      iconaFinale = Icons.shield_outlined;
+      coloreIcona = const Color(0xFFF59E0B);
+      coloreImporto = const Color(0xFFF59E0B);
+      titoloBreve = 'Sblocco Riserva';
+      importoFormattato = importoPuro;
+
+      final String da = getNomeConto(fromAccountId, 'Salvadanaio Tasse');
+      final String a = getNomeConto(toAccountId, fallbackAccountName ?? 'Conto Liquido');
+      rigaDettaglio = '$dataStr • Da $da ➔ $a';
+
+    // 3. 🔄 GIROCONTO ORDINARIO (Grigio Neutro)
+    } else if (titleLower.contains('giroconto')) {
+      iconaFinale = Icons.sync_alt_rounded;
+      coloreIcona = const Color(0xFFA1A1AA);
+      coloreImporto = const Color(0xFFA1A1AA);
+      titoloBreve = 'Giroconto';
+      importoFormattato = importoPuro;
+
+      final String da = getNomeConto(fromAccountId, fallbackAccountName ?? 'Conto Origine');
+      final String a = getNomeConto(toAccountId, 'Conto Destinazione');
+      rigaDettaglio = '$dataStr • Da $da ➔ $a';
+
+    // 4. 💼 STIPENDIO / ENTRATE / USCITE
+    } else {
+      if (titleLower.contains('stipendio') || titleLower.contains('busta paga')) {
+        iconaFinale = Icons.work_rounded;
+        coloreIcona = const Color(0xFF10B981);
+      } else if (titleLower.contains('incasso') || titleLower.contains('fattura')) {
+        iconaFinale = Icons.request_quote_rounded;
+      } else if (!isIncome) {
+        if (titleLower.contains('affitto')) {
+          iconaFinale = Icons.home_rounded;
+        } else if (titleLower.contains('supermercato') || titleLower.contains('alimentari')) {
+          iconaFinale = Icons.shopping_cart_rounded;
+        } else if (titleLower.contains('ristorante') || titleLower.contains('bar')) {
+          iconaFinale = Icons.restaurant_rounded;
+        } else {
+          iconaFinale = Icons.north_east_rounded;
+        }
+      }
+
+      final String nomeConto = getNomeConto(fromAccountId, fallbackAccountName ?? '');
+      rigaDettaglio = nomeConto.isNotEmpty ? '$dataStr • $nomeConto' : subtitle;
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: coloreIcona.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(iconaFinale, color: coloreIcona, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titoloBreve,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rigaDettaglio,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                importoFormattato,
+                style: TextStyle(
+                  color: coloreImporto,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(color: Colors.white.withOpacity(0.06), height: 1),
+      ],
     );
   }
 }
