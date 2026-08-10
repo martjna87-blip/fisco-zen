@@ -53,8 +53,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final text = '${account.title} ${account.subtitle}'.toLowerCase();
     if (text.contains('carta') || text.contains('prepagata') || text.contains('debito')) {
       return Icons.credit_card_rounded;
+    } else if (text.contains('tasse') || text.contains('fisco') || text.contains('riserva tasse')) {
+      return Icons.shield_outlined; // 🛡️ Scudo vuoto per il Serbatoio Tasse!
     } else if (text.contains('salvadanaio') || text.contains('riserva') || text.contains('accumulo')) {
-      return Icons.savings_outlined;
+      return Icons.savings_outlined; // Maialino per gli altri salvadanai generici
     } else if (text.contains('titoli') || text.contains('investiment')) {
       return Icons.show_chart_rounded;
     } else {

@@ -554,18 +554,27 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  ...walletProvider.accounts.map((acc) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10.0),
-                        child: _buildAccountCard(
-                          icon: acc.id == '1'
-                              ? Icons.account_balance_rounded
-                              : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded),
-                          title: acc.title,
-                          subtitle: acc.subtitle,
-                          amount: _formattaValuta(acc.amount),
-                          color: acc.color,
-                        ),
-                      )),
+                  ...walletProvider.accounts.map((acc) {
+                    // 🛡️ Legato all'ID/Ruolo strutturale, NON al nome modificabile!
+                    final bool isSerbatoioTasse = acc.role == AccountRole.taxReserve || acc.id == '3';
+
+                    final IconData iconaConto = isSerbatoioTasse
+                        ? Icons.shield_outlined // 🛡️ Scudo per il Salvadanaio Tasse
+                        : (acc.id == '1'
+                            ? Icons.account_balance_rounded
+                            : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded));
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10.0),
+                      child: _buildAccountCard(
+                        icon: iconaConto,
+                        title: acc.title,
+                        subtitle: acc.subtitle,
+                        amount: _formattaValuta(acc.amount),
+                        color: acc.color,
+                      ),
+                    );
+                  }),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
