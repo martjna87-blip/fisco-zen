@@ -11,8 +11,11 @@ import '3_5_PI_dettaglio_fatture_sheet.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_bottom_sheet.dart'; // 👈 Aggiunto import del nuovo Bottom Sheet
 import '../data/notifications_provider.dart';
 import '../widgets_shared/fiscon_logo.dart';
+import '../widgets_shared/advisor_tip_card.dart'; // 👈 Importa il consulente
+import '../data/advisor_engine.dart'; // 👈 Motore delle regole del Consulente
 
 class HomeScreen extends StatefulWidget {
   final String? codiceAtecoIniziale;
@@ -33,6 +36,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // 🙈 Mantiene in memoria i titoli dei tip chiusi con la 'X'
+  final Set<String> _dismissedAdvisorTips = {};
+
   late String _codiceAteco;
   late double _coefficienteRedditivita;
   late double _aliquotaImposta;
@@ -131,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogRegistraFattura() {
-    AppPopupWrapper.mostra(
+    AppBottomSheet.mostra(
       context: context,
       child: RegistraFatturaSheet(
         onFatturaSalvata: (cliente, importo, dataFormattata) {
@@ -703,6 +709,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
 
                     const SizedBox(height: 16),
+
+                    // 🤖 IL CONSULENTE VIRTUALE (Memoria Globale nel Provider)
+                    Builder(
+                      builder: (context) {
+                        final tips = AdvisorEngine.getBusinessTips(walletProvider);
+
+                        if (tips.isEmpty) return const SizedBox.shrink();
+
+                        final currentTip = tips.first;
+
+                        return AdvisorTipCard(
+                          mood: currentTip.mood,
+                          title: currentTip.title,
+                          message: currentTip.message,
+                          actionText: currentTip.actionText,
+                          icon: currentTip.icon,
+                          onDismiss: () {
+                            // 👈 Salva la chiusura direttamente nel WalletProvider!
+                            walletProvider.dismissAdvisorTip(currentTip.title);
+                          },
+                          onAction: currentTip.action == null ? null : () {
+                            if (currentTip.action == AdvisorAction.vediFattureInRitardo) {
+                              _mostraDialogIncassoFatture(walletProvider);
+                            } else if (currentTip.action == AdvisorAction.mettiAlSicuroTasse) {
+                              SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF141417));
+                            }
+                          },
+                        );
+                      }
+                    ),
 
                     // 2. SERBATOIO RISERVA TASSE (In seconda linea, aperto di default)
                     SerbatoioTasseWidget(

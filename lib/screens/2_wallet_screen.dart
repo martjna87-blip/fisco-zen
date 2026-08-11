@@ -9,6 +9,8 @@ import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '2_4_wallet_budget_pilot_v2.dart';
 import '../widgets_shared/fiscon_logo.dart';
+import '../data/advisor_engine.dart';
+import '../widgets_shared/advisor_tip_card.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -520,6 +522,33 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
 
                     const SizedBox(height: 16), // 👈 Spazio tra bottoni e bussola
+
+                    // 🤖 IL CONSULENTE VIRTUALE DEL WALLET (Regole Personali)
+      Builder(
+        builder: (context) {
+          final walletProvider = context.watch<WalletProvider>();
+          final tips = AdvisorEngine.getPersonalTips(walletProvider);
+
+          if (tips.isEmpty) return const SizedBox.shrink();
+
+          final currentTip = tips.first;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: AdvisorTipCard(
+              mood: currentTip.mood,
+              title: currentTip.title,
+              message: currentTip.message,
+              actionText: currentTip.actionText,
+              icon: currentTip.icon,
+              onDismiss: () => walletProvider.dismissAdvisorTip(currentTip.title),
+              onAction: () {
+                // Eventuale azione custom per il Wallet
+              },
+            ),
+          );
+        }
+      ),
 
                     // 2. LA BUSSOLA SPESE (Scivolata in seconda posizione)
                     _buildRipartizioneSpeseCard(

@@ -233,6 +233,7 @@ class WalletProvider with ChangeNotifier {
 
   int _mesiAttiviIncasso = 10;
   int get mesiAttivi => _mesiAttiviIncasso;
+  double get nettoTargetMensile => _nettoTargetMensile; // 👈 Incolla qui
 
   int? _annoAperturaPiva = 2024;
   int? get annoAperturaPiva => _annoAperturaPiva;
@@ -1315,5 +1316,13 @@ class WalletProvider with ChangeNotifier {
     _aggiornaTasseVirtuali();
     await _salvaDatiInLocalStorage();
     notifyListeners();
+  }
+  // 🙈 MEMORIA TIP DEL CONSULENTE CHIUSI DALL'UTENTE
+  final Set<String> _dismissedTipKeys = {};
+  Set<String> get dismissedTipKeys => _dismissedTipKeys;
+
+  void dismissAdvisorTip(String key) {
+    _dismissedTipKeys.add(key);
+    notifyListeners(); // 🔄 Aggiorna l'app e nasconde il tip in tutte le schermate
   }
 }
