@@ -9,6 +9,7 @@ import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_image_picker.dart';
 import '../screens/0_1_pro_upgrade.dart';
+import '../services/document_scanner_service.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -239,32 +240,49 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       setState(() => _isAnalyzing = true);
 
-      AppNotifications.mostraInAlto(context, 'Lettura intelligente scontrino in corso... 🤖');
+      AppNotifications.mostraInAlto(
+        context,
+        '🔍 Lettura intelligente scontrino in corso...',
+        type: NotificationType.warning,
+      );
 
-      await Future.delayed(const Duration(seconds: 2));
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
 
-      double importoTrovato = 42.80;
-      String esercenteTrovato = 'Supermercato Conad';
-      DateTime dataTrovata = DateTime.now();
+      final result = await DocumentScannerService.scanDocument(
+        imagePath: image.path,
+        wallet: walletProvider,
+      );
 
       setState(() {
-        _amountController.text = importoTrovato.toStringAsFixed(2).replaceAll('.', ',');
-        _noteController.text = esercenteTrovato;
-        _dataSelezionata = dataTrovata;
-        _tipoMovimento = 'uscita'; 
-        _suggerisciCategoriaAuto();
+        if (result.importo != null) {
+          _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+        }
+        if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+          _noteController.text = result.ragioneSociale!;
+        }
+        if (result.data != null) {
+          _dataSelezionata = result.data!;
+        }
+        _tipoMovimento = 'uscita';
+        _suggerisciCategoriaAuto(); // 🪄 Assegna in automatico anche la categoria (es. Alimentari, Auto)
         _isAnalyzing = false;
       });
 
       if (mounted) {
-        AppNotifications.mostraInAlto(
-          context, 'Dati estratti! Controlla e salva! 🎉'
-        );
+        final messaggio = result.metodoUsato == 'AI_VISION'
+            ? '🤖 Scontrino analizzato con AI Vision Pro!'
+            : '⚡ Importo estratto con scansione rapida.';
+
+        AppNotifications.mostraInAlto(context, messaggio);
       }
     } catch (e) {
       setState(() => _isAnalyzing = false);
       if (mounted) {
-        AppNotifications.mostraInAlto(context, 'Impossibile caricare immagine: $e', type: NotificationType.error);
+        AppNotifications.mostraInAlto(
+          context,
+          'Impossibile leggere lo scontrino. Riprova!',
+          type: NotificationType.error,
+        );
       }
     }
   }

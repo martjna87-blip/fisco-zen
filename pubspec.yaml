@@ -5,33 +5,41 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.12.2
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-    
-  provider: ^6.1.2
   flutter_localizations:
     sdk: flutter
-  intl: any # 👈 Usare 'any' risolve qualsiasi problema di versione in Codespaces
-  shared_preferences: ^2.5.5
-  image_picker: ^1.1.2
   cupertino_icons: ^1.0.8
 
-  # 🟢 I 3 PACCHETTI FIREBASE (Aggiunti qui sotto, allineati a 2 spazi)
+  # STATO E STORAGE
+  provider: ^6.1.2
+  shared_preferences: ^2.5.5
+  intl: any
+
+  # FOTO & UTILITIES
+  image_picker: ^1.1.2
+  url_launcher: ^6.3.2
+  http: ^1.2.0
+
+  # OCR & AI
+  google_mlkit_text_recognition: ^0.13.0
+
+  # FIREBASE
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
   firebase_crashlytics: ^4.3.10
-  url_launcher: ^6.3.2
 
-# ⚙️ CONFIGURAZIONE ICONA APP
+# CONFIGURAZIONE ICONA APP
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/app_icon.png"
   remove_alpha_ios: true
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

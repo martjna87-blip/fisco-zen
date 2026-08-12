@@ -7,6 +7,9 @@ import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../screens/0_1_pro_upgrade.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/document_scanner_service.dart';
+import '../widgets_shared/app_image_picker.dart';
 
 // 🇮🇹 FORMATTATORE VALUTA ITALIANA (1.000,00)
 class ItalianCurrencyFormatter extends TextInputFormatter {
@@ -233,6 +236,60 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉',
     );
   }
+  Future<void> _scattaFoto() async {
+    // 📸 Mostra il pop-up di scelta: Fotocamera o Galleria/File
+    final XFile? photo = await AppImagePickerSheet.mostra(
+      context,
+      titolo: 'Scansiona Fattura',
+    );
+
+    if (photo != null) {
+      AppNotifications.mostraInAlto(
+        context,
+        '🔍 Lettura del documento in corso...',
+        type: NotificationType.warning,
+      );
+
+      try {
+        final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+        
+        final result = await DocumentScannerService.scanDocument(
+          imagePath: photo.path,
+          wallet: walletProvider,
+        );
+
+        setState(() {
+          if (result.importo != null) {
+            _importoController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+          }
+          if (result.piva != null && result.piva!.isNotEmpty) {
+            _pivaClienteController.text = result.piva!;
+            _inviaSdi = true; // Attiva automaticamente lo SDI se trova la P.IVA
+          }
+          if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+            _clienteController.text = result.ragioneSociale!;
+          }
+          if (result.data != null) {
+            _dataSelezionata = result.data!;
+          }
+        });
+
+        final messaggio = result.metodoUsato == 'AI_VISION'
+            ? '🤖 Documento analizzato con AI Vision Pro!'
+            : '⚡ Dati estratti con scansione rapida.';
+
+        AppNotifications.mostraInAlto(context, messaggio, type: NotificationType.success);
+
+      } catch (e) {
+        debugPrint('Errore scansione: $e');
+        AppNotifications.mostraInAlto(
+          context,
+          'Non sono riuscito a leggere bene la foto. Riprova!',
+          type: NotificationType.error,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -263,12 +320,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                   ),
                 ),
                 InkWell(
-                  onTap: () {
+                  onTap: () async {
                     final wallet = Provider.of<WalletProvider>(context, listen: false);
                     if (!wallet.canUseOCR) {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
                     } else {
-                      AppNotifications.mostraInAlto(context, 'Scansione in attivazione... 📸');
+                      await _scattaFoto(); // 👈 Chiama la fotocamera!
                     }
                   },
                   borderRadius: BorderRadius.circular(10),
