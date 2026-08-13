@@ -10,6 +10,7 @@ import '../screens/0_1_pro_upgrade.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/document_scanner_service.dart';
 import '../widgets_shared/app_image_picker.dart';
+import '../data/ateco_database.dart'; // 👈 ECCO IL COLLEGAMENTO AL DATABASE CENTRALIZZATO!
 
 // 🇮🇹 FORMATTATORE VALUTA ITALIANA (1.000,00)
 class ItalianCurrencyFormatter extends TextInputFormatter {
@@ -91,18 +92,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   bool _initializedAteco = false;
   bool _calcolaAncheAccontoF24 = true;
 
-  // 🗂️ DATABASE ATECO UNIFICATO E CONFORME ALL'ONBOARDING
-  final List<Map<String, dynamic>> _databaseAteco = [
-    {'codice': '74.10.21', 'descrizione': 'Graphic design, Web design, UI/UX', 'coef': 0.78},
-    {'codice': '62.01.00', 'descrizione': 'Sviluppo software e programmazione', 'coef': 0.78},
-    {'codice': '70.22.09', 'descrizione': 'Consulenza imprenditoriale e gestionale', 'coef': 0.78},
-    {'codice': '73.11.02', 'descrizione': 'Marketing, Social Media e Advertising', 'coef': 0.78},
-    {'codice': '85.52.09', 'descrizione': 'Formazione culturale, corsi e coaching', 'coef': 0.78},
-    {'codice': '47.91.10', 'descrizione': 'Commercio al dettaglio (E-commerce)', 'coef': 0.67},
-    {'codice': '56.10.11', 'descrizione': 'Ristoranti, Pizzerie, Bar', 'coef': 0.40},
-    {'codice': '96.02.01', 'descrizione': 'Servizi dei saloni e personal care', 'coef': 0.40},
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -132,7 +121,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       _atecoCoef = _defaultAtecoCoef;
       _atecoCodice = _defaultAtecoCodice;
 
-      final matchIniziale = _databaseAteco.firstWhere(
+      // 👇 USIAMO IL NUOVO DATABASE PER CERCARE IL NOME INIZIALE
+      final matchIniziale = AtecoDatabase.lista.firstWhere(
         (item) => item['codice'] == _atecoCodice,
         orElse: () => {'descrizione': 'Consulenza & Digital'},
       );
@@ -236,8 +226,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉',
     );
   }
+  
   Future<void> _scattaFoto() async {
-    // 📸 Mostra il pop-up di scelta: Fotocamera o Galleria/File
     final XFile? photo = await AppImagePickerSheet.mostra(
       context,
       titolo: 'Scansiona Fattura',
@@ -264,7 +254,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
           }
           if (result.piva != null && result.piva!.isNotEmpty) {
             _pivaClienteController.text = result.piva!;
-            _inviaSdi = true; // Attiva automaticamente lo SDI se trova la P.IVA
+            _inviaSdi = true; 
           }
           if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
             _clienteController.text = result.ragioneSociale!;
@@ -306,17 +296,17 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📸 SCANNER OCR CON BADGE PRO INTEGRATO INLINE
+            // 📸 HEADER: INSERIMENTO MANUALE VS SCANNER
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'INSERIMENTO MANUALE',
                   style: TextStyle(
-                    color: Colors.white38,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
                   ),
                 ),
                 InkWell(
@@ -325,7 +315,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     if (!wallet.canUseOCR) {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
                     } else {
-                      await _scattaFoto(); // 👈 Chiama la fotocamera!
+                      await _scattaFoto(); 
                     }
                   },
                   borderRadius: BorderRadius.circular(10),
@@ -365,7 +355,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             ),
             const SizedBox(height: 12),
 
-            // N° FATTURA + DATA
+            // N° FATTURA + DATA 
             Row(
               children: [
                 Expanded(
@@ -375,26 +365,26 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     decoration: _buildInputDecoration('N° Fattura', Icons.tag_rounded),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12), 
                 Expanded(
                   child: InkWell(
                     onTap: () => _selezionaData(context),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14), 
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)), 
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 16),
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _formattaData(_dataSelezionata),
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -429,10 +419,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isAtecoEspanso ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
+                  color: _isAtecoEspanso ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.3),
                 ),
               ),
               child: Column(
@@ -444,18 +434,18 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                         if (!_isAtecoEspanso) _searchAtecoController.clear();
                       });
                     },
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.category_rounded, color: Color(0xFF2DD4BF), size: 16),
+                          const Icon(Icons.category_rounded, color: Color(0xFF2DD4BF), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _atecoNome,
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis, 
                             ),
                           ),
                           if (isCurrentSelectedDefault) ...[
@@ -507,7 +497,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                               physics: const BouncingScrollPhysics(),
                               children: (() {
                                 final query = _searchAtecoController.text.toLowerCase().replaceAll('.', '').trim();
-                                final atecoFiltrati = _databaseAteco.where((item) {
+                                
+                                // 👇 FILTRIAMO DALLA LISTA CENTRALIZZATA!
+                                final atecoFiltrati = AtecoDatabase.lista.where((item) {
                                   return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) ||
                                       item['descrizione'].toString().toLowerCase().contains(query);
                                 }).toList();
@@ -588,15 +580,15 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
               ),
             ),
 
-            // TOGGLE FATTURAZIONE ELETTRONICA SDI CON BADGE PRO INLINE
+            // TOGGLE FATTURAZIONE ELETTRONICA SDI
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.08),
+                  color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.3),
                 ),
               ),
               child: Column(
@@ -610,9 +602,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                             builder: (context, wallet, child) {
                               return Row(
                                 children: [
-                                  Icon(Icons.send_rounded, color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white54, size: 16),
+                                  Icon(Icons.send_rounded, color: _inviaSdi ? const Color(0xFF2DD4BF) : Colors.white54, size: 18),
                                   const SizedBox(width: 8),
-                                  const Text('Invia allo SDI', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const Text('Invia allo SDI', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                                   if (!wallet.canSendSDI) ...[
                                     const SizedBox(width: 6),
                                     Container(
@@ -633,6 +625,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                       Switch(
                         value: _inviaSdi,
                         activeColor: const Color(0xFF2DD4BF),
+                        activeTrackColor: const Color(0xFF2DD4BF).withOpacity(0.3),
+                        inactiveThumbColor: Colors.white70,
+                        inactiveTrackColor: Colors.white12, 
                         onChanged: (val) {
                           final wallet = Provider.of<WalletProvider>(context, listen: false);
                           if (!wallet.canSendSDI && val) {
@@ -652,7 +647,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     const SizedBox(height: 8),
                     TextField(controller: _descrizioneController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('Descrizione Prestazione', Icons.description_outlined)),
                     
-                    // 📌 AVVISO MARCA DA BOLLO VIRTUALE DA 2,00€ (PER FATTURE > 77,47€)
                     if (richiedeBollo) ...[
                       const SizedBox(height: 10),
                       Container(
@@ -692,7 +686,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                 onPressed: _salvaFattura,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2DD4BF),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: const Text(
@@ -752,7 +746,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
       ),
       child: Column(

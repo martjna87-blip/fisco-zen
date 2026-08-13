@@ -30,7 +30,7 @@ dependencies:
   # FIREBASE
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.4
+  cloud_firestore: ^5.6.12
   firebase_crashlytics: ^4.3.10
 
 # CONFIGURAZIONE ICONA APP

@@ -4,6 +4,7 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '1_main_menu.dart';
 import '../widgets_shared/fiscon_logo.dart';
+import '../data/ateco_database.dart'; // 👈 IMPORT DEL DATABASE CENTRALIZZATO!
 
 class OnboardingWizard extends StatefulWidget {
   const OnboardingWizard({super.key});
@@ -23,7 +24,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
   // 🗂️ STEP 1: PROFILO & ATECO
   String? tipoProfilo; // 'piva' o 'dipendente'
   String? aliquotaTasse; // '5%' o '15%'
-  int? annoAperturaPiva; // 👈 Nuova variabile
+  int? annoAperturaPiva; 
   double? coefficienteRedditivita;
   String? codiceAtecoSelezionato;
   final TextEditingController _searchController = TextEditingController();
@@ -45,16 +46,8 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
 
   int get _mesiAttiviConteggio => _mesiAttiviState.where((m) => m).length;
 
-  final List<Map<String, dynamic>> _databaseAteco = [
-    {'codice': '85.52.09', 'descrizione': 'Altra formazione culturale', 'coef': 0.78},
-    {'codice': '62.01.00', 'descrizione': 'Sviluppo di software e programmazione', 'coef': 0.78},
-    {'codice': '70.22.09', 'descrizione': 'Consulenza imprenditoriale e gestionale', 'coef': 0.78},
-    {'codice': '73.11.02', 'descrizione': 'Marketing, Social Media e Advertising', 'coef': 0.78},
-    {'codice': '74.10.21', 'descrizione': 'Graphic design, Web design, UI/UX', 'coef': 0.78},
-    {'codice': '47.91.10', 'descrizione': 'Commercio al dettaglio (E-commerce)', 'coef': 0.67},
-    {'codice': '56.10.11', 'descrizione': 'Ristoranti, Pizzerie con somministrazione', 'coef': 0.40},
-    {'codice': '96.02.01', 'descrizione': 'Servizi dei saloni di barbiere e parrucchiere', 'coef': 0.40},
-  ];
+  // 👇 RIMOSSA LA VECCHIA LISTA _databaseAteco
+  // Ora useremo AtecoDatabase.lista
 
   @override
   void initState() {
@@ -317,7 +310,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
 
   // STEP 1: PROFILO & ATECO
   Widget _buildStep1() {
-    final atecoFiltrati = _databaseAteco.where((item) {
+    final atecoFiltrati = AtecoDatabase.lista.where((item) {
       final query = _searchQuery.toLowerCase().replaceAll('.', '').trim();
       return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) || 
              item['descrizione'].toString().toLowerCase().contains(query);
@@ -465,87 +458,95 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
               ),
               const SizedBox(height: 16),
               Container(
-                decoration: BoxDecoration(color: const Color(0xFF101618).withOpacity(0.88), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF1F2937))),
-                child: _searchQuery.isNotEmpty
-                    ? ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: atecoFiltrati.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFF1F2937), indent: 16),
-                        itemBuilder: (context, index) {
-                          final item = atecoFiltrati[index];
-                          
-                          // 📌 CORRETTO: controlla se il codice selezionato INIZIA con il codice della riga
-                          final isSelected = codiceAtecoSelezionato != null && 
-                                             codiceAtecoSelezionato!.startsWith(item['codice'].toString());
-                          
-                          final double coef = (item['coef'] as num).toDouble();
-
-                          return Container(
-                            color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
-                            child: ListTile(
-                              onTap: () {
-                                // 1. Chiude la tastiera per farti vedere bene la selezione e il tasto Avanti
-                                FocusScope.of(context).unfocus();
-                                
-                                // 2. Salva la selezione
-                                setState(() {
-                                  coefficienteRedditivita = coef;
-                                  codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
-                                });
-                                _scrollToBottom();
-                              },
-                              title: Row(
-                                children: [
-                                  Text(
-                                    item['codice'], 
-                                    style: TextStyle(
-                                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.white, 
-                                      fontWeight: FontWeight.bold, 
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF1F2937), 
-                                      borderRadius: BorderRadius.circular(6),
-                                    ), 
-                                    child: Text(
-                                      '${(coef * 100).toInt()}%', 
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Text(
-                                item['descrizione'], 
-                                style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12),
-                              ),
-                              // 📌 MOSTRA LA SPUNTA VERDE BELLA VISIBILE QUANDO SELEZIONATA
-                              trailing: isSelected 
-                                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 22) 
-                                  : const Icon(Icons.circle_outlined, color: Colors.white24, size: 20),
-                            ),
-                          );
-                        })
-                    : Column(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF101618).withOpacity(0.88), 
+                  borderRadius: BorderRadius.circular(24), 
+                  border: Border.all(color: const Color(0xFF1F2937))
+                ),
+                // 🧠 LOGICA SMART: Se la barra è vuota mostra i Top 3, altrimenti cerca su Firebase!
+                child: _searchQuery.isEmpty
+                    ? Column(
                         children: [
-                          _buildRevolutListTile(icon: Icons.laptop_mac_rounded, title: 'Consulenza & Digital (78%)', subtitle: 'IT, Marketing, Formazione', isSelected: coefficienteRedditivita == 0.78, onTap: () => _selectAtecoPreset(0.78, '74.10.21 - Consulenza & Digital')),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 16, bottom: 8),
+                            child: Text('🔥 I PIÙ SCELTI IN ITALIA', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                          ),
+                          _buildRevolutListTile(
+                            icon: Icons.laptop_mac_rounded, 
+                            title: 'Consulenza & Digital (78%)', 
+                            subtitle: 'Es. 74.10.21 - IT, Marketing, Design', 
+                            isSelected: codiceAtecoSelezionato?.startsWith('74.10.21') ?? false, 
+                            onTap: () => _selectAtecoPreset(0.78, '74.10.21 - Consulenza & Digital')
+                          ),
                           const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
-                          _buildRevolutListTile(icon: Icons.storefront_rounded, title: 'Commercio & Agenti (67%)', subtitle: 'E-commerce, Negozi', isSelected: coefficienteRedditivita == 0.67, onTap: () => _selectAtecoPreset(0.67, '47.91.10 - Commercio & Agenti')),
+                          _buildRevolutListTile(
+                            icon: Icons.storefront_rounded, 
+                            title: 'Commercio & E-commerce (40%)', 
+                            subtitle: 'Es. 47.91.10 - Vendita online, Dropshipping', 
+                            isSelected: codiceAtecoSelezionato?.startsWith('47.91.10') ?? false, 
+                            onTap: () => _selectAtecoPreset(0.40, '47.91.10 - Commercio & E-commerce')
+                          ),
                           const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
-                          _buildRevolutListTile(icon: Icons.build_rounded, title: 'Artigiani & Ristorazione (40%)', subtitle: 'Produzione, Bar, Estetisti', isSelected: coefficienteRedditivita == 0.40, onTap: () => _selectAtecoPreset(0.40, '56.10.11 - Artigiani & Ristorazione')),
+                          _buildRevolutListTile(
+                            icon: Icons.build_rounded, 
+                            title: 'Artigiani & Ristorazione (40%)', 
+                            subtitle: 'Es. 56.10.11 - Produzione, Bar, Parrucchieri', 
+                            isSelected: codiceAtecoSelezionato?.startsWith('56.10.11') ?? false, 
+                            onTap: () => _selectAtecoPreset(0.40, '56.10.11 - Artigiani & Ristorazione')
+                          ),
                         ],
+                      )
+                    : (atecoFiltrati.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(20), 
+                            child: Center(child: Text('Nessun codice ATECO trovato', style: TextStyle(color: Colors.white54, fontSize: 12)))
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: atecoFiltrati.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFF1F2937), indent: 16),
+                            itemBuilder: (context, index) {
+                              final item = atecoFiltrati[index];
+                              final isSelected = codiceAtecoSelezionato != null && codiceAtecoSelezionato!.startsWith(item['codice'].toString());
+                              final double coef = (item['coef'] as num).toDouble();
+
+                              return Container(
+                                color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
+                                child: ListTile(
+                                  onTap: () {
+                                    FocusScope.of(context).unfocus();
+                                    setState(() {
+                                      coefficienteRedditivita = coef;
+                                      codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
+                                    });
+                                    _scrollToBottom();
+                                  },
+                                  title: Row(
+                                    children: [
+                                      Text(item['codice'], style: TextStyle(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                        decoration: BoxDecoration(color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF1F2937), borderRadius: BorderRadius.circular(6)), 
+                                        child: Text('${(coef * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Text(item['descrizione'], style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12)),
+                                  trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 22) : const Icon(Icons.circle_outlined, color: Colors.white24, size: 20),
+                                ),
+                              );
+                            }
+                          )
                       ),
-              ),
+                  ),
+                ],
+              ],
             ],
-          ],
-        ],
-      ),
-    );
-  }
+          ),
+        );
+      }
 
   void _selectAtecoPreset(double coef, String str) {
     setState(() {

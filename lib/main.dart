@@ -14,6 +14,8 @@ import 'data/auth_provider.dart';
 import 'screens/auth_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'data/ateco_database.dart';
+import 'data/ateco_uploader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +23,11 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 👇 AGGIUNGI QUESTA RIGA TEMPORANEA per caricare la lista su FireBase:
+  // await AtecoUploader.caricaTuttoSuFirebase();
+
+  await AtecoDatabase.sincronizzaCodiciDaFirebase();
   
   // 🛡️ ATTIVAZIONE CRASHLYTICS (Solo su dispositivi mobili iOS/Android)
   if (!kIsWeb) {

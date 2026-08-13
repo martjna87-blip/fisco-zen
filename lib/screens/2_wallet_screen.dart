@@ -40,6 +40,8 @@ class _WalletScreenState extends State<WalletScreen> {
     'https://plus.unsplash.com/premium_photo-1674517879286-0ee281fc5262?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDR8fHxlbnwwfHx8fHw%3D',
     'https://images.unsplash.com/photo-1481819613568-3701cbc70156?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8cGlhbmV0aXxlbnwwfHwwfHx8MA%3D%3D',
     //'https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8c29sZXxlbnwwfHwwfHx8MA%3D%3D',
+    'https://plus.unsplash.com/premium_photo-1711434824963-ca894373272e?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8bmF0dXJhfGVufDB8fDB8fHww',
+    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8bmF0dXJhfGVufDB8fDB8fHww',
 ];
 
   bool _isBussolaEspansa = false;
