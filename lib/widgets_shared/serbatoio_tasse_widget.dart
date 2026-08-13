@@ -112,7 +112,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
     );
   }
 
-  static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF292524)}) {
+  static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF18181B)}) {
     final walletProvider = context.read<WalletProvider>();
     final accounts = walletProvider.accounts;
 
@@ -157,6 +157,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
         : contoPrincipale.id;
 
     bool modalitaAccantona = true;
+    bool isTendinaContiAperta = false;
 
     final TextEditingController importoController = TextEditingController(
       text: mancanteReale > 0 ? mancanteReale.toStringAsFixed(2).replaceAll('.', ',') : '',
@@ -187,7 +188,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
           final Color coloreAttuale = modalitaAccantona ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B);
 
           return AppSecondaryPopup(
-            backgroundColor: cardColor,
+            backgroundColor: const Color(0xFF18181B),
             icon: modalitaAccantona ? Icons.shield_outlined : Icons.lock_open_rounded,
             iconColor: coloreAttuale,
             titolo: modalitaAccantona ? 'Accantona Tasse' : 'Sblocca Fondi Tasse',
@@ -256,11 +257,13 @@ class SerbatoioTasseWidget extends StatefulWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 🔘 SELETTORE MODALITÀ (ACCANTONA / SBLOCCA)
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.black.withOpacity(0.4),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
                   ),
                   child: Row(
                     children: [
@@ -269,6 +272,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
                           onTap: () {
                             setDialogState(() {
                               modalitaAccantona = true;
+                              isTendinaContiAperta = false;
                               importoController.text = mancanteReale > 0 ? mancanteReale.toStringAsFixed(2).replaceAll('.', ',') : '';
                             });
                           },
@@ -293,6 +297,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
                           onTap: () {
                             setDialogState(() {
                               modalitaAccantona = false;
+                              isTendinaContiAperta = false;
                               importoController.text = '';
                             });
                           },
@@ -318,124 +323,187 @@ class SerbatoioTasseWidget extends StatefulWidget {
 
                 const SizedBox(height: 16),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                    Text(_formattaValuta(tasseTotaliCalcolate), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                    Text(_formattaValuta(riservaGiaAccantonata), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Copertura: $percentualeInt%',
-                          style: TextStyle(
-                            color: percentualeInt >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (extraCuscinetto > 0)
+                // 📊 SCHEDA RIEPILOGO COPERTURA
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Totale Tasse Dovute:', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                          Text(_formattaValuta(tasseTotaliCalcolate), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Già in Salvadanaio:', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                          Text(_formattaValuta(riservaGiaAccantonata), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const Divider(color: Colors.white12, height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                           Text(
-                            '+${_formattaInt(extraCuscinetto)} € Cuscinetto',
-                            style: const TextStyle(color: Color(0xFF06B6D4), fontSize: 11, fontWeight: FontWeight.bold),
+                            'Copertura: $percentualeInt%',
+                            style: TextStyle(
+                              color: percentualeInt >= 100 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    _buildBarraAvanzamentoSmart(percentualeInt),
-                  ],
+                          if (extraCuscinetto > 0)
+                            Text(
+                              '+${_formattaInt(extraCuscinetto)} € Cuscinetto',
+                              style: const TextStyle(color: Color(0xFF06B6D4), fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _buildBarraAvanzamentoSmart(percentualeInt),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 16),
 
-                if (modalitaAccantona) ...[
-                  DropdownButtonFormField<String>(
-                    value: contoSorgenteAccantonaId,
-                    dropdownColor: cardColor,
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      labelText: 'Preleva la cifra da:',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF3B82F6), size: 18),
-                    ),
-                    items: contiDisponibili.map((acc) {
-                      return DropdownMenuItem<String>(
-                        value: acc.id,
-                        child: Text('${acc.title} (${_formattaInt(acc.amount)} €)'),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          contoSorgenteAccantonaId = val;
-                        });
-                      }
-                    },
+                // 🏦 SELETTORE CONTO CUSTOM INTEGRATO (RISOLVE IL BUG FLUTTER WEB)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
                   ),
-                  const SizedBox(height: 12),
-                ] else ...[
-                  DropdownButtonFormField<String>(
-                    value: contoDestinazioneSbloccoId,
-                    dropdownColor: cardColor,
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      labelText: 'Versa la cifra su:',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF59E0B), size: 18),
-                    ),
-                    items: contiDisponibili.map((acc) {
-                      return DropdownMenuItem<String>(
-                        value: acc.id,
-                        child: Text('${acc.title} (${_formattaInt(acc.amount)} €)'),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          contoDestinazioneSbloccoId = val;
-                        });
-                      }
-                    },
+                  child: Column(
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          setDialogState(() {
+                            isTendinaContiAperta = !isTendinaContiAperta;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.account_balance_wallet_rounded, color: coloreAttuale, size: 18),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        modalitaAccantona ? 'Preleva la cifra da:' : 'Versa la cifra su:',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        () {
+                                          final selectedId = modalitaAccantona ? contoSorgenteAccantonaId : contoDestinazioneSbloccoId;
+                                          final acc = contiDisponibili.firstWhere((a) => a.id == selectedId, orElse: () => contiDisponibili[0]);
+                                          return '${acc.title} (${_formattaInt(acc.amount)} €)';
+                                        }(),
+                                        style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Icon(
+                                isTendinaContiAperta ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                color: coloreAttuale,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (isTendinaContiAperta) ...[
+                        const Divider(color: Colors.white12, height: 1),
+                        Column(
+                          children: contiDisponibili.map((acc) {
+                            final String attualeSelectedId = modalitaAccantona ? contoSorgenteAccantonaId : contoDestinazioneSbloccoId;
+                            final bool isSelected = acc.id == attualeSelectedId;
+                            return InkWell(
+                              onTap: () {
+                                setDialogState(() {
+                                  if (modalitaAccantona) {
+                                    contoSorgenteAccantonaId = acc.id;
+                                  } else {
+                                    contoDestinazioneSbloccoId = acc.id;
+                                  }
+                                  isTendinaContiAperta = false;
+                                });
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                color: isSelected ? coloreAttuale.withOpacity(0.15) : Colors.transparent,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                      color: isSelected ? coloreAttuale : Colors.white38,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        '${acc.title} (${_formattaInt(acc.amount)} €)',
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : Colors.white70,
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                ],
+                ),
 
+                const SizedBox(height: 12),
+
+                // ✏️ CAMPO DI TESTO IMPORTO
                 TextField(
                   controller: importoController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: coloreAttuale, fontSize: 22, fontWeight: FontWeight.bold),
                   onChanged: (_) => setDialogState(() {}),
                   decoration: InputDecoration(
                     labelText: modalitaAccantona ? 'Importo da spostare nel Salvadanaio (€)' : 'Importo da prelevare dal Salvadanaio (€)',
-                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                    labelStyle: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    fillColor: Colors.black.withOpacity(0.4),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12), 
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: coloreAttuale),
+                    ),
                     prefixIcon: Icon(
                       modalitaAccantona ? Icons.savings_rounded : Icons.payments_rounded, 
                       color: coloreAttuale, 
-                      size: 20
+                      size: 20,
                     ),
                   ),
                 ),
@@ -521,7 +589,6 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 📌 1. HEADER CON AZIONI SEPARATE
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -556,7 +623,7 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                   ),
                 ),
                 InkWell(
-                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
+                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF18181B)),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -577,13 +644,12 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
               ],
             ),
 
-            // 📌 2. CONTENUTO ESPANDIBILE (SFERA CON ONDA LIQUIDA ANIMATA)
             if (!widget.isCollapsible || _isEspanso) ...[
               const SizedBox(height: 18),
 
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
+                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF18181B)),
                 child: Center(
                   child: SizedBox(
                     width: 130,
@@ -635,12 +701,12 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                               'IN SALVADANAIO',
                               style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                             ),
-                            const SizedBox(height: 8), // 👈 Ora ha spazio per respirare!
+                            const SizedBox(height: 8),
                             Text(
                               '${SerbatoioTasseWidget._formattaInt(riservaAccantonata)} €',
                               style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 4), // 👈 Spazio aumentato
+                            const SizedBox(height: 4),
                             Text(
                               'su ${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
                               style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w500),
@@ -690,7 +756,6 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
   }
 }
 
-// 🎨 PAINTER DELL'ONDA LIQUIDA ANIMATA (Definito a livello globale)
 class _LiquidWavePainter extends CustomPainter {
   final double animationValue;
   final double percentage;

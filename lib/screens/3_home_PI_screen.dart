@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogIncassoFatture(WalletProvider walletProvider) {
-    AppPopupWrapper.mostra(
+    AppBottomSheet.mostra(
       context: context,
       child: IncassoFattureSheet(
         fattureDaIncassare: walletProvider.fattureDaIncassare,
@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _mostraDialogDettaglioTasse(double totaleInSospeso, double totaleIncassatoReale) {
     final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     
-    AppPopupWrapper.mostra(
+    AppBottomSheet.mostra(
       context: context,
       child: TasseAccantonamentoSheet(
         codiceAteco: _codiceAteco,
@@ -159,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
         aliquotaInps: _aliquotaInps,
         totaleFatturatoIncassato: totaleIncassatoReale,
         totaleFatturatoInSospeso: totaleInSospeso,
-        fattureIncassate: walletProvider.fattureIncassate,    // 👈 Passa le fatture incassate
-        fattureDaIncassare: walletProvider.fattureDaIncassare,// 👈 Passa le fatture in sospeso
+        fattureIncassate: walletProvider.fattureIncassate,
+        fattureDaIncassare: walletProvider.fattureDaIncassare,
         onAtecoCambiato: (nuovoAteco, nuovoCoeff) {
           setState(() {
             _codiceAteco = nuovoAteco;
@@ -171,9 +171,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 👈 MODIFICA 1 UNIFICATA: Helper per Dettaglio Fatture tramite AppPopupWrapper
   void _mostraDialogDettaglioFatture(List<Map<String, dynamic>> fattureIncassate) {
-    AppPopupWrapper.mostra(
+    AppBottomSheet.mostra(
       context: context,
       child: DettaglioFattureSheet(
         fattureIncassate: fattureIncassate,
@@ -569,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // 🔹 PILLOLA TASSE DOVUTE (In Vetro)
                 Center(
                   child: InkWell(
-                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                    onTap: null, // 👈 Disabilitata l'apertura della pagina //=> _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                     onLongPress: () {
                       AppPopupWrapper.mostraInfo(
                         context: context,

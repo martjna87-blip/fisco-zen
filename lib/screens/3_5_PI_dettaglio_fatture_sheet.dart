@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 
 class DettaglioFattureSheet extends StatefulWidget {
   final List<Map<String, dynamic>>? fattureIncassate;
@@ -33,7 +33,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
   ];
 
-  // 🇮🇹 HELPER VALUTA ITALIANA (1.000,00 €)
   String _formattaValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
@@ -95,7 +94,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
       return sorgenteFatture;
     }
 
-    // 🧮 PRINCIPIO DI CASSA: Usiamo la data di incasso vera (dataIncasso)
     return sorgenteFatture.where((f) {
       final rawData = f['dataIncasso'] ?? f['data'];
       if (rawData != null) {
@@ -156,11 +154,9 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
     final fattureInSospeso = walletProvider.fattureDaIncassare;
 
-    // 📌 CALCOLO MESI E PERCENTUALE CUSCINETTO DAL PROVIDER
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
     final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
-    // 1. CALCOLI SULLE FATTURE INCASSATE
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
     double impostaYTotale = 0.0;
@@ -193,7 +189,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final double grandQuotaFondoFerie = grandNettoDopoTasse * percentualeFondoFerie;
     final double nettoTotaleSpendibile = grandNettoDopoTasse - grandQuotaFondoFerie;
 
-    // 2. CALCOLI SULLE FATTURE EMESSE IN SOSPESO
     double lordoSospeso = 0.0;
     double imponibileSospeso = 0.0;
     double inpsSospeso = 0.0;
@@ -217,13 +212,13 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final int annoCorrente = DateTime.now().year;
     final int annoProssimo = annoCorrente + 1;
 
-    return AppPopupWrapper(
+    return AppBottomSheet(
       title: 'Dettaglio Fiscale',
       badgeText: 'P.IVA',
       badgeColor: const Color(0xFF2DD4BF),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 📌 SELETTORE MESI FISSO IN ALTO
           SizedBox(
             height: 32,
             child: ListView.builder(
@@ -260,13 +255,11 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
           ),
           const SizedBox(height: 10),
 
-          // 📌 AREA FLUIDA SENZA OVERFLOW (Avvolge Lista e Box Finali)
-          Expanded(
+          Flexible(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
-                  // 1. ELENCO FATTURE
                   if (fattureFiltrate.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 30),
@@ -347,6 +340,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                             ),
                                           ),
                                           const SizedBox(width: 8),
+                                          // ✨ BADGE ATECO AGGIORNATO
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -354,9 +348,16 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                               borderRadius: BorderRadius.circular(6),
                                               border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
                                             ),
-                                            child: Text(
-                                              '${(coefFattura * 100).toInt()}%',
-                                              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 10),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  'ATECO ${(coefFattura * 100).toInt()}%',
+                                                  style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
@@ -434,17 +435,13 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 8),
                                   _buildSimpleRow('Saldo INPS', _formattaValuta(inpsY), Colors.white70),
-                                  const SizedBox(height: 3),
                                   _buildSimpleRow('Saldo Imposta', _formattaValuta(impostaY), Colors.white70),
-                                  const SizedBox(height: 3),
                                   _buildSimpleRow('Totale Saldo', _formattaValuta(totaleTasseYCard), const Color(0xFFF59E0B), isBold: true),
                                   const SizedBox(height: 8),
                                   Divider(color: Colors.white.withOpacity(0.12), height: 1),
                                   const SizedBox(height: 8),
                                   _buildSimpleRow('Acconto INPS', _formattaValuta(accontoInpsY1Card), Colors.white70),
-                                  const SizedBox(height: 3),
                                   _buildSimpleRow('Acconto Imposta', _formattaValuta(accontoImpostaY1Card), Colors.white70),
-                                  const SizedBox(height: 3),
                                   _buildSimpleRow('Totale Acconto', _formattaValuta(totaleAccontiY1Card), const Color(0xFFF97316), isBold: true),
                                   const SizedBox(height: 12),
                                   Align(
@@ -481,7 +478,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                   const SizedBox(height: 4),
 
-                  // 2. SCHEDA RIEPILOGO COMPLETO
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -560,7 +556,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                     ),
                   ),
 
-                  // 3. ⚠️ BOX GIALLO IN FONDO COME ULTIMO ELEMENTO: FATTURE EMESSE IN SOSPESO
                   if (lordoSospeso > 0) ...[
                     const SizedBox(height: 12),
                     AnimatedContainer(
@@ -621,7 +616,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // 🏷️ NUOVA NOMENCLATURA AGGIORNATA
                                   _buildRow('Lordo non incassato:', '+${_formattaValuta(lordoSospeso)}', color: Colors.white),
                                   _buildRow('Imponibile Fiscale Stimato:', _formattaValuta(imponibileSospeso)),
                                   _buildRow('Saldo Tasse Stimato (Anno $annoCorrente):', '-${_formattaValuta(saldoSospeso)}', color: const Color(0xFFF59E0B)),
@@ -630,7 +624,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                   _buildRow('Totale Tasse Stimato in Sospeso:', '-${_formattaValuta(totaleF24Sospeso)}', color: const Color(0xFFEF4444), isBold: true),
                                   
                                   const SizedBox(height: 10),
-                                  // 💡 BANNER STRATEGICO COMPETENZA ANNO SOLARE
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
@@ -638,15 +631,28 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.2)),
                                     ),
-                                    child: const Row(
+                                    child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFF59E0B), size: 16),
-                                        SizedBox(width: 8),
+                                        const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFF59E0B), size: 16),
+                                        const SizedBox(width: 8),
                                         Expanded(
-                                          child: Text(
-                                            'Regola del Criterio di Cassa: Se queste fatture non vengono validate e incassate entro il 31 Dicembre, la relativa quota tasse slitterà automaticamente alla dichiarazione dei redditi dell\'anno prossimo!',
-                                            style: TextStyle(color: Colors.white70, fontSize: 10, height: 1.35),
+                                          child: Text.rich(
+                                            TextSpan(
+                                              style: const TextStyle(color: Colors.white70, fontSize: 10, height: 1.35),
+                                              children: [
+                                                const TextSpan(
+                                                  text: 'Regola del Criterio di Cassa: ',
+                                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
+                                                ),
+                                                const TextSpan(text: 'Se queste fatture non vengono incassate entro il '),
+                                                const TextSpan(
+                                                  text: '31 Dicembre',
+                                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                                ),
+                                                const TextSpan(text: ', la relativa quota tasse slitterà automaticamente alla dichiarazione dei redditi dell\'anno prossimo!'),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -703,7 +709,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     );
   }
 
-  // HELPER CON ICONA E VALORE IN EVIDENZA
   Widget _buildSalvaDanaioRow({
     required IconData icon,
     required Color color,
@@ -733,33 +738,36 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     );
   }
 
-  // HELPER PER LE VOCI DI DETTAGLIO ANALITICO
+  // ✨ MODIFICATO: Più contrasto e respiro verticale
   Widget _buildSimpleRow(String label, String value, Color color, {bool isBold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isBold ? Colors.white : Colors.white60,
-              fontSize: 11,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isBold ? Colors.white : Colors.white70,
+                fontSize: 11,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

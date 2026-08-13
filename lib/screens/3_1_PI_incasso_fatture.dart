@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_bottom_sheet.dart'; // 👈 ECCO IL NUOVO IMPORT!
 import '../widgets_shared/app_datepicker.dart';
 
 class IncassoFattureSheet extends StatefulWidget {
@@ -152,7 +152,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
       _contoSelezionato = contiDisponibili.first;
     }
 
-    return AppPopupWrapper(
+    // 👇 USIAMO APP BOTTOM SHEET INVECE DI APP POPUP WRAPPER
+    return AppBottomSheet(
       title: 'Incasso Fatture',
       badgeText: 'P.IVA',
       badgeColor: const Color(0xFF2DD4BF),
@@ -170,6 +171,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
               )
             : ListView.builder(
                 padding: EdgeInsets.zero,
+                shrinkWrap: true, // Aggiunto per evitare problemi di scroll nel BottomSheet
                 physics: const BouncingScrollPhysics(),
                 itemCount: fattureAttuali.length,
                 itemBuilder: (context, index) {
@@ -183,7 +185,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                   final bool isScaduta = _isScadutaDaOltre15Giorni(f['data']?.toString());
 
                   // 📌 1. LEGGIAMO IL COEFFICIENTE ATECO SALVATO NELLA SPECIFICA FATTURA
-                  // (Se per qualsiasi motivo non c'è, usa come scorta quello principale)
                   final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
 
                   // 📌 2. CALCOLIAMO L'IMPONIBILE USANDO IL SUO ATECO CORRETTO
@@ -219,7 +220,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                             ? const Color(0xFF2DD4BF)
                             : (isScaduta
                                 ? const Color(0xFFEF4444).withOpacity(0.65)
-                                : Colors.white.withOpacity(0.08)),
+                                : Colors.white.withOpacity(0.15)), // Opacità leggermente alzata per visibilità
                         width: isScaduta && !isEspansa ? 1.2 : 1,
                       ),
                     ),
@@ -325,7 +326,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // 1. INCASSO LORDO (#10B981)
                                       _buildDetailRow(
                                         Icons.add_circle_outline,
                                         'Incasso Lordo:',
@@ -334,8 +334,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-
-                                      // 2. NETTO SPENDIBILE (#2DD4BF)
                                       _buildDetailRow(
                                         Icons.account_balance_wallet_outlined,
                                         'Netto Spendibile:',
@@ -344,8 +342,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-
-                                      // 3. TASSE (SALDO + ACCONTO) (#3B82F6)
                                       _buildDetailRow(
                                         Icons.shield_outlined,
                                         'Tasse (Saldo + Acconto):',
@@ -354,18 +350,13 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-
-                                      // 4. CUSCINETTO MESI NO-LAVORO (#8B5CF6)
                                       _buildDetailRow(
                                         Icons.beach_access_rounded,
                                         'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
                                         '-${_formattaValuta(quotaFondoFerie)}',
                                         const Color(0xFF8B5CF6),
                                       ),
-
                                       const Divider(color: Colors.white12, height: 14),
-
-                                      // CALCOLO ANNO CORRENTE E SUCCESSIVO
                                       _buildDetailRow(
                                         Icons.remove_circle_outline,
                                         'Saldo Tasse (Anno ${_dataSelezionata.year}):',
@@ -391,7 +382,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                     color: Colors.black.withOpacity(0.4),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: _isTendinaContiAperta ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.1),
+                                      // 👇 OPACITÀ 0.3 PER ALLINEARSI ALLA REGISTRAZIONE FATTURA
+                                      color: _isTendinaContiAperta ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.3),
                                     ),
                                   ),
                                   child: Column(
@@ -491,7 +483,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                     decoration: BoxDecoration(
                                       color: Colors.black.withOpacity(0.4),
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                      // 👇 OPACITÀ 0.3 PER ALLINEARSI ALLA REGISTRAZIONE FATTURA
+                                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -533,7 +526,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                       if (_contoSelezionato != null) {
                                         final String dataFormatted = _formattaDataInItaliano(_dataSelezionata);
                                         
-                                        // 1. Eseguiamo l'incasso nel provider
                                         context.read<WalletProvider>().incassaFatturaPiva(
                                           idFattura: id,
                                           cliente: nomeCliente,
@@ -543,7 +535,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           dataIncasso: dataFormatted,
                                         );
 
-                                        // 2. Chiamiamo la callback esterna se presente
                                         if (widget.onIncasse != null) {
                                           widget.onIncasse!(
                                             id,
@@ -554,13 +545,10 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           );
                                         }
 
-                                        // 3. Ripristiniamo la UI per le prossime fatture
                                         setState(() {
                                           _fatturaEspansaId = null;
                                         });
 
-                                        // 4. Se ne restano altre, mostriamo solo una notifica e restiamo nello sheet.
-                                        // Altrimenti (la lista ora è vuota), chiudiamo la schermata!
                                         final rimanenti = context.read<WalletProvider>().fattureDaIncassare.length;
                                         if (rimanenti > 0) {
                                           AppNotifications.mostraInAlto(
@@ -572,9 +560,17 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                         }
                                       }
                                     },
-                                    child: const Text(
-                                      'Conferma Incasso',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    child: Text(
+                                      _contoSelezionato != null 
+                                          ? 'Conferma Incasso su $_contoSelezionato' 
+                                          : 'Conferma Incasso',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold, 
+                                        fontSize: 13,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
