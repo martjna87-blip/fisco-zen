@@ -157,10 +157,10 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
       badgeText: 'P.IVA',
       badgeColor: const Color(0xFF2DD4BF),
       child: Container(
-        // 📐 VINCOLO ALTEZZA MINIMA FISSA: 55% DELLO SCHERMO
-        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        // 🔒 ALTEZZA BLOCCATA FISSA AL 55%
+        height: screenHeight * 0.55,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (fattureAttuali.isEmpty)
               Padding(

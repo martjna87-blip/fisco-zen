@@ -611,7 +611,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       badgeText: 'Wallet',
       badgeColor: const Color(0xFF2DD4BF),
       child: Container(
-        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        height: screenHeight * 0.55, // 🔒 55% FISSO
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -219,7 +219,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
       badgeColor: const Color(0xFF2DD4BF),
       child: Container(
         // 📐 VINCOLO ALTEZZA MINIMA FISSA: 55% DELLO SCHERMO
-        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        height: screenHeight * 0.55,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -970,10 +970,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       badgeText: 'Wallet',
       badgeColor: const Color(0xFF2DD4BF),
       child: Container(
-        // 📐 VINCOLO ALTEZZA MINIMA FISSA: 55% DELLO SCHERMO
-        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        height: screenHeight * 0.55, // 🔒 55% FISSO
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
