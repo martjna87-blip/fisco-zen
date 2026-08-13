@@ -1,3 +1,4 @@
+import 'dart:ui'; 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -9,8 +10,6 @@ import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '2_4_wallet_budget_pilot_v2.dart';
 import '../widgets_shared/fiscon_logo.dart';
-import '../data/advisor_engine.dart';
-import '../widgets_shared/advisor_tip_card.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -24,12 +23,26 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   String _filtroMeseMovimenti = 'ultimi_5';
 
-  // 🎨 REGOLATORE COMANDO COLORI
-  final Color coloreSfondo = const Color(0xFF1C1917);
-  final Color coloreCard   = const Color(0xFF292524);
-  bool _isBussolaEspansa = false; // 👈 Aggiungiamo lo stato (di base è chiusa)
+  // 🎨 COLORI ACCENTO PER IL VETRO
+  final Color oceanCyan  = const Color(0xFF38BDF8); 
+  final Color goldAccent = const Color(0xFFFBBF24); 
+  final Color purpleZen  = const Color(0xFFC084FC); 
+  final Color taxBlue    = const Color(0xFF60A5FA); 
 
-  // 📅 STATI PER IL SELETTORE TEMPORALE DELLA RIPARTIZIONE SPESE
+  // 👇 CONTATORE PER IL TEST DELLE FOTO
+  int _testIndex = 0;
+
+  // 📸 GALLERIA SFONDI (Link stabili di test, sostituisci poi con i tuoi)
+  final List<String> _sfondiSettimanali = [
+    'https://images.unsplash.com/photo-1505413687799-90481dfc0203?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTl8fG1hcmV8ZW58MHx8MHx8fDA%3D',
+    'https://images.unsplash.com/photo-1555412654-72a95a495858?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YWNxdWF8ZW58MHx8MHx8fDA%3D',
+    //'https://images.unsplash.com/photo-1543005472-1b1d37fa4eae?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8ZnVvY298ZW58MHx8MHx8fDA%3D',
+    'https://plus.unsplash.com/premium_photo-1674517879286-0ee281fc5262?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDR8fHxlbnwwfHx8fHw%3D',
+    'https://images.unsplash.com/photo-1481819613568-3701cbc70156?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8cGlhbmV0aXxlbnwwfHwwfHx8MA%3D%3D',
+    //'https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8c29sZXxlbnwwfHwwfHx8MA%3D%3D',
+];
+
+  bool _isBussolaEspansa = false;
   DateTime _dataFiltroRipartizione = DateTime(2026, 8);
   bool _isVistaAnnuale = false;
 
@@ -38,7 +51,6 @@ class _WalletScreenState extends State<WalletScreen> {
     'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
   ];
 
-  // 🇮🇹 HELPER VALUTA ITALIANA CON DECIMALI (es. 1.000,50 €)
   String _formattaValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
@@ -48,7 +60,6 @@ class _WalletScreenState extends State<WalletScreen> {
     return '$intPart,${parti[1]} €';
   }
 
-  // 🇮🇹 HELPER CIFRA INTERA SENZA DECIMALI CON PUNTO MIGLIAIA (es. 1.000 €)
   String _formattaInt(double importo) {
     final int intVal = importo.round();
     final strVal = intVal.abs().toString().replaceAllMapped(
@@ -70,13 +81,15 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 👇 QUESTA RIGA PESCA LA FOTO CORRENTE BASATA SUI TUOI TAP
+    final String currentBackgroundUrl = _sfondiSettimanali[_testIndex % _sfondiSettimanali.length];
+
     final double topPadding = MediaQuery.of(context).padding.top;
-    final double headerHeight = 220 + topPadding;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     final walletProvider = context.watch<WalletProvider>();
     final patrimonioNetto = walletProvider.patrimonioNetto;
     final movimenti = walletProvider.transactions;
-    
     final bool mostraPiva = widget.isPiva || walletProvider.isPartitaIVA;
 
     final double tasseRealiFatture = walletProvider.fattureIncassate
@@ -86,7 +99,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double residuoTasseDaCoprire = tasseDaAccantonare;
 
-    // 📌 CALCOLO NETTO SPENDIBILE PRUDENZIALE (CON CUSCINETTO NO-LAVORO)
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
     final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
@@ -100,7 +112,6 @@ class _WalletScreenState extends State<WalletScreen> {
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
-    // 🤖 CALCOLO DINAMICO DELLE SPESE REALI PER IL PERIODO SELEZIONATO
     final txsFiltrate = movimenti.where((tx) {
       if (tx.isIncome) return false;
       if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
@@ -123,8 +134,6 @@ class _WalletScreenState extends State<WalletScreen> {
         spesoRealeSvago += tx.amount;
       } else if (cat.contains('20') || cat.contains('risparm') || cat.contains('invest')) {
         spesoRealeRisparmio += tx.amount;
-      } else if (cat.contains('50') || cat.contains('fiss') || cat.contains('alimentar') || cat.contains('casa') || cat.contains('bollet') || cat.contains('auto')) {
-        spesoRealeBisogni += tx.amount;
       } else {
         spesoRealeBisogni += tx.amount;
       }
@@ -160,1191 +169,642 @@ class _WalletScreenState extends State<WalletScreen> {
         final parts = _filtroMeseMovimenti.split('_');
         final m = int.tryParse(parts[0]) ?? 8;
         final y = int.tryParse(parts[1]) ?? 2026;
-        return lista
-            .where((tx) => tx.date.month == m && tx.date.year == y)
-            .toList();
+        return lista.where((tx) => tx.date.month == m && tx.date.year == y).toList();
       }
     })();
 
     return Scaffold(
-      backgroundColor: coloreSfondo,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 50), // 👈 Margine di sicurezza per svincolare i movimenti dalla Bottom Bar
-        child: Column(
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // 1. IMMAGINE DI SFONDO (Più alta per scendere dietro alla bussola)
-                Container(
-                  height: headerHeight + 100, // 👈 Allungato
-                  decoration: const BoxDecoration(
+      backgroundColor: Colors.black, 
+      body: Stack(
+        children: [
+          // 🖼️ 1. FOTOGRAFIA SFONDO CON TEST MODE
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: screenHeight * 0.75,
+            child: GestureDetector(
+              onTap: () {
+                // 👇 QUANDO TOCCHI LO SFONDO, CAMBIA FOTO!
+                setState(() {
+                  _testIndex++;
+                });
+              },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 800), // Dissolvenza 
+                child: Container(
+                  key: ValueKey<String>(currentBackgroundUrl),
+                  decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: NetworkImage(
-                        'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=1000&auto=format&fit=crop',
-                      ),
+                      image: NetworkImage(currentBackgroundUrl),
                       fit: BoxFit.cover,
-                      opacity: 0.45,
                     ),
                   ),
-                ),
-                
-                // GRADIENTE Mimetico (Il trucco per far sparire il "taglio")
-                Container(
-                  height: headerHeight + 100, // 👈 Stessa altezza
+                  child: Container(
+                  // 👇 Niente "const" qui davanti!
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: const [0.0, 0.4, 0.85, 1.0], // 👈 IL SEGRETO: Le percentuali di sfumatura
                       colors: [
-                        coloreSfondo.withOpacity(0.0), // Inizia totalmente trasparente
-                        coloreSfondo.withOpacity(0.5), // A metà scurisce
-                        coloreSfondo, // All'85% dello spazio diventa GIÀ del colore di sfondo solido
-                        coloreSfondo, // Al 100% rimane solido, annullando il bordo netto!
+                        Colors.black.withOpacity(0.99), // Leggibilità estrema in alto
+                        Colors.black.withOpacity(0.4),  // Scurisce la neve per non accecare
+                        Colors.black,                   // Si fonde col nero della bottom bar
                       ],
+                      stops: const [0.0, 0.3, 1.0],
                     ),
                   ),
                 ),
-
-               // 2. ✨ EFFETTO GLOW (Luce Bianca Premium - Glassmorphism)
-                Positioned(
-                  top: -60,
-                  left: -50,
-                  child: Container(
-                    width: 250,
-                    height: 250,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.12), // 👈 Bianco al 12%
-                      boxShadow: [
-                        BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 100, spreadRadius: 40)
-                      ],
-                    ),
-                  ),
-                ),
-
-                // 3. LOGO Fisco Zen
-                Positioned(
-                  top: topPadding + 12,
-                  left: 20,
-                  child: const FiscOnLogo(
-                    fontSize: 22,
-                    sottotitolo: 'Portafoglio Personale',
-                  ),
-                ),
-
-                // 4. TASTO RIEPILOGO
-                Positioned(
-                  top: topPadding + 10,
-                  right: 16,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      AppPopupWrapper.mostra(
-                        context: context,
-                        child: const AnnualSummarySheet(),
-                      );
-                    },
-                    icon: const Icon(Icons.show_chart_rounded, size: 14, color: Color(0xFF2DD4BF)),
-                    label: const Text(
-                      'RIEPILOGO',
-                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.1), // 👈 Un pelo più visibile
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-
-                // 5. CARD PATRIMONIO NETTO (Vetro più definito e luminoso)
-                Padding(
-                  padding: EdgeInsets.only(top: topPadding + 10),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      InkWell(
-                        onLongPress: () {
-                          AppPopupWrapper.mostraInfo(
-                            context: context,
-                            icon: Icons.account_balance_rounded,
-                            color: Colors.white,
-                            titolo: 'Patrimonio Netto Complessivo',
-                            descrizione: 'Somma totale dei saldi di tutti i tuoi conti correnti e del salvadanaio tasse.',
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(28),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent, // 👈 Trasparente, niente sfondo o vetro
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'PATRIMONIO NETTO',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _formattaInt(patrimonioNetto),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      if (mostraPiva)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // PILLOLA LIQUIDITÀ (Verde)
-                              InkWell(
-                                onTap: () {},
-                                onLongPress: () {
-                                  AppPopupWrapper.mostraInfo(
-                                    context: context,
-                                    icon: Icons.payments_rounded,
-                                    color: const Color(0xFF10B981),
-                                    titolo: 'Liquidità Reale Spendibile',
-                                    descrizione: 'Sono i tuoi veri soldi personali spendibili in serenità. Calcolati prendendo i saldi dei tuoi conti e togliendo sia le tasse stimate che il cuscinetto di protezione per i mesi non lavorati.',
-                                    formula: 'Conti Liquidi − Tasse − Cuscinetto No-Lavoro',
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981).withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 12),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _formattaInt(nettoRealeSpendibile),
-                                        style: const TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 8),
-
-                              // PILLOLA TASSE (Blu/Viola - Ora con lo Scudo!)
-                              InkWell(
-                                onTap: () {},
-                                onLongPress: () {
-                                  AppPopupWrapper.mostraInfo(
-                                    context: context,
-                                    icon: Icons.shield_outlined, // 👈 Scudo!
-                                    color: const Color(0xFF3B82F6),
-                                    titolo: 'Riserva Tasse Calcolata',
-                                    descrizione: 'È la stima totale delle tasse dovute sulle fatture incassate (Imposta Sostitutiva + INPS).',
-                                    formula: 'Stima Fiscale ATECO + Contributi',
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF3B82F6).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF3B82F6).withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 12), // 👈 Scudo Vuoto!
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _formattaInt(tasseTotaliCalcolate),
-                                        style: const TextStyle(
-                                          color: Color(0xFF3B82F6),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-
-                                      // TASTO ACCANTONA DENTRO LA PILLOLA
-                                      InkWell(
-                                        onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: coloreCard),
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: isTasseCoperte
-                                                ? const Color(0xFF10B981).withOpacity(0.2)
-                                                : const Color(0xFF3B82F6),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: isTasseCoperte
-                                              ? const Row(
-                                                  children: [
-                                                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 10),
-                                                    SizedBox(width: 3),
-                                                    Text(
-                                                      'Protette',
-                                                      style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
-                                                    ),
-                                                  ],
-                                                )
-                                              : const Text(
-                                                  'Accantona',
-                                                  style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                                                ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // ✨ INIZIO DEL TRUCCO ✨
-            Transform.translate(
-              offset: const Offset(0, -50), 
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 0),
-
-                    // 1. I TRE BOTTONI IN PRIMA LINEA (Subito sotto il saldo!)
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: _buildMiniCard(
-                              icon: Icons.add_circle_outline_rounded,
-                              title: 'Movimenti',
-                              value: 'Entrata / Uscita',
-                              iconColor: const Color(0xFF10B981),
-                              valueColor: Colors.white,
-                              onTap: () {
-                                AppPopupWrapper.mostra(
-                                  context: context,
-                                  child: const AddMovementSheet(initialTab: 'riepilogo'),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMiniCard(
-                              icon: Icons.account_balance_wallet_outlined,
-                              title: 'Gestione\nConti',
-                              value: '${walletProvider.accounts.length} Attivi',
-                              iconColor: const Color(0xFFF59E0B),
-                              valueColor: Colors.white,
-                              onTap: () {
-                                AppPopupWrapper.mostra(
-                                  context: context,
-                                  child: ManageAccountsSheet(isPiva: widget.isPiva),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMiniCard(
-                              icon: Icons.pie_chart_outline_rounded,
-                              title: 'Pianificazione\nSpese',
-                              value: 'Budget',
-                              iconColor: const Color(0xFF8B5CF6),
-                              valueColor: Colors.white,
-                              onTap: () {
-                                AppPopupWrapper.mostra(
-                                  context: context,
-                                  child: const PianoSpesaSheet(),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16), // 👈 Spazio tra bottoni e bussola
-
-                    // 🤖 IL CONSULENTE VIRTUALE DEL WALLET (Regole Personali)
-      Builder(
-        builder: (context) {
-          final walletProvider = context.watch<WalletProvider>();
-          final tips = AdvisorEngine.getPersonalTips(walletProvider);
-
-          if (tips.isEmpty) return const SizedBox.shrink();
-
-          final currentTip = tips.first;
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: AdvisorTipCard(
-              mood: currentTip.mood,
-              title: currentTip.title,
-              message: currentTip.message,
-              actionText: currentTip.actionText,
-              icon: currentTip.icon,
-              onDismiss: () => walletProvider.dismissAdvisorTip(currentTip.title),
-              onAction: () {
-                // Eventuale azione custom per il Wallet
-              },
-            ),
-          );
-        }
-      ),
-
-                    // 2. LA BUSSOLA SPESE (Scivolata in seconda posizione)
-                    _buildRipartizioneSpeseCard(
-                      spesoBisogni: spesoRealeBisogni,
-                      spesoSvago: spesoRealeSvago,
-                      spesoRisparmio: spesoRealeRisparmio,
-                      totaleSpeseReali: totaleSpeseReali,
-                      targetBisogni: targetBisogni,
-                      targetSvago: targetSvago,
-                      targetRisparmio: targetRisparmio,
-                      entrateRiferimento: entrateRiferimento,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                  if (mostraPiva) ...[
-                    SerbatoioTasseWidget(
-                      cardColor: coloreCard, // Usa il colore standard della card
-                      isCollapsible: true,   // Abilita la tendina
-                      initiallyExpanded: true, // 🟢 Parte già aperto all'avvio!
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  const SizedBox(height: 8),
-
-                  const Text(
-                    'CONTI & CARTE',
-                    style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Container(
-                    decoration: BoxDecoration(
-                      color: coloreCard.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                    ),
-                    child: Column(
-                      children: walletProvider.accounts.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final acc = entry.value;
-                        final bool isLast = index == walletProvider.accounts.length - 1;
-
-                        final bool isSerbatoioTasse = acc.role == AccountRole.taxReserve || acc.id == '3';
-                        final IconData iconaConto = isSerbatoioTasse
-                            ? Icons.shield_outlined
-                            : (acc.id == '1'
-                                ? Icons.account_balance_rounded
-                                : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded));
-
-                        return Column(
-                          children: [
-                            _buildAccountCard(
-                              icon: iconaConto,
-                              title: acc.title,
-                              subtitle: acc.subtitle,
-                              amount: _formattaValuta(acc.amount),
-                              color: acc.color,
-                            ),
-                            if (!isLast) Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 16, endIndent: 16),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'MOVIMENTI',
-                        style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                      ),
-                      Container(
-                        height: 30,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: coloreCard.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
-                        ),
-                        child: DropdownButton<String>(
-                          value: _filtroMeseMovimenti,
-                          dropdownColor: const Color(0xFF1C1C21),
-                          underline: const SizedBox(),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF2DD4BF), size: 16),
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _filtroMeseMovimenti = val);
-                            }
-                          },
-                          items: const [
-                            DropdownMenuItem(value: 'ultimi_5', child: Text('Ultimi 5 recenti')),
-                            DropdownMenuItem(value: '8_2026', child: Text('Agosto 2026')),
-                            DropdownMenuItem(value: '7_2026', child: Text('Luglio 2026')),
-                            DropdownMenuItem(value: '6_2026', child: Text('Giugno 2026')),
-                            DropdownMenuItem(value: '5_2026', child: Text('Maggio 2026')),
-                            DropdownMenuItem(value: '4_2026', child: Text('Aprile 2026')),
-                            DropdownMenuItem(value: '3_2026', child: Text('Marzo 2026')),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  if (movimentiFiltrati.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: coloreCard.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Nessun movimento in questo periodo',
-                          style: TextStyle(color: Colors.white38, fontSize: 12),
-                        ),
-                      ),
-                    )
-                  else
-                    ...(() {
-                      final List<Map<String, dynamic>> movimentiUnici = [];
-                      final Set<String> chiaviProcessate = {};
-
-                      for (int i = 0; i < movimentiFiltrati.length; i++) {
-                        final tx = movimentiFiltrati[i];
-                        final String catLower = (tx.category ?? '').toLowerCase();
-                        final String titleLower = (tx.title ?? '').toLowerCase();
-
-                        final bool isTrasferimento = catLower.contains('giroconto') ||
-                            titleLower.contains('giroconto') ||
-                            titleLower.contains('accantonamento') ||
-                            titleLower.contains('sblocco') ||
-                            titleLower.contains('riserva');
-
-                        if (isTrasferimento) {
-                          final String chiave = '${tx.date.year}_${tx.date.month}_${tx.date.day}_${tx.date.hour}_${tx.date.minute}_${tx.amount.abs().toStringAsFixed(2)}';
-
-                          if (chiaviProcessate.contains(chiave)) {
-                            final idx = movimentiUnici.indexWhere((m) => m['chiave'] == chiave);
-                            if (idx != -1) {
-                              if (tx.isIncome) {
-                                movimentiUnici[idx]['toAccountId'] = tx.accountId;
-                              } else {
-                                movimentiUnici[idx]['fromAccountId'] = tx.accountId;
-                              }
-                            }
-                            continue;
-                          }
-
-                          chiaviProcessate.add(chiave);
-                          movimentiUnici.add({
-                            'chiave': chiave,
-                            'tx': tx,
-                            'fromAccountId': !tx.isIncome ? tx.accountId : null,
-                            'toAccountId': tx.isIncome ? tx.accountId : null,
-                          });
-                        } else {
-                          movimentiUnici.add({
-                            'chiave': 'tx_$i',
-                            'tx': tx,
-                            'fromAccountId': tx.accountId,
-                            'toAccountId': null,
-                          });
-                        }
-                      }
-
-                      return movimentiUnici.map((item) {
-                        final tx = item['tx'];
-                        return _buildTransactionTile(
-                          title: tx.title,
-                          subtitle: tx.subtitle,
-                          amount: _formattaValuta(tx.amount),
-                          isIncome: tx.isIncome,
-                          fromAccountId: item['fromAccountId'] as String?,
-                          toAccountId: item['toAccountId'] as String?,
-                        );
-                      });
-                    })(),
-                ],
-              ),
-            ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRipartizioneSpeseCard({
-    required double spesoBisogni,
-    required double spesoSvago,
-    required double spesoRisparmio,
-    required double totaleSpeseReali,
-    required double targetBisogni,
-    required double targetSvago,
-    required double targetRisparmio,
-    required double entrateRiferimento,
-  }) {
-    final String etichettaPeriodo = _isVistaAnnuale
-        ? '${_dataFiltroRipartizione.year}'
-        : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}';
-
-    final double speseConsumoTotali = spesoBisogni + spesoSvago;
-    final double margineRisparmioReale = (entrateRiferimento - speseConsumoTotali).clamp(0.0, entrateRiferimento);
-
-    final bool sforatoBisogni = spesoBisogni > targetBisogni && targetBisogni > 0;
-    final bool sforatoSvago = spesoSvago > targetSvago && targetSvago > 0;
-    final bool risparmioEroso = margineRisparmioReale < targetRisparmio && entrateRiferimento > 0;
-    final bool haSforamenti = sforatoBisogni || sforatoSvago || risparmioEroso;
-
-    final String testoBadgeHeader = haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio';
-    final Color coloreBadgeHeader = haSforamenti ? const Color(0xFFEF4444) : const Color(0xFF10B981);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: coloreCard.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300), // Effetto tendina fluido!
-        curve: Curves.easeInOut,
-        alignment: Alignment.topCenter,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ✨ 1. HEADER CLICCABILE
-            GestureDetector(
-              behavior: HitTestBehavior.opaque, // 👈 LA MAGIA: Rende cliccabile TUTTA la riga, anche lo spazio vuoto!
-              onTap: () {
-                setState(() {
-                  _isBussolaEspansa = !_isBussolaEspansa; // Apre/Chiude
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 4), // 👈 Dà un po' più di spessore per il tocco del dito
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.explore_rounded, color: Color(0xFF8B5CF6), size: 18), // 🟣 Viola Neon/Pianificazione
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bussola Spese (50/30/20)',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white54,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: coloreBadgeHeader.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        testoBadgeHeader,
-                        style: TextStyle(
-                          color: coloreBadgeHeader,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
-
-            // ✨ 2. IL CORPO DELLA BUSSOLA (Visibile solo se aperta)
-            if (_isBussolaEspansa) ...[
-              const SizedBox(height: 14),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => _cambiaPeriodoRipartizione(-1),
-                        borderRadius: BorderRadius.circular(6),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2.0),
-                          child: Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF), size: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        etichettaPeriodo,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
-                      InkWell(
-                        onTap: () => _cambiaPeriodoRipartizione(1),
-                        borderRadius: BorderRadius.circular(6),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2.0),
-                          child: Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF), size: 18),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                    ),
-                    child: Row(
-                      children: [
-                        InkWell(
-                          onTap: () => setState(() => _isVistaAnnuale = false),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: !_isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Mese',
-                              style: TextStyle(
-                                color: !_isVistaAnnuale ? Colors.black : Colors.white54,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () => setState(() => _isVistaAnnuale = true),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _isVistaAnnuale ? const Color(0xFF2DD4BF) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Anno',
-                              style: TextStyle(
-                                color: _isVistaAnnuale ? Colors.black : Colors.white54,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  height: 6,
-                  color: Colors.white10,
-                  child: entrateRiferimento > 0
-                      ? Row(
-                          children: [
-                            if (spesoBisogni > 0)
-                              Expanded(
-                                flex: (spesoBisogni / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFF10B981)), // Verde
-                              ),
-                            if (spesoSvago > 0)
-                              Expanded(
-                                flex: (spesoSvago / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFFF59E0B)), // Arancio
-                              ),
-                            if (margineRisparmioReale > 0)
-                              Expanded(
-                                flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt().clamp(1, 1000),
-                                child: Container(color: const Color(0xFF8B5CF6)), // Viola
-                              ),
-                          ],
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Spese Fisse & Bisogni',
-                targetPct: 50,
-                valoreReale: spesoBisogni,
-                valoreRiferimento: targetBisogni,
-                colore: const Color(0xFF10B981),
-              ),
-              const SizedBox(height: 8),
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Spese Variabili & Libero',
-                targetPct: 30,
-                valoreReale: spesoSvago,
-                valoreRiferimento: targetSvago,
-                colore: const Color(0xFFF59E0B),
-              ),
-              const SizedBox(height: 8),
-              _buildRigaConfrontoRealeTarget(
-                titolo: 'Risparmi & Futuro',
-                targetPct: 20,
-                valoreReale: margineRisparmioReale,
-                valoreRiferimento: targetRisparmio,
-                colore: const Color(0xFF8B5CF6),
-                isRisparmio: true,
-              ),
-
-              const SizedBox(height: 12),
-              Divider(color: Colors.white.withOpacity(0.06), height: 1),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    haSforamenti ? Icons.info_outline_rounded : Icons.lightbulb_outline_rounded,
-                    color: haSforamenti ? const Color(0xFFF59E0B) : const Color(0xFF2DD4BF),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      risparmioEroso
-                          ? 'Attenzione: le spese stanno riducendo la quota da preservare per il futuro.'
-                          : (haSforamenti
-                              ? 'Consiglio: riduci le spese variabili per rientrare nei parametri.'
-                              : 'Ottimo! Stai preservando oltre il 20% delle entrate per il tuo futuro.'),
-                      style: TextStyle(
-                        color: haSforamenti ? const Color(0xFFF59E0B) : Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ], // <-- Fine blocco if(_isBussolaEspansa)
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRigaConfrontoRealeTarget({
-    required String titolo,
-    required int targetPct,
-    required double valoreReale,
-    required double valoreRiferimento,
-    required Color colore,
-    bool isRisparmio = false,
-  }) {
-    final bool inAllarme = isRisparmio
-        ? (valoreReale < valoreRiferimento && valoreRiferimento > 0)
-        : (valoreReale > valoreRiferimento && valoreRiferimento > 0);
-
-    final String etichettaTarget = isRisparmio
-        ? 'min. ${_formattaInt(valoreRiferimento)}'
-        : '/ ${_formattaInt(valoreRiferimento)}';
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(color: colore, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              titolo,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              '($targetPct%)',
-              style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            Text(
-              _formattaInt(valoreReale),
-              style: TextStyle(
-                color: inAllarme ? const Color(0xFFEF4444) : Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              etichettaTarget,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              isRisparmio
-                  ? (!inAllarme ? Icons.check_circle_rounded : Icons.warning_amber_rounded)
-                  : (inAllarme ? Icons.error_outline_rounded : Icons.check_circle_rounded),
-              color: isRisparmio
-                  ? (!inAllarme ? const Color(0xFF10B981) : const Color(0xFFEF4444))
-                  : (inAllarme ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
-              size: 13,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required VoidCallback onTap,
-    Color? iconColor,
-    Color? valueColor,
-  }) {
-    final accentColor = iconColor ?? const Color(0xFF2DD4BF);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: coloreCard.withOpacity(0.4), // 🥷 Sfondo scuro e minimale (niente colore di fondo invasivo)
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: accentColor.withOpacity(0.35), // 💡 Bordo sottile con il colore tematico
-            width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.08), // ✨ Leggerissimo bagliore neon sul bordo
-              blurRadius: 12,
-              spreadRadius: -2,
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: accentColor, size: 22),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-                height: 1.15,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white, // Testo candido, pulito ed elegante
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildAccountCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String amount,
-    required Color color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+          // 📱 2. CONTENUTO SCROLLABILE (Glassmorphism)
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 80),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                // 🔹 HEADER TOP
+                Padding(
+                  padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // FAI TAP SUL LOGO PER CAMBIARE IMMAGINE DI TEST
+GestureDetector(
+  onTap: () {
+    setState(() {
+      _testIndex++;
+    });
+  },
+  child: const FiscOnLogo(fontSize: 22, sottotitolo: 'Portafoglio Personale'),
+),
+                      
+                      // TASTO RIEPILOGO
+                      _buildGlassContainer(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        borderRadius: BorderRadius.circular(20),
+                        child: InkWell(
+                          onTap: () => AppPopupWrapper.mostra(context: context, child: const AnnualSummarySheet()),
+                          child: Row(
+                            children: [
+                              Icon(Icons.show_chart_rounded, size: 14, color: oceanCyan),
+                              const SizedBox(width: 6),
+                              const Text('RIEPILOGO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 45),
+
+                // 🔹 PATRIMONIO NETTO GIGANTE
+                Center(
+                  child: InkWell(
+                    onLongPress: () {
+                      AppPopupWrapper.mostraInfo(
+                        context: context,
+                        icon: Icons.account_balance_rounded,
+                        color: Colors.white,
+                        titolo: 'Patrimonio Netto',
+                        descrizione: 'Somma totale dei saldi di tutti i tuoi conti correnti e del salvadanaio tasse.',
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(28),
+                    child: Column(
+                      children: [
+                        Text(
+                          'PATRIMONIO NETTO',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.5,
+                            shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _formattaInt(patrimonioNetto),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 60, 
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -2.0,
+                            shadows: [Shadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, 4))],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // 🔹 PILLOLE LIQUIDITÀ E TASSE
+                if (mostraPiva)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 16),
+                        _buildGlassBadge(
+                          icon: Icons.payments_rounded,
+                          color: oceanCyan,
+                          value: _formattaInt(nettoRealeSpendibile),
+                          onTap: () {},
+                        ),
+                        const SizedBox(width: 12),
+                        _buildGlassBadge(
+                          icon: Icons.shield_outlined,
+                          color: taxBlue,
+                          value: _formattaInt(tasseTotaliCalcolate),
+                          isTasse: true,
+                          isProtetta: isTasseCoperte,
+                          onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 50),
+
+                // 🔹 SEZIONE CORPO
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _buildGlassMiniCard(
+                                icon: Icons.add_circle_outline_rounded,
+                                title: 'Storico\nMovimenti',
+                                value: 'Registra',
+                                iconColor: oceanCyan,
+                                onTap: () => AppPopupWrapper.mostra(context: context, child: const AddMovementSheet(initialTab: 'riepilogo')),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildGlassMiniCard(
+                                icon: Icons.account_balance_wallet_outlined,
+                                title: 'I Tuoi\nConti',
+                                value: '${walletProvider.accounts.length} Attivi',
+                                iconColor: goldAccent,
+                                onTap: () => AppPopupWrapper.mostra(context: context, child: ManageAccountsSheet(isPiva: widget.isPiva)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildGlassMiniCard(
+                                icon: Icons.pie_chart_outline_rounded,
+                                title: 'Gestione\nSpese',
+                                value: 'Budget',
+                                iconColor: purpleZen,
+                                onTap: () => AppPopupWrapper.mostra(context: context, child: const PianoSpesaSheet()),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      _buildRipartizioneSpeseGlass(
+                        spesoBisogni: spesoRealeBisogni,
+                        spesoSvago: spesoRealeSvago,
+                        spesoRisparmio: spesoRealeRisparmio,
+                        totaleSpeseReali: totaleSpeseReali,
+                        targetBisogni: targetBisogni,
+                        targetSvago: targetSvago,
+                        targetRisparmio: targetRisparmio,
+                        entrateRiferimento: entrateRiferimento,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      if (mostraPiva) ...[
+                        _buildGlassContainer(
+                          padding: EdgeInsets.zero, // Togliamo il padding per farlo aderire
+                          borderRadius: BorderRadius.circular(24),
+                          child: SerbatoioTasseWidget(
+                            cardColor: Colors.transparent, // 👈 Questo è il colore che devi passare!
+                            isCollapsible: true,
+                            initiallyExpanded: true,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8.0),
+                        child: Text(
+                          'CONTI & CARTE',
+                          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildGlassContainer(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          children: walletProvider.accounts.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final acc = entry.value;
+                            final bool isLast = index == walletProvider.accounts.length - 1;
+
+                            final bool isSerbatoioTasse = acc.role == AccountRole.taxReserve || acc.id == '3';
+                            final IconData iconaConto = isSerbatoioTasse
+                                ? Icons.shield_outlined
+                                : (acc.id == '1' ? Icons.account_balance_rounded : (acc.id == '2' ? Icons.credit_card_rounded : Icons.savings_rounded));
+
+                            return Column(
+                              children: [
+                                _buildAccountRow(icon: iconaConto, title: acc.title, subtitle: acc.subtitle, amount: _formattaValuta(acc.amount), color: acc.color),
+                                if (!isLast) Divider(color: Colors.white.withOpacity(0.1), height: 1, indent: 20, endIndent: 20),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'MOVIMENTI',
+                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                            ),
+                            _buildGlassContainer(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              borderRadius: BorderRadius.circular(12),
+                              child: DropdownButton<String>(
+                                value: _filtroMeseMovimenti,
+                                dropdownColor: const Color(0xFF1E293B),
+                                underline: const SizedBox(),
+                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: oceanCyan, size: 16),
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _filtroMeseMovimenti = val);
+                                },
+                                items: const [
+                                  DropdownMenuItem(value: 'ultimi_5', child: Text('Ultimi 5')),
+                                  DropdownMenuItem(value: '8_2026', child: Text('Agosto 2026')),
+                                  DropdownMenuItem(value: '7_2026', child: Text('Luglio 2026')),
+                                  DropdownMenuItem(value: '6_2026', child: Text('Giugno 2026')),
+                                  DropdownMenuItem(value: '5_2026', child: Text('Maggio 2026')),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (movimentiFiltrati.isEmpty)
+                        _buildGlassContainer(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Center(child: Text('Nessun movimento in questo periodo', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13))),
+                        )
+                      else
+                        _buildGlassContainer(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: (() {
+                              final List<Map<String, dynamic>> movimentiUnici = [];
+                              final Set<String> chiaviProcessate = {};
+                              for (int i = 0; i < movimentiFiltrati.length; i++) {
+                                final tx = movimentiFiltrati[i];
+                                final String catLower = (tx.category ?? '').toLowerCase();
+                                final String titleLower = (tx.title ?? '').toLowerCase();
+                                final bool isTrasferimento = catLower.contains('giroconto') || titleLower.contains('giroconto') || titleLower.contains('accantonamento') || titleLower.contains('sblocco') || titleLower.contains('riserva');
+
+                                if (isTrasferimento) {
+                                  final String chiave = '${tx.date.year}_${tx.date.month}_${tx.date.day}_${tx.date.hour}_${tx.date.minute}_${tx.amount.abs().toStringAsFixed(2)}';
+                                  if (chiaviProcessate.contains(chiave)) {
+                                    final idx = movimentiUnici.indexWhere((m) => m['chiave'] == chiave);
+                                    if (idx != -1) {
+                                      if (tx.isIncome) movimentiUnici[idx]['toAccountId'] = tx.accountId;
+                                      else movimentiUnici[idx]['fromAccountId'] = tx.accountId;
+                                    }
+                                    continue;
+                                  }
+                                  chiaviProcessate.add(chiave);
+                                  movimentiUnici.add({ 'chiave': chiave, 'tx': tx, 'fromAccountId': !tx.isIncome ? tx.accountId : null, 'toAccountId': tx.isIncome ? tx.accountId : null });
+                                } else {
+                                  movimentiUnici.add({ 'chiave': 'tx_$i', 'tx': tx, 'fromAccountId': tx.accountId, 'toAccountId': null });
+                                }
+                              }
+                              return movimentiUnici.asMap().entries.map((entry) {
+                                final txData = entry.value;
+                                final isLast = entry.key == movimentiUnici.length - 1;
+                                return Column(
+                                  children: [
+                                    _buildTransactionRow(tx: txData['tx'], fromAccountId: txData['fromAccountId'], toAccountId: txData['toAccountId']),
+                                    if (!isLast) Divider(color: Colors.white.withOpacity(0.1), height: 1, indent: 20, endIndent: 20),
+                                  ],
+                                );
+                              }).toList();
+                            })(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionTile({
-    required String title,
-    required String subtitle,
-    required String amount,
-    required bool isIncome,
-    String? fromAccountId,
-    String? toAccountId,
-    String? fallbackAccountName,
-    IconData icon = Icons.receipt_long_rounded,
+  // ✨ WIDGET UTILS 
+  Widget _buildGlassContainer({
+    required Widget child,
+    EdgeInsetsGeometry? padding,
+    BorderRadius? borderRadius,
   }) {
-    final walletProvider = context.watch<WalletProvider>();
-
-    String getNomeConto(String? id, String defaultName) {
-      if (id != null && id.isNotEmpty) {
-        final matches = walletProvider.accounts.where((acc) => acc.id == id);
-        if (matches.isNotEmpty && matches.first.title.isNotEmpty) {
-          return matches.first.title;
-        }
-      }
-      return defaultName;
-    }
-
-    String dataStr = subtitle;
-    if (subtitle.contains('-')) {
-      dataStr = subtitle.split('-').first.trim();
-    } else if (subtitle.contains('•')) {
-      dataStr = subtitle.split('•').first.trim();
-    }
-
-    final String titoloPulito = title.replaceAll('⚠️', '').replaceAll('🛡️', '').trim();
-    final String titleLower = titoloPulito.toLowerCase();
-    final String importoPuro = amount.replaceAll('+', '').replaceAll('-', '').trim();
-
-    IconData iconaFinale = icon;
-    Color coloreIcona = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-    Color coloreImporto = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-
-    String titoloBreve = titoloPulito;
-    String importoFormattato = isIncome ? '+$importoPuro' : '-$importoPuro';
-    String rigaDettaglio = subtitle;
-
-    // 1. 🛡️ ACCANTONAMENTO TASSE (Scudo Blu)
-    if (titleLower.contains('accantonamento') || titleLower.contains('ricezione riserva') || titleLower.contains('versamento riserva')) {
-      iconaFinale = Icons.shield_rounded;
-      coloreIcona = const Color(0xFF3B82F6);
-      coloreImporto = const Color(0xFF3B82F6);
-      titoloBreve = 'Accantonamento Tasse';
-      importoFormattato = importoPuro;
-
-      final String da = getNomeConto(fromAccountId, fallbackAccountName ?? 'Conto Liquido');
-      final String a = getNomeConto(toAccountId, 'Salvadanaio Tasse');
-      rigaDettaglio = '$dataStr • Da $da ➔ $a';
-
-    // 2. 🔓 SBLOCCO RISERVA TASSE (Scudo Giallo)
-    } else if (titleLower.contains('rientro') || titleLower.contains('prelievo da riserva') || titleLower.contains('sblocco')) {
-      iconaFinale = Icons.shield_outlined;
-      coloreIcona = const Color(0xFFF59E0B);
-      coloreImporto = const Color(0xFFF59E0B);
-      titoloBreve = 'Sblocco Riserva';
-      importoFormattato = importoPuro;
-
-      final String da = getNomeConto(fromAccountId, 'Salvadanaio Tasse');
-      final String a = getNomeConto(toAccountId, fallbackAccountName ?? 'Conto Liquido');
-      rigaDettaglio = '$dataStr • Da $da ➔ $a';
-
-    // 3. 🔄 GIROCONTO ORDINARIO (Grigio Neutro)
-    } else if (titleLower.contains('giroconto')) {
-      iconaFinale = Icons.sync_alt_rounded;
-      coloreIcona = const Color(0xFFA1A1AA);
-      coloreImporto = const Color(0xFFA1A1AA);
-      titoloBreve = 'Giroconto';
-      importoFormattato = importoPuro;
-
-      final String da = getNomeConto(fromAccountId, fallbackAccountName ?? 'Conto Origine');
-      final String a = getNomeConto(toAccountId, 'Conto Destinazione');
-      rigaDettaglio = '$dataStr • Da $da ➔ $a';
-
-    // 4. 💼 STIPENDIO / ENTRATE / USCITE
-    } else {
-      if (titleLower.contains('stipendio') || titleLower.contains('busta paga')) {
-        iconaFinale = Icons.work_rounded;
-        coloreIcona = const Color(0xFF10B981);
-      } else if (titleLower.contains('incasso') || titleLower.contains('fattura')) {
-        iconaFinale = Icons.request_quote_rounded;
-      } else if (!isIncome) {
-        if (titleLower.contains('affitto')) {
-          iconaFinale = Icons.home_rounded;
-        } else if (titleLower.contains('supermercato') || titleLower.contains('alimentari')) {
-          iconaFinale = Icons.shopping_cart_rounded;
-        } else if (titleLower.contains('ristorante') || titleLower.contains('bar')) {
-          iconaFinale = Icons.restaurant_rounded;
-        } else {
-          iconaFinale = Icons.north_east_rounded;
-        }
-      }
-
-      final String nomeConto = getNomeConto(fromAccountId, fallbackAccountName ?? '');
-      rigaDettaglio = nomeConto.isNotEmpty ? '$dataStr • $nomeConto' : subtitle;
-    }
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: coloreIcona.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(iconaFinale, color: coloreIcona, size: 16),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titoloBreve,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      rigaDettaglio,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                importoFormattato,
-                style: TextStyle(
-                  color: coloreImporto,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ],
+    final radius = borderRadius ?? BorderRadius.circular(24);
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), 
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06), 
+            borderRadius: radius,
+            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.5),
           ),
+          child: child,
         ),
-        Divider(color: Colors.white.withOpacity(0.06), height: 1),
+      ),
+    );
+  }
+
+  Widget _buildGlassBadge({required IconData icon, required Color color, required String value, bool isTasse = false, bool isProtetta = false, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _buildGlassContainer(
+        padding: const EdgeInsets.only(left: 6, right: 16, top: 6, bottom: 6),
+        borderRadius: BorderRadius.circular(30),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: color.withOpacity(0.2), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 14),
+            ),
+            const SizedBox(width: 8),
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
+            if (isTasse) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isProtetta ? oceanCyan.withOpacity(0.3) : color.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: isProtetta
+                    ? Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: oceanCyan, size: 10),
+                          const SizedBox(width: 4),
+                          Text('Protette', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.w800)),
+                        ],
+                      )
+                    : Text('Accantona', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800)),
+              )
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassMiniCard({required IconData icon, required String title, required String value, required Color iconColor, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _buildGlassContainer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(height: 16),
+            Text(title, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, height: 1.2, fontWeight: FontWeight.w600), maxLines: 2),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.2)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRipartizioneSpeseGlass({
+    required double spesoBisogni, required double spesoSvago, required double spesoRisparmio,
+    required double totaleSpeseReali, required double targetBisogni, required double targetSvago,
+    required double targetRisparmio, required double entrateRiferimento,
+  }) {
+    final bool sforatoBisogni = spesoBisogni > targetBisogni && targetBisogni > 0;
+    final bool sforatoSvago = spesoSvago > targetSvago && targetSvago > 0;
+    final double margineRisparmioReale = (entrateRiferimento - spesoBisogni - spesoSvago).clamp(0.0, entrateRiferimento);
+    final bool risparmioEroso = margineRisparmioReale < targetRisparmio && entrateRiferimento > 0;
+    final bool haSforamenti = sforatoBisogni || sforatoSvago || risparmioEroso;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      alignment: Alignment.topCenter,
+      child: _buildGlassContainer(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _isBussolaEspansa = !_isBussolaEspansa),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: purpleZen.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                        child: Icon(Icons.explore_rounded, color: purpleZen, size: 16),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Bussola Spese (50/30/20)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: haSforamenti ? const Color(0xFFEF4444).withOpacity(0.2) : oceanCyan.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                    child: Text(haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio', style: TextStyle(color: haSforamenti ? const Color(0xFFEF4444) : oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+            if (_isBussolaEspansa) ...[
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      InkWell(onTap: () => _cambiaPeriodoRipartizione(-1), child: Icon(Icons.chevron_left_rounded, color: oceanCyan)),
+                      const SizedBox(width: 8),
+                      Text(_isVistaAnnuale ? '${_dataFiltroRipartizione.year}' : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      InkWell(onTap: () => _cambiaPeriodoRipartizione(1), child: Icon(Icons.chevron_right_rounded, color: oceanCyan)),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      GestureDetector(onTap: () => setState(() => _isVistaAnnuale = false), child: Text('Mese', style: TextStyle(color: !_isVistaAnnuale ? oceanCyan : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12))),
+                      const SizedBox(width: 12),
+                      GestureDetector(onTap: () => setState(() => _isVistaAnnuale = true), child: Text('Anno', style: TextStyle(color: _isVistaAnnuale ? oceanCyan : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12))),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 8,
+                  color: Colors.white.withOpacity(0.1),
+                  child: entrateRiferimento > 0 ? Row(
+                    children: [
+                      if (spesoBisogni > 0) Expanded(flex: (spesoBisogni / entrateRiferimento * 1000).toInt(), child: Container(color: oceanCyan)),
+                      if (spesoSvago > 0) Expanded(flex: (spesoSvago / entrateRiferimento * 1000).toInt(), child: Container(color: goldAccent)),
+                      if (margineRisparmioReale > 0) Expanded(flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt(), child: Container(color: purpleZen)),
+                    ],
+                  ) : null,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildTargetRow('Spese Fisse', 50, spesoBisogni, targetBisogni, oceanCyan),
+              const SizedBox(height: 12),
+              _buildTargetRow('Spese Variabili', 30, spesoSvago, targetSvago, goldAccent),
+              const SizedBox(height: 12),
+              _buildTargetRow('Risparmio', 20, margineRisparmioReale, targetRisparmio, purpleZen, isRisparmio: true),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTargetRow(String title, int pct, double real, double target, Color color, {bool isRisparmio = false}) {
+    final bool inAllarme = isRisparmio ? (real < target && target > 0) : (real > target && target > 0);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 6),
+            Text('($pct%)', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+          ],
+        ),
+        Row(
+          children: [
+            Text(_formattaInt(real), style: TextStyle(color: inAllarme ? const Color(0xFFEF4444) : Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 4),
+            Text('/ ${_formattaInt(target)}', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
+          ],
+        )
       ],
+    );
+  }
+
+  Widget _buildAccountRow({required IconData icon, required String title, required String subtitle, required String amount, required Color color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.2), shape: BoxShape.circle), child: Icon(icon, color: color, size: 18)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+              ],
+            ),
+          ),
+          Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionRow({required dynamic tx, String? fromAccountId, String? toAccountId}) {
+    final walletProvider = context.watch<WalletProvider>();
+    String getNome(String? id) => id != null ? (walletProvider.accounts.firstWhere((a) => a.id == id, orElse: () => walletProvider.accounts.first).title) : '';
+
+    String titleLower = tx.title.toLowerCase();
+    IconData icon = Icons.receipt_long_rounded;
+    Color color = tx.isIncome ? oceanCyan : const Color(0xFFF43F5E);
+    String amountStr = (tx.isIncome ? '+' : '-') + _formattaValuta(tx.amount).replaceAll('+', '').replaceAll('-', '');
+    String detail = tx.subtitle;
+
+    if (titleLower.contains('accantonamento')) { icon = Icons.shield_rounded; color = taxBlue; detail = 'Verso Salvadanaio Tasse'; amountStr = _formattaValuta(tx.amount); }
+    else if (titleLower.contains('sblocco')) { icon = Icons.shield_outlined; color = goldAccent; detail = 'Da Salvadanaio Tasse'; amountStr = _formattaValuta(tx.amount); }
+    else if (titleLower.contains('giroconto')) { icon = Icons.sync_alt_rounded; color = Colors.white54; detail = 'Tra i tuoi conti'; amountStr = _formattaValuta(tx.amount); }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.2), shape: BoxShape.circle), child: Icon(icon, color: color, size: 18)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tx.title.replaceAll('⚠️', '').replaceAll('🛡️', '').trim(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                Text(detail.split('-').first.trim(), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          Text(amountStr, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 14)),
+        ],
+      ),
     );
   }
 }

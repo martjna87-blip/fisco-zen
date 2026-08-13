@@ -510,7 +510,7 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: widget.cardColor.withOpacity(0.92),
+        color: widget.cardColor,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
@@ -556,7 +556,7 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                   ),
                 ),
                 InkWell(
-                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: widget.cardColor),
+                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -583,7 +583,7 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
 
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: widget.cardColor),
+                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
                 child: Center(
                   child: SizedBox(
                     width: 130,
@@ -633,33 +633,17 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                           children: [
                             const Text(
                               'IN SALVADANAIO',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                              ),
+                              style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                             ),
-                            const SizedBox(height: 1),
+                            const SizedBox(height: 8), // 👈 Ora ha spazio per respirare!
                             Text(
                               '${SerbatoioTasseWidget._formattaInt(riservaAccantonata)} €',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 6)],
-                              ),
+                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 1),
+                            const SizedBox(height: 4), // 👈 Spazio aumentato
                             Text(
                               'su ${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w500,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                              ),
+                              style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
