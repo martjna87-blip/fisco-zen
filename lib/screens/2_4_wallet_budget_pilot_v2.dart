@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_notifications.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 
 class PianoSpesaSheet extends StatefulWidget {
@@ -582,6 +582,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final walletProvider = context.watch<WalletProvider>();
     final stringaMeseCorrente = _stringaMeseAnno(_meseSelezionato);
 
@@ -605,174 +606,179 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       if (v['categoria'] == 'Risparmio (20%)') spesoRisparmio += spesoReale;
     }
 
-    return AppPopupWrapper(
-      title: 'Pianificazione Spese', // 👈 TITOLO ELEGANTE E PERSONALE
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. BARRA MESI COMPATTA CON MESI A 3 LETTERE + TASTI AZIONE
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+    return AppBottomSheet(
+      title: 'Pianificazione Spese',
+      badgeText: 'Wallet',
+      badgeColor: const Color(0xFF2DD4BF),
+      child: Container(
+        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. BARRA MESI COMPATTA CON MESI A 3 LETTERE + TASTI AZIONE
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Row(
+                    children: [
+                      InkWell(
+                        onTap: () => _cambiaMese(-1),
+                        child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        stringaMeseCorrente.toUpperCase(),
+                        style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => _cambiaMese(1),
+                        child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
+                Row(
                   children: [
                     InkWell(
-                      onTap: () => _cambiaMese(-1),
-                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
+                      onTap: _mostraDialogModificaRegola,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.tune_rounded, color: Colors.white, size: 13),
+                            SizedBox(width: 4),
+                            Text('Modifica 50/30/20', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      stringaMeseCorrente.toUpperCase(),
-                      style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     InkWell(
-                      onTap: () => _cambiaMese(1),
-                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+                      onTap: _mostraDialogAggiungiSpesa,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2DD4BF).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
+                            SizedBox(width: 2),
+                            Text('Spesa', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: _mostraDialogModificaRegola,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.tune_rounded, color: Colors.white, size: 13),
-                          SizedBox(width: 4),
-                          Text('Modifica 50/30/20', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // 2. FILTRI COMPATTI
+            Row(
+              children: [
+                FilterChip(
+                  selected: _filtroVisualizzazione == 'tutti',
+                  label: const Text('Tutte le Voci', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  backgroundColor: Colors.white.withOpacity(0.05),
+                  selectedColor: const Color(0xFF2DD4BF).withOpacity(0.25),
+                  side: BorderSide(color: _filtroVisualizzazione == 'tutti' ? const Color(0xFF2DD4BF) : Colors.white12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (_) => setState(() => _filtroVisualizzazione = 'tutti'),
+                ),
+                const SizedBox(width: 6),
+                FilterChip(
+                  selected: _filtroVisualizzazione == 'da_saldare',
+                  avatar: const Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFF59E0B)),
+                  label: const Text('Da Saldare', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  backgroundColor: Colors.white.withOpacity(0.05),
+                  selectedColor: const Color(0xFFF59E0B).withOpacity(0.25),
+                  side: BorderSide(color: _filtroVisualizzazione == 'da_saldare' ? const Color(0xFFF59E0B) : Colors.white12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (_) => setState(() => _filtroVisualizzazione = 'da_saldare'),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // 3. CATEGORIE (INIZIALMENTE TUTTE CHIUSE)
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCategoryCardPulita(
+                      provider: walletProvider,
+                      categoriaKey: '50',
+                      title: 'Spese Fisse & Bisogni',
+                      icon: Icons.home_rounded,
+                      targetPct: _percentBisogni,
+                      pianificatoTotale: pianificatoBisogni,
+                      spesoRealeTotale: spesoBisogni,
+                      color: const Color(0xFF2DD4BF),
+                      voci: _vociPianificate.where((v) => v['categoria'] == 'Bisogni (50%)').toList(),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: _mostraDialogAggiungiSpesa,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2DD4BF).withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
-                          SizedBox(width: 2),
-                          Text('Spesa', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
+                    const SizedBox(height: 8),
+                    _buildCategoryCardPulita(
+                      provider: walletProvider,
+                      categoriaKey: '30',
+                      title: 'Spese Variabili & Tempo Libero',
+                      icon: Icons.explore_rounded,
+                      targetPct: _percentSvago,
+                      pianificatoTotale: pianificatoSvago,
+                      spesoRealeTotale: spesoSvago,
+                      color: const Color(0xFFF59E0B),
+                      voci: _vociPianificate.where((v) => v['categoria'] == 'Svago (30%)').toList(),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                    const SizedBox(height: 8),
+                    _buildCategoryCardPulita(
+                      provider: walletProvider,
+                      categoriaKey: '20',
+                      title: 'Risparmi & Futuro',
+                      icon: Icons.trending_up_rounded,
+                      targetPct: _percentRisparmio,
+                      pianificatoTotale: pianificatoRisparmio,
+                      spesoRealeTotale: spesoRisparmio,
+                      color: const Color(0xFF3B82F6),
+                      voci: _vociPianificate.where((v) => v['categoria'] == 'Risparmio (20%)').toList(),
+                    ),
+                    const SizedBox(height: 12),
 
-          const SizedBox(height: 10),
-
-          // 2. FILTRI COMPATTI
-          Row(
-            children: [
-              FilterChip(
-                selected: _filtroVisualizzazione == 'tutti',
-                label: const Text('Tutte le Voci', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.white.withOpacity(0.05),
-                selectedColor: const Color(0xFF2DD4BF).withOpacity(0.25),
-                side: BorderSide(color: _filtroVisualizzazione == 'tutti' ? const Color(0xFF2DD4BF) : Colors.white12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                visualDensity: VisualDensity.compact,
-                onSelected: (_) => setState(() => _filtroVisualizzazione = 'tutti'),
-              ),
-              const SizedBox(width: 6),
-              FilterChip(
-                selected: _filtroVisualizzazione == 'da_saldare',
-                avatar: const Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFF59E0B)),
-                label: const Text('Da Saldare', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.white.withOpacity(0.05),
-                selectedColor: const Color(0xFFF59E0B).withOpacity(0.25),
-                side: BorderSide(color: _filtroVisualizzazione == 'da_saldare' ? const Color(0xFFF59E0B) : Colors.white12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                visualDensity: VisualDensity.compact,
-                onSelected: (_) => setState(() => _filtroVisualizzazione = 'da_saldare'),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // 3. CATEGORIE (INIZIALMENTE TUTTE CHIUSE)
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCategoryCardPulita(
-                    provider: walletProvider,
-                    categoriaKey: '50',
-                    title: 'Spese Fisse & Bisogni',
-                    icon: Icons.home_rounded,
-                    targetPct: _percentBisogni,
-                    pianificatoTotale: pianificatoBisogni,
-                    spesoRealeTotale: spesoBisogni,
-                    color: const Color(0xFF2DD4BF),
-                    voci: _vociPianificate.where((v) => v['categoria'] == 'Bisogni (50%)').toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildCategoryCardPulita(
-                    provider: walletProvider,
-                    categoriaKey: '30',
-                    title: 'Spese Variabili & Tempo Libero',
-                    icon: Icons.explore_rounded,
-                    targetPct: _percentSvago,
-                    pianificatoTotale: pianificatoSvago,
-                    spesoRealeTotale: spesoSvago,
-                    color: const Color(0xFFF59E0B),
-                    voci: _vociPianificate.where((v) => v['categoria'] == 'Svago (30%)').toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildCategoryCardPulita(
-                    provider: walletProvider,
-                    categoriaKey: '20',
-                    title: 'Risparmi & Futuro',
-                    icon: Icons.trending_up_rounded,
-                    targetPct: _percentRisparmio,
-                    pianificatoTotale: pianificatoRisparmio,
-                    spesoRealeTotale: spesoRisparmio,
-                    color: const Color(0xFF3B82F6),
-                    voci: _vociPianificate.where((v) => v['categoria'] == 'Risparmio (20%)').toList(),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 💡 SUGGERIMENTO COERENTE IN STILE LAMPADINA DISCRETA
-                  _buildNotaDiscreta(percentualeRisparmioStimata),
-                  const SizedBox(height: 12),
-                ],
+                    // 💡 SUGGERIMENTO COERENTE IN STILE LAMPADINA DISCRETA
+                    _buildNotaDiscreta(percentualeRisparmioStimata),
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '2_5_wallet_annual_summary.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_bottom_sheet.dart'; // 👈 GUSCIO UNICO BOTTOM SHEET
 import '2_4_wallet_budget_pilot_v2.dart';
 import '../widgets_shared/fiscon_logo.dart';
 
@@ -32,17 +33,15 @@ class _WalletScreenState extends State<WalletScreen> {
   // 👇 CONTATORE PER IL TEST DELLE FOTO
   int _testIndex = 0;
 
-  // 📸 GALLERIA SFONDI (Link stabili di test, sostituisci poi con i tuoi)
+  // 📸 GALLERIA SFONDI (Link stabili di test)
   final List<String> _sfondiSettimanali = [
     'https://images.unsplash.com/photo-1505413687799-90481dfc0203?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTl8fG1hcmV8ZW58MHx8MHx8fDA%3D',
     'https://images.unsplash.com/photo-1555412654-72a95a495858?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YWNxdWF8ZW58MHx8MHx8fDA%3D',
-    //'https://images.unsplash.com/photo-1543005472-1b1d37fa4eae?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8ZnVvY298ZW58MHx8MHx8fDA%3D',
     'https://plus.unsplash.com/premium_photo-1674517879286-0ee281fc5262?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDR8fHxlbnwwfHx8fHw%3D',
     'https://images.unsplash.com/photo-1481819613568-3701cbc70156?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8cGlhbmV0aXxlbnwwfHwwfHx8MA%3D%3D',
-    //'https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8c29sZXxlbnwwfHwwfHx8MA%3D%3D',
     'https://plus.unsplash.com/premium_photo-1711434824963-ca894373272e?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8bmF0dXJhfGVufDB8fDB8fHww',
     'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8bmF0dXJhfGVufDB8fDB8fHww',
-];
+  ];
 
   bool _isBussolaEspansa = false;
   DateTime _dataFiltroRipartizione = DateTime(2026, 8);
@@ -83,7 +82,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 👇 QUESTA RIGA PESCA LA FOTO CORRENTE BASATA SUI TUOI TAP
     final String currentBackgroundUrl = _sfondiSettimanali[_testIndex % _sfondiSettimanali.length];
 
     final double topPadding = MediaQuery.of(context).padding.top;
@@ -179,7 +177,6 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: Colors.black, 
       body: Stack(
         children: [
-          // 🖼️ 1. FOTOGRAFIA SFONDO CON TEST MODE
           Positioned(
             top: 0,
             left: 0,
@@ -187,13 +184,12 @@ class _WalletScreenState extends State<WalletScreen> {
             height: screenHeight * 0.75,
             child: GestureDetector(
               onTap: () {
-                // 👇 QUANDO TOCCHI LO SFONDO, CAMBIA FOTO!
                 setState(() {
                   _testIndex++;
                 });
               },
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 800), // Dissolvenza 
+                duration: const Duration(milliseconds: 800),
                 child: Container(
                   key: ValueKey<String>(currentBackgroundUrl),
                   decoration: BoxDecoration(
@@ -203,54 +199,50 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ),
                   child: Container(
-                  // 👇 Niente "const" qui davanti!
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.99), // Leggibilità estrema in alto
-                        Colors.black.withOpacity(0.4),  // Scurisce la neve per non accecare
-                        Colors.black,                   // Si fonde col nero della bottom bar
-                      ],
-                      stops: const [0.0, 0.3, 1.0],
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.99),
+                          Colors.black.withOpacity(0.4),
+                          Colors.black,
+                        ],
+                        stops: const [0.0, 0.3, 1.0],
+                      ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),
           ),
 
-          // 📱 2. CONTENUTO SCROLLABILE (Glassmorphism)
           SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 80),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔹 HEADER TOP
                 Padding(
                   padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // FAI TAP SUL LOGO PER CAMBIARE IMMAGINE DI TEST
-GestureDetector(
-  onTap: () {
-    setState(() {
-      _testIndex++;
-    });
-  },
-  child: const FiscOnLogo(fontSize: 22, sottotitolo: 'Portafoglio Personale'),
-),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _testIndex++;
+                          });
+                        },
+                        child: const FiscOnLogo(fontSize: 22, sottotitolo: 'Portafoglio Personale'),
+                      ),
                       
-                      // TASTO RIEPILOGO
+                      // 🚀 RIEPILOGO ANNUALE CON APP BOTTOM SHEET
                       _buildGlassContainer(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         borderRadius: BorderRadius.circular(20),
                         child: InkWell(
-                          onTap: () => AppPopupWrapper.mostra(context: context, child: const AnnualSummarySheet()),
+                          onTap: () => AppBottomSheet.mostra(context: context, child: const AnnualSummarySheet()),
                           child: Row(
                             children: [
                               Icon(Icons.show_chart_rounded, size: 14, color: oceanCyan),
@@ -266,7 +258,6 @@ GestureDetector(
 
                 const SizedBox(height: 45),
 
-                // 🔹 PATRIMONIO NETTO GIGANTE
                 Center(
                   child: InkWell(
                     onLongPress: () {
@@ -309,7 +300,6 @@ GestureDetector(
 
                 const SizedBox(height: 30),
 
-                // 🔹 PILLOLE LIQUIDITÀ E TASSE
                 if (mostraPiva)
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -330,7 +320,7 @@ GestureDetector(
                           value: _formattaInt(tasseTotaliCalcolate),
                           isTasse: true,
                           isProtetta: isTasseCoperte,
-                          onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF1E293B)),
+                          onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF18181B)),
                         ),
                         const SizedBox(width: 16),
                       ],
@@ -339,7 +329,6 @@ GestureDetector(
 
                 const SizedBox(height: 50),
 
-                // 🔹 SEZIONE CORPO
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Column(
@@ -349,33 +338,38 @@ GestureDetector(
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // 🚀 1. STORICO MOVIMENTI CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.add_circle_outline_rounded,
                                 title: 'Storico\nMovimenti',
                                 value: 'Registra',
                                 iconColor: oceanCyan,
-                                onTap: () => AppPopupWrapper.mostra(context: context, child: const AddMovementSheet(initialTab: 'riepilogo')),
+                                onTap: () => AppBottomSheet.mostra(context: context, child: const AddMovementSheet(initialTab: 'riepilogo')),
                               ),
                             ),
                             const SizedBox(width: 12),
+
+                            // 🚀 2. GESTIONE CONTI CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.account_balance_wallet_outlined,
                                 title: 'I Tuoi\nConti',
                                 value: '${walletProvider.accounts.length} Attivi',
                                 iconColor: goldAccent,
-                                onTap: () => AppPopupWrapper.mostra(context: context, child: ManageAccountsSheet(isPiva: widget.isPiva)),
+                                onTap: () => AppBottomSheet.mostra(context: context, child: ManageAccountsSheet(isPiva: widget.isPiva)),
                               ),
                             ),
                             const SizedBox(width: 12),
+
+                            // 🚀 3. PIANO SPESA CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.pie_chart_outline_rounded,
                                 title: 'Gestione\nSpese',
                                 value: 'Budget',
                                 iconColor: purpleZen,
-                                onTap: () => AppPopupWrapper.mostra(context: context, child: const PianoSpesaSheet()),
+                                onTap: () => AppBottomSheet.mostra(context: context, child: const PianoSpesaSheet()),
                               ),
                             ),
                           ],
@@ -399,10 +393,10 @@ GestureDetector(
 
                       if (mostraPiva) ...[
                         _buildGlassContainer(
-                          padding: EdgeInsets.zero, // Togliamo il padding per farlo aderire
+                          padding: EdgeInsets.zero,
                           borderRadius: BorderRadius.circular(24),
-                          child: SerbatoioTasseWidget(
-                            cardColor: Colors.transparent, // 👈 Questo è il colore che devi passare!
+                          child: const SerbatoioTasseWidget(
+                            cardColor: Colors.transparent,
                             isCollapsible: true,
                             initiallyExpanded: true,
                           ),
@@ -457,7 +451,7 @@ GestureDetector(
                               borderRadius: BorderRadius.circular(12),
                               child: DropdownButton<String>(
                                 value: _filtroMeseMovimenti,
-                                dropdownColor: const Color(0xFF1E293B),
+                                dropdownColor: const Color(0xFF18181B),
                                 underline: const SizedBox(),
                                 icon: Icon(Icons.keyboard_arrow_down_rounded, color: oceanCyan, size: 16),
                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
@@ -536,7 +530,6 @@ GestureDetector(
     );
   }
 
-  // ✨ WIDGET UTILS 
   Widget _buildGlassContainer({
     required Widget child,
     EdgeInsetsGeometry? padding,

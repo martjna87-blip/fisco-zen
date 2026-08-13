@@ -8,6 +8,7 @@ import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_image_picker.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 import '../screens/0_1_pro_upgrade.dart';
 import '../services/document_scanner_service.dart';
 
@@ -38,7 +39,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _giornoRicorrenzaController = TextEditingController(text: '1');
 
-  // FocusNode per aprire la tastiera automaticamente sull'importo
   final FocusNode _amountFocusNode = FocusNode();
   
   final ScrollController _scrollControllerSpesa = ScrollController();
@@ -106,12 +106,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
 
-  final List<String> _contiDisponibili = [
-    'Conto Principale (IBAN)',
-    'Carta Spese & Svago',
-    'Salvadanaio Emergenze / Tasse',
-  ];
-
   final List<Map<String, dynamic>> _speseFrequenti = [
     {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Alimentari'},
     {'label': 'Affitto', 'icon': Icons.home_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
@@ -164,7 +158,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
     _noteController.addListener(_suggerisciCategoriaAuto);
 
-    // Gestione autofocus tastiera
     if (initialPage != 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _amountFocusNode.requestFocus();
@@ -264,7 +257,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           _dataSelezionata = result.data!;
         }
         _tipoMovimento = 'uscita';
-        _suggerisciCategoriaAuto(); // 🪄 Assegna in automatico anche la categoria (es. Alimentari, Auto)
+        _suggerisciCategoriaAuto();
         _isAnalyzing = false;
       });
 
@@ -332,16 +325,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       isRecurrent: _isRicorrente,
       frequenza: _isRicorrente ? _frequenzaSelezionata : null,
       giornoRicorrenza: giornoRicorrenzaFinale,
-      dataFineRicorrenza: _isRicorrente ? _dataFineRicorrenza : null, // 🟢 Data di fine opzionale
+      dataFineRicorrenza: _isRicorrente ? _dataFineRicorrenza : null,
     );
 
-    // Reset sicuro dei campi e mantenimento della tab attiva pronto per un nuovo inserimento
     setState(() {
       _amountController.clear();
       _noteController.clear();
       _dataSelezionata = DateTime.now();
       _isRicorrente = false;
-      _dataFineRicorrenza = null; // 🟢 Reset di fine ricorrenza
+      _dataFineRicorrenza = null;
     });
 
     _amountFocusNode.requestFocus();
@@ -353,6 +345,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     showDialog(
       context: context,
       builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
         icon: Icons.warning_amber_rounded,
         iconColor: const Color(0xFFEF4444),
         titolo: 'Gestisci Movimento',
@@ -452,6 +445,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     showDialog(
       context: context,
       builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
         icon: Icons.event_repeat_rounded,
         iconColor: const Color(0xFF2DD4BF),
         titolo: 'Gestisci Ricorrenza Futura',
@@ -562,7 +556,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _iconaCorrente = item['icon'] as IconData;
       _categoriaSelezionata = item['cat'] ?? '50% Spese Fisse';
       _sottocategoriaSelezionata = item['sottoCat'] ?? 'Alimentari';
-      _isPreferitoSelezionato = true; // 🔒 Blocca le tendine
+      _isPreferitoSelezionato = true;
     });
   }
 
@@ -571,7 +565,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _noteController.text = item['label'];
       _iconaCorrente = item['icon'] as IconData;
       _sottocategoriaEntrataSelezionata = item['sottoCat'] ?? 'Stipendio';
-      _isPreferitoSelezionato = true; // 🔒 Blocca le tendine
+      _isPreferitoSelezionato = true;
     });
   }
 
@@ -589,6 +583,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AppSecondaryPopup(
+            backgroundColor: const Color(0xFF18181B),
             icon: Icons.edit_note_rounded,
             iconColor: const Color(0xFF2DD4BF),
             titolo: 'Gestisci Preferito',
@@ -623,10 +618,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'Nome Preferito',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -636,12 +631,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     const SizedBox(height: 4),
                     DropdownButtonFormField<String>(
                       value: catTemp,
-                      dropdownColor: const Color(0xFF18181B),
+                      dropdownColor: const Color(0xFF121214),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        fillColor: Colors.black.withOpacity(0.4),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                       ),
                       items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) {
@@ -655,12 +650,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: sottoCatTemp,
-                    dropdownColor: const Color(0xFF18181B),
+                    dropdownColor: const Color(0xFF121214),
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                     ),
                     items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
                         .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -706,6 +701,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     showDialog(
       context: context,
       builder: (context) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
         icon: Icons.account_balance_wallet_rounded,
         iconColor: const Color(0xFF2DD4BF),
         titolo: 'Crea Nuovo Conto',
@@ -742,12 +738,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Nome Conto o Carta (es. Carta N26)',
-                labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.black.withOpacity(0.4),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
                 ),
               ),
             ),
@@ -758,12 +754,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Saldo Iniziale (€)',
-                labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.black.withOpacity(0.4),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
                 ),
                 prefixIcon: const Icon(
                   Icons.euro_symbol_rounded,
@@ -782,6 +778,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     showDialog(
       context: context,
       builder: (context) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
         icon: Icons.grid_view_rounded,
         iconColor: const Color(0xFF2DD4BF),
         titolo: 'Scegli Pittogramma',
@@ -830,6 +827,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AppSecondaryPopup(
+            backgroundColor: const Color(0xFF18181B),
             icon: isExpense ? Icons.shopping_bag_outlined : Icons.add_chart_outlined,
             iconColor: const Color(0xFF2DD4BF),
             titolo: isExpense ? 'Crea Uscita Frequente' : 'Crea Entrata Frequente',
@@ -869,10 +867,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: isExpense ? 'Nome uscita (es. Idraulico)' : 'Nome entrata (es. Dividendi)',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -881,12 +879,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     const SizedBox(height: 4),
                     DropdownButtonFormField<String>(
                       value: categoriaNuova,
-                      dropdownColor: const Color(0xFF18181B),
+                      dropdownColor: const Color(0xFF121214),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        fillColor: Colors.black.withOpacity(0.4),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                       ),
                       items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) {
@@ -900,12 +898,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: sottoCatNuova,
-                    dropdownColor: const Color(0xFF18181B),
+                    dropdownColor: const Color(0xFF121214),
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
                     ),
                     items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
                         .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -962,83 +960,68 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final String titoloModal = _tipoMovimento == 'riepilogo'
         ? 'Riepilogo Movimenti'
         : (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa' ? 'Registra Uscita' : 'Registra Entrata');
 
-    return AppPopupWrapper(
+    return AppBottomSheet(
       title: titoloModal,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+      badgeText: 'Wallet',
+      badgeColor: const Color(0xFF2DD4BF),
+      child: Container(
+        // 📐 VINCOLO ALTEZZA MINIMA FISSA: 55% DELLO SCHERMO
+        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTypeTab(
+                      label: 'Riepilogo',
+                      isSelected: _tipoMovimento == 'riepilogo',
+                      color: const Color(0xFF2DD4BF),
+                      onTap: () => setState(() => _tipoMovimento = 'riepilogo'),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildTypeTab(
+                      label: 'Uscita',
+                      isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
+                      color: const Color(0xFFEF4444),
+                      onTap: () => setState(() => _tipoMovimento = 'uscita'),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildTypeTab(
+                      label: 'Entrata',
+                      isSelected: _tipoMovimento == 'entrata',
+                      color: const Color(0xFF10B981),
+                      onTap: () => setState(() => _tipoMovimento = 'entrata'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildTypeTab(
-                    label: 'Riepilogo',
-                    isSelected: _tipoMovimento == 'riepilogo',
-                    color: const Color(0xFF2DD4BF),
-                    onTap: () {
-                      _pageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: _buildTypeTab(
-                    label: 'Uscita',
-                    isSelected: _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa',
-                    color: const Color(0xFFEF4444),
-                    onTap: () {
-                      _pageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: _buildTypeTab(
-                    label: 'Entrata',
-                    isSelected: _tipoMovimento == 'entrata',
-                    color: const Color(0xFF10B981),
-                    onTap: () {
-                      _pageController.animateToPage(2, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const BouncingScrollPhysics(),
-              onPageChanged: (index) {
-                setState(() {
-                  if (index == 0) _tipoMovimento = 'riepilogo';
-                  else if (index == 1) _tipoMovimento = 'uscita';
-                  else if (index == 2) _tipoMovimento = 'entrata';
-                });
+            const SizedBox(height: 12),
 
-                if (index != 0) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _amountFocusNode.requestFocus();
-                  });
-                }
-              },
-              children: [
-                _buildSchermataRiepilogo(),
-                _buildFormMovimento(isSpesa: true),
-                _buildFormMovimento(isSpesa: false),
-              ],
-            ),
-          ),
-        ],
+            if (_tipoMovimento == 'riepilogo')
+              Flexible(child: _buildSchermataRiepilogo())
+            else if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa')
+              Flexible(child: _buildFormMovimento(isSpesa: true))
+            else
+              Flexible(child: _buildFormMovimento(isSpesa: false)),
+          ],
+        ),
       ),
     );
   }
@@ -1056,7 +1039,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                tx.title.toLowerCase().contains('giroconto') ||
                                tx.title.toLowerCase().contains('salvadanaio');
 
-      // 🧠 MAPPATURA AUTOMATICA PER LA BUSSOLA SPESE (50/30/20)
       String regolaBussola = '50% Spese Fisse';
       final catLower = tx.category.toLowerCase();
       if (catLower.contains('30') || catLower.contains('svag') || catLower.contains('divertiment') || catLower.contains('variabil')) {
@@ -1138,21 +1120,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false && m['isGiroconto'] == false)
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
-    // 1. RAGGRUPPAMENTO PER CATEGORIA SPECIFICA
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
     for (var m in movimentiMeseSelezionato) {
       final cat = m['cat'] as String;
       perCategoria.putIfAbsent(cat, () => []).add(m);
     }
 
-    // 2. RAGGRUPPAMENTO PER BUSSOLA SPESE
     final Map<String, List<Map<String, dynamic>>> perBussola = {};
     for (var m in movimentiMeseSelezionato) {
       final bussola = m['bussola'] as String;
       perBussola.putIfAbsent(bussola, () => []).add(m);
     }
 
-    // 3. RAGGRUPPAMENTO PER DATA
     final List<Map<String, dynamic>> movimentiOrdinatiData = List.from(movimentiMeseSelezionato);
     movimentiOrdinatiData.sort((a, b) => (b['data'] as DateTime).compareTo(a['data'] as DateTime));
 
@@ -1163,12 +1142,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       perData.putIfAbsent(dataStr, () => []).add(m);
     }
 
-    // Selezione Mappa Attiva in base alla Tab scelta
     final Map<String, List<Map<String, dynamic>>> mappaCorrente = _vistaRiepilogo == 'categoria'
         ? perCategoria
         : (_vistaRiepilogo == 'bussola' ? perBussola : perData);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -1192,9 +1171,35 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       });
                     },
                   ),
-                  Text(
-                    _formattaMeseAnno(_meseSelezionatoRiepilogo).toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  // ✨ SELETTORE MESE CLICCABILE
+                  InkWell(
+                    onTap: () async {
+                      final DateTime? picked = await AppDatePicker.selezionaData(
+                        context,
+                        dataIniziale: _meseSelezionatoRiepilogo,
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          _meseSelezionatoRiepilogo = picked;
+                          _categoriaEspansaIndex = null;
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formattaMeseAnno(_meseSelezionatoRiepilogo).toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF2DD4BF), size: 20),
+                        ],
+                      ),
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2DD4BF), size: 16),
@@ -1243,7 +1248,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
               const SizedBox(height: 12),
 
-              // 📌 TAB SELETTORE A 3 OPZIONI: CATEGORIA | BUSSOLA | DATA
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -1335,12 +1339,49 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ),
         ),
         const SizedBox(height: 12),
-        Expanded(
-          child: movimentiMeseSelezionato.isEmpty
-              ? const Center(
-                  child: Text('Nessun movimento in questo mese.', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                )
-              : ListView.builder(
+
+        movimentiMeseSelezionato.isEmpty
+            ? Container(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined, 
+                      color: Colors.white.withOpacity(0.2), 
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Nessun movimento in questo mese.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.4), 
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // ✨ PULSANTE DI AZIONE PER STATO VUOTO
+                    ElevatedButton.icon(
+                      onPressed: () => setState(() => _tipoMovimento = 'uscita'),
+                      icon: const Icon(Icons.add_rounded, size: 16, color: Colors.black),
+                      label: const Text(
+                        'Registra primo movimento',
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2DD4BF),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
                   itemCount: mappaCorrente.keys.length,
                   itemBuilder: (context, index) {
@@ -1435,8 +1476,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                               Expanded(
                                                 child: Text(
                                                   _vistaRiepilogo == 'bussola'
-                                                    ? '$desc ($catSpecifica)'
-                                                    : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
+                                                      ? '$desc ($catSpecifica)'
+                                                      : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
                                                   style: TextStyle(
                                                     color: isPrevisto ? Colors.white38 : Colors.white60, 
                                                     fontSize: 11, 
@@ -1451,14 +1492,14 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         const SizedBox(width: 6),
                                         Text(
                                           isGiroconto 
-                                            ? _formatValuta(imp)
-                                            : '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
+                                              ? _formatValuta(imp)
+                                              : '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
                                           style: TextStyle(
                                             color: isGiroconto
-                                              ? const Color(0xFF3B82F6)
-                                              : (isPrevisto 
-                                                ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
-                                                : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
+                                                ? const Color(0xFF3B82F6)
+                                                : (isPrevisto 
+                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
+                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1494,7 +1535,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     );
                   },
                 ),
-        ),
+              ),
       ],
     );
   }
@@ -1521,88 +1562,104 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (isSpesa) const SizedBox(height: 10),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Center(
-                  child: IntrinsicWidth(
-                    child: TextField(
-                      controller: _amountController,
-                      focusNode: _amountFocusNode,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      autofocus: true,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '0,00 €',
-                        hintStyle: const TextStyle(color: Colors.white24, fontSize: 36),
-                        border: InputBorder.none,
-                        prefixText: isSpesa ? '- ' : '+ ',
-                        prefixStyle: TextStyle(
+            
+            // ✨ GLOW LUMINOSO SULL'IMPORTO QUANDO DIGITI
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: _amountFocusNode.hasFocus && _amountController.text.isNotEmpty
+                    ? [
+                        BoxShadow(
+                          color: (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withOpacity(0.18),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: IntrinsicWidth(
+                      child: TextField(
+                        controller: _amountController,
+                        focusNode: _amountFocusNode,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        autofocus: true,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
                           color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
                         ),
+                        decoration: InputDecoration(
+                          hintText: '0,00 €',
+                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 36),
+                          border: InputBorder.none,
+                          prefixText: isSpesa ? '- ' : '+ ',
+                          prefixStyle: TextStyle(
+                            color: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (isSpesa)
-                  Positioned(
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: () {
-                        final wallet = Provider.of<WalletProvider>(context, listen: false);
-                        if (!wallet.canUseOCR) {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione Scontrini (OCR)')));
-                        } else {
-                          _avviaScansioneIntelligente();
-                        }
-                      },
-                      child: Consumer<WalletProvider>(
-                        builder: (context, wallet, child) {
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                // 👈 MARGINE ANCHE QUI
-                                margin: const EdgeInsets.only(top: 8, right: 8),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.08),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.document_scanner_rounded, color: Colors.white70, size: 20),
-                              ),
-                              if (!wallet.canUseOCR)
-                                Positioned(
-                                  top: 0,
-                                  right: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF59E0B),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: const Color(0xFF18181B), width: 2),
-                                    ),
-                                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 12),
-                                  ),
-                                ),
-                            ],
-                          );
+                  if (isSpesa)
+                    Positioned(
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () {
+                          final wallet = Provider.of<WalletProvider>(context, listen: false);
+                          if (!wallet.canUseOCR) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione Scontrini (OCR)')));
+                          } else {
+                            _avviaScansioneIntelligente();
+                          }
                         },
+                        child: Consumer<WalletProvider>(
+                          builder: (context, wallet, child) {
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(top: 8, right: 8),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.document_scanner_rounded, color: Colors.white70, size: 20),
+                                ),
+                                if (!wallet.canUseOCR)
+                                  Positioned(
+                                    top: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF59E0B),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: const Color(0xFF18181B), width: 2),
+                                      ),
+                                      child: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 12),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 12),
 
-            // 📌 1. BARRA PREFERITI SPPOSTATA SOPRA LA DESCRIZIONE CON TASTO '+' COMPATTO
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1620,7 +1677,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 itemBuilder: (context, index) {
                   final list = isSpesa ? _speseFrequenti : _entrateFrequenti;
                   
-                  // 📌 IL TASTO SOLO '+' È IL PRIMO ELEMENTO PICCOLINO
                   if (index == 0) {
                     return Padding(
                       padding: const EdgeInsets.only(right: 6.0),
@@ -1651,13 +1707,21 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         showCheckmark: false,
                         selected: isSelected,
                         avatar: Icon(item['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF2DD4BF)),
-                        label: Text(
-                          item['label'],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
+                        // ✨ AFFORDANCE MODIFICA: ICONA MATITA DISCRETA SULLE CHIP
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item['label'],
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.edit_outlined, size: 10, color: isSelected ? Colors.white60 : Colors.white24),
+                          ],
                         ),
                         backgroundColor: Colors.black.withOpacity(0.35),
                         selectedColor: const Color(0xFF2DD4BF).withOpacity(0.4),
@@ -1678,13 +1742,12 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
             const SizedBox(height: 12),
 
-            // 📌 2. CAMPO DESCRIZIONE (Se l'utente digita a mano sblocca le tendine)
             TextField(
               controller: _noteController,
               style: const TextStyle(color: Colors.white, fontSize: 13),
               onChanged: (_) {
                 if (_isPreferitoSelezionato) {
-                  setState(() => _isPreferitoSelezionato = false); // 🔓 Sblocca se scrive a mano
+                  setState(() => _isPreferitoSelezionato = false);
                 }
               },
               decoration: InputDecoration(
@@ -1703,7 +1766,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
             const SizedBox(height: 16),
 
-            // 📌 3. DATA CON APPDATEPICKER & CONTO
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1787,7 +1849,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
             const SizedBox(height: 12),
 
-            // 📌 4. CATEGORIA E BUSSOLA SPESE (BLOCCATI SE È SELEZIONATO UN PREFERITO)
             if (isSpesa) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1808,7 +1869,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
                           selectedValue: _sottocategoriaSelezionata,
                           isExpanded: _isSottocategoriaEspansa,
-                          isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
+                          isDisabled: _isPreferitoSelezionato,
                           onToggle: () {
                             if (_isPreferitoSelezionato) return;
                             setState(() {
@@ -1844,7 +1905,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
                           selectedValue: _categoriaSelezionata,
                           isExpanded: _isCategoriaEspansa,
-                          isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
+                          isDisabled: _isPreferitoSelezionato,
                           onToggle: () {
                             if (_isPreferitoSelezionato) return;
                             setState(() {
@@ -1882,7 +1943,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF10B981),
                     selectedValue: _sottocategoriaEntrataSelezionata,
                     isExpanded: _isSottocategoriaEspansa,
-                    isDisabled: _isPreferitoSelezionato, // 🔒 Blocca tendina
+                    isDisabled: _isPreferitoSelezionato,
                     onToggle: () {
                       if (_isPreferitoSelezionato) return;
                       setState(() {
@@ -1903,7 +1964,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               const SizedBox(height: 12),
             ],
 
-            // 📌 5. REGOLE RICORRENZA
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -2044,7 +2104,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     ),
                     const SizedBox(height: 10),
 
-                    // 🟢 BARRA COMPATTA SCADENZA RICORRENZA
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -2054,7 +2113,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           onTap: () async {
                             final picked = await AppDatePicker.selezionaData(
                               context,
-                              // 🟢 Parte da oggi (o dalla data selezionata per il movimento)
                               dataIniziale: _dataFineRicorrenza ?? _dataSelezionata,
                             );
                             if (picked != null) {
@@ -2124,24 +2182,33 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
             const SizedBox(height: 20),
 
-            // 📌 PULSANTE DI SALVATAGGIO
+            // ✨ PULSANTE SOLIDO CON ICONA BIANCA E TESTO BIANCO
             SizedBox(
               width: double.infinity,
               height: 48,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: _salvaMovimento,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
+                icon: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 20,
                 ),
-                child: Text(
+                label: Text(
                   isSpesa ? 'Salva Uscita' : 'Salva Entrata',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSpesa 
+                      ? const Color(0xFFEF4444) 
+                      : const Color(0xFF10B981),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
                 ),
               ),
             ),
@@ -2159,7 +2226,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     required VoidCallback onToggle,
     required List<String> items,
     required Function(String) onSelect,
-    bool isDisabled = false, // 🔒 Supporto blocco tendina
+    bool isDisabled = false,
   }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -2187,7 +2254,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       style: TextStyle(
                         color: isDisabled ? Colors.white54 : Colors.white,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: _isPreferitoSelezionato ? FontWeight.w600 : FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

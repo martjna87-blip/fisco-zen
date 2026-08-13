@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
@@ -19,7 +19,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   final ScrollController _scrollController = ScrollController();
   int? _contoEspansoIndex;
 
-  // 🇮🇹 HELPER VALUTA ITALIANA CON DECIMALI (es. 1.000,50 €)
   String _formattaValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
@@ -54,9 +53,9 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     if (text.contains('carta') || text.contains('prepagata') || text.contains('debito')) {
       return Icons.credit_card_rounded;
     } else if (text.contains('tasse') || text.contains('fisco') || text.contains('riserva tasse')) {
-      return Icons.shield_outlined; // 🛡️ Scudo vuoto per il Serbatoio Tasse!
+      return Icons.shield_outlined;
     } else if (text.contains('salvadanaio') || text.contains('riserva') || text.contains('accumulo')) {
-      return Icons.savings_outlined; // Maialino per gli altri salvadanai generici
+      return Icons.savings_outlined;
     } else if (text.contains('titoli') || text.contains('investiment')) {
       return Icons.show_chart_rounded;
     } else {
@@ -77,12 +76,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final provider = context.read<WalletProvider>();
     final altriConti = provider.accounts.where((a) => a.id != account.id).toList();
 
-    // Cerca le transazioni ricorrenti collegate a questo conto
     final ricorrentiAttive = provider.transactions
         .where((t) => t.accountId == account.id && t.isRecurrent)
         .toList();
 
-    // Stato iniziale per le selezioni dell'utente
     String? contoSceltoSaldo = altriConti.isNotEmpty ? altriConti.first.id : 'AZZERA';
     final Map<String, String> scelteRicorrenze = {};
     for (var tx in ricorrentiAttive) {
@@ -119,7 +116,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- SEZIONE 1: SALDO RESIDUO ---
                 if (account.amount != 0.0) ...[
                   Text(
                     'Sul conto è presente un saldo di ${_formattaValuta(account.amount)}.\nDove vuoi trasferire questo importo?',
@@ -153,7 +149,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   const SizedBox(height: 16),
                 ],
 
-                // --- SEZIONE 2: LISTA SPESE RICORRENTI ---
                 if (ricorrentiAttive.isNotEmpty) ...[
                   Text(
                     'Ci sono ${ricorrentiAttive.length} spese ricorrenti collegate a questo conto. Su quale conto vuoi spostare i futuri addebiti?',
@@ -218,6 +213,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       ),
     );
   }
+
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
@@ -440,7 +436,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               final sottotitoloFinale = dettaglioText.isNotEmpty ? dettaglioText : tipoSelezionato;
               final coloreConto = _getAccountTypeColor(tipoSelezionato);
 
-              // 🟢 Una sola chiamata pulita: crea il conto e registra tutto al posto giusto!
               provider.addAccount(
                 title: nome,
                 subtitle: sottotitoloFinale,
@@ -738,17 +733,14 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  // ===========================================================================
-  // 🔴 INIZIO SOSTITUZIONE — METODO: build(BuildContext context) in 2_2_wallet_manage_accounts.dart
-  // ===========================================================================
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final walletProvider = context.watch<WalletProvider>();
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
     final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
 
-    // 📌 CALCOLO DELLE QUOTE GLOBALI PRUDENZIALI
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
     final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
@@ -761,319 +753,330 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final double cuscinettoFerie = postTasse * percentualeFondoFerie;
     final double nettoRealeSpendibile = postTasse - cuscinettoFerie;
 
-    return AppPopupWrapper(
+    return AppBottomSheet(
       title: 'Gestione Conti',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 📌 HEADER GLOBALE: LIQUIDITÀ SPENDIBILE + CUSCINETTO PROTETTO
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PATRIMONIO LIQUIDO TOTALE',
-                            style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _formattaValuta(saldoTotale),
-                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (mostraPiva) ...[
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white12, height: 1),
-                  const SizedBox(height: 12),
-                  // 📊 TABELLA GLOBALE 2 RIGHE: SPENDIBILE + CUSCINETTO
-                  Table(
-                    columnWidths: const {
-                      0: IntrinsicColumnWidth(),
-                      1: FixedColumnWidth(12),
-                      2: FlexColumnWidth(),
-                    },
-                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                    children: [
-                      TableRow(
-                        children: [
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
-                              SizedBox(width: 6),
-                              Text('LIQUIDITÀ SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox.shrink(),
-                          Text(
-                            _formattaValuta(nettoRealeSpendibile),
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const TableRow(
-                        children: [
-                          SizedBox(height: 6),
-                          SizedBox.shrink(),
-                          SizedBox(height: 6),
-                        ],
-                      ),
-                      TableRow(
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
-                              const SizedBox(width: 6),
-                              Text(
-                                'CUSCINETTO MESI NO-LAVORO ($mesiLavorati MESI):',
-                                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox.shrink(),
-                          Text(
-                            _formattaValuta(cuscinettoFerie),
-                            style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // 📌 INTESTAZIONE E AZIONI DEI CONTI (Qui sono stati spostati i tasti "Nuovo" e "Giroconto")
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    'I TUOI CONTI & CARTE',
-                    style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
-                ],
+      badgeText: 'Wallet',
+      badgeColor: const Color(0xFF2DD4BF),
+      child: Container(
+        constraints: BoxConstraints(minHeight: screenHeight * 0.55),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: _mostraDialogNuovoConto,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.add_rounded, color: Color(0xFF2DD4BF), size: 14),
-                          SizedBox(width: 3),
-                          Text(
-                            'Nuovo',
-                            style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                    onPressed: () => _mostraDialogGiroconto(accounts),
-                    tooltip: 'Esegui Giroconto',
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // 📌 LISTA CONTI ORDINABILE E PULITA
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ReorderableListView.builder(
-                    buildDefaultDragHandles: false,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: accounts.length,
-                    onReorder: (oldIndex, newIndex) {
-                      setState(() {
-                        _contoEspansoIndex = null;
-                      });
-                      context.read<WalletProvider>().reorderAccounts(oldIndex, newIndex);
-                    },
-                    itemBuilder: (context, index) {
-                      final account = accounts[index];
-                      final bool isPrincipal = account.id == '1' || account.title.toLowerCase().contains('principale');
-                      final double contoPostTasse = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
-
-                      return Container(
-                        key: ValueKey(account.id),
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.35),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'PATRIMONIO LIQUIDO TOTALE',
+                              style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _formattaValuta(saldoTotale),
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: InkWell(
-                          onTap: () => _mostraDettaglioMovimentiConto(context, account),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                            child: Row(
+                      ),
+                    ],
+                  ),
+                  if (mostraPiva) ...[
+                    const SizedBox(height: 12),
+                    const Divider(color: Colors.white12, height: 1),
+                    const SizedBox(height: 12),
+                    Table(
+                      columnWidths: const {
+                        0: IntrinsicColumnWidth(),
+                        1: FixedColumnWidth(12),
+                        2: FlexColumnWidth(),
+                      },
+                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                      children: [
+                        TableRow(
+                          children: [
+                            const Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                ReorderableDragStartListener(
-                                  index: index,
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8),
-                                    child: Icon(Icons.drag_handle_rounded, color: Colors.white38, size: 20),
-                                  ),
+                                Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
+                                SizedBox(width: 6),
+                                Text('LIQUIDITÀ SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox.shrink(),
+                            Text(
+                              _formattaValuta(nettoRealeSpendibile),
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const TableRow(
+                          children: [
+                            SizedBox(height: 6),
+                            SizedBox.shrink(),
+                            SizedBox(height: 6),
+                          ],
+                        ),
+                        TableRow(
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'CUSCINETTO MESI NO-LAVORO ($mesiLavorati MESI):',
+                                  style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: account.color.withOpacity(0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _getAccountIcon(account),
-                                    color: account.color,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        account.title,
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: () {
+                                    AppSecondaryPopup.mostra(
+                                      context: context,
+                                      icon: Icons.info_outline_rounded,
+                                      iconColor: const Color(0xFF8B5CF6),
+                                      titolo: 'Cuscinetto Mesi No-Lavoro',
+                                      testoAnnulla: 'Ho capito',
+                                      child: Text(
+                                        'È la riserva strategica accantonata in base ai mesi effettivi di lavoro ($mesiLavorati su 12).\n\nServirà a proteggere il tuo stile di vita coprendo spese fisse e ferie anche nei mesi di inattività!',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        account.subtitle,
-                                        style: const TextStyle(color: Colors.white38, fontSize: 10),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      _formattaValuta(account.amount),
-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                    ),
-                                    // 📌 RIPARTIZIONE CONTABILE ORDINATA SUL CONTO PRINCIPALE (Post-Tasse e Tasse)
-                                    if (mostraPiva && isPrincipal) ...[
-                                      const SizedBox(height: 4),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _formattaValuta(contoPostTasse),
-                                                style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _formattaValuta(account.virtualTaxAmount),
-                                                style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),
-                                  color: const Color(0xFF1C1C21),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  offset: const Offset(0, 40),
-                                  onSelected: (value) {
-                                    if (value == 'edit') _mostraDialogModificaConto(context, account);
-                                    if (value == 'delete') _confermaEliminazioneConto(context, account);
+                                    );
                                   },
-                                  itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(children: [Icon(Icons.edit_rounded, color: Colors.white, size: 16), SizedBox(width: 8), Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 12))]),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(children: [Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16), SizedBox(width: 8), Text('Elimina Conto', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12))]),
-                                    ),
-                                  ],
+                                  child: const Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 13),
                                 ),
                               ],
                             ),
-                          ),
+                            const SizedBox.shrink(),
+                            Text(
+                              _formattaValuta(cuscinettoFerie),
+                              style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'I TUOI CONTI & CARTE',
+                      style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${accounts.length} attivi', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                  ],
+                ),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _mostraDialogNuovoConto,
+                      icon: const Icon(Icons.add_rounded, color: Colors.black, size: 14),
+                      label: const Text(
+                        'Nuovo',
+                        style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2DD4BF),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        elevation: 0,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
+                      onPressed: () => _mostraDialogGiroconto(accounts),
+                      tooltip: 'Esegui Giroconto',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ReorderableListView.builder(
+                      buildDefaultDragHandles: false,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: accounts.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          _contoEspansoIndex = null;
+                        });
+                        context.read<WalletProvider>().reorderAccounts(oldIndex, newIndex);
+                      },
+                      itemBuilder: (context, index) {
+                        final account = accounts[index];
+                        final bool isPrincipal = account.id == '1' || account.title.toLowerCase().contains('principale');
+                        final double contoPostTasse = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
+
+                        return Container(
+                          key: ValueKey(account.id),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          ),
+                          child: InkWell(
+                            onTap: () => _mostraDettaglioMovimentiConto(context, account),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                              child: Row(
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8),
+                                      child: Icon(Icons.drag_handle_rounded, color: Colors.white38, size: 20),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: account.color.withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _getAccountIcon(account),
+                                      color: account.color,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          account.title,
+                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          account.subtitle,
+                                          style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        _formattaValuta(account.amount),
+                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                      if (mostraPiva && isPrincipal) ...[
+                                        const SizedBox(height: 4),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _formattaValuta(contoPostTasse),
+                                                  style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _formattaValuta(account.virtualTaxAmount),
+                                                  style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),
+                                    color: const Color(0xFF1C1C21),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    offset: const Offset(0, 40),
+                                    onSelected: (value) {
+                                      if (value == 'edit') _mostraDialogModificaConto(context, account);
+                                      if (value == 'delete') _confermaEliminazioneConto(context, account);
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(children: [Icon(Icons.edit_rounded, color: Colors.white, size: 16), SizedBox(width: 8), Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 12))]),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(children: [Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16), SizedBox(width: 8), Text('Elimina Conto', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12))]),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
