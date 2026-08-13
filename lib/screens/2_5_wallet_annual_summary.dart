@@ -1,5 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-
+import 'package:provider/provider.dart';
+import '../data/wallet_provider.dart';
+import '../screens/0_1_pro_upgrade.dart';
 
 class AnnualSummarySheet extends StatefulWidget {
   const AnnualSummarySheet({super.key});
@@ -12,26 +15,27 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
   final PageController _pageController = PageController(viewportFraction: 0.85, initialPage: 1);
   int _selectedYearIndex = 1; // 0: 2025, 1: 2026, 2: 2027
 
-  final List<Map<String, dynamic>> _anniData = [
+  // 🖼️ DATI DEMO ASPIRAZIONALI (VISIBILI SOLO AGLI UTENTI NON PRO)
+  final List<Map<String, dynamic>> _anniDemoData = [
     {
       'anno': '2025',
       'risparmioNetto': 9840.00,
       'incassato': 33600.00,
       'speso': 23760.00,
-      'bgImage': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop',
+      'bgImage': 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=800&auto=format&fit=crop',
       'storicoMesi': [
-        {'mese': 'Gen', 'incassato': 2800.0, 'speso': 1900.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Feb', 'incassato': 2800.0, 'speso': 1850.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Mar', 'incassato': 2800.0, 'speso': 2100.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Apr', 'incassato': 2800.0, 'speso': 1780.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Mag', 'incassato': 2800.0, 'speso': 2300.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Giu', 'incassato': 3400.0, 'speso': 2150.0, 'pilotaggio': 2200.0, 'isPassato': true},
-        {'mese': 'Lug', 'incassato': 2800.0, 'speso': 1950.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Ago', 'incassato': 2800.0, 'speso': 2600.0, 'pilotaggio': 2400.0, 'isPassato': true},
-        {'mese': 'Set', 'incassato': 2800.0, 'speso': 1890.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Ott', 'incassato': 2800.0, 'speso': 1900.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Nov', 'incassato': 2800.0, 'speso': 2250.0, 'pilotaggio': 2100.0, 'isPassato': true},
-        {'mese': 'Dic', 'incassato': 4200.0, 'speso': 3100.0, 'pilotaggio': 2800.0, 'isPassato': true},
+        {'mese': 'Gen', 'incassato': 2800.0, 'speso': 1900.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Feb', 'incassato': 2800.0, 'speso': 1850.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Mar', 'incassato': 2800.0, 'speso': 2100.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Apr', 'incassato': 2800.0, 'speso': 1780.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Mag', 'incassato': 2800.0, 'speso': 2300.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Giu', 'incassato': 3400.0, 'speso': 2150.0, 'budget': 2200.0, 'isPassato': true},
+        {'mese': 'Lug', 'incassato': 2800.0, 'speso': 1950.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Ago', 'incassato': 2800.0, 'speso': 2600.0, 'budget': 2400.0, 'isPassato': true},
+        {'mese': 'Set', 'incassato': 2800.0, 'speso': 1890.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Ott', 'incassato': 2800.0, 'speso': 1900.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Nov', 'incassato': 2800.0, 'speso': 2250.0, 'budget': 2100.0, 'isPassato': true},
+        {'mese': 'Dic', 'incassato': 4200.0, 'speso': 3100.0, 'budget': 2800.0, 'isPassato': true},
       ],
     },
     {
@@ -39,20 +43,20 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
       'risparmioNetto': 12450.00,
       'incassato': 37800.00,
       'speso': 25350.00,
-      'bgImage': 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=800&auto=format&fit=crop',
+      'bgImage': 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop',
       'storicoMesi': [
-        {'mese': 'Gen', 'incassato': 2800.0, 'speso': 1850.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Feb', 'incassato': 2800.0, 'speso': 1920.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Mar', 'incassato': 3100.0, 'speso': 2500.0, 'pilotaggio': 2100.0, 'isPassato': true},
-        {'mese': 'Apr', 'incassato': 2800.0, 'speso': 1600.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Mag', 'incassato': 2800.0, 'speso': 2400.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Giu', 'incassato': 3400.0, 'speso': 2150.0, 'pilotaggio': 2200.0, 'isPassato': true},
-        {'mese': 'Lug', 'incassato': 2800.0, 'speso': 1950.0, 'pilotaggio': 2000.0, 'isPassato': true},
-        {'mese': 'Ago', 'incassato': 2800.0, 'speso': 2400.0, 'pilotaggio': 2400.0, 'isPassato': false},
-        {'mese': 'Set', 'incassato': 2800.0, 'speso': 2000.0, 'pilotaggio': 2000.0, 'isPassato': false},
-        {'mese': 'Ott', 'incassato': 2800.0, 'speso': 2000.0, 'pilotaggio': 2000.0, 'isPassato': false},
-        {'mese': 'Nov', 'incassato': 2800.0, 'speso': 2100.0, 'pilotaggio': 2100.0, 'isPassato': false},
-        {'mese': 'Dic', 'incassato': 4200.0, 'speso': 2800.0, 'pilotaggio': 2800.0, 'isPassato': false},
+        {'mese': 'Gen', 'incassato': 2800.0, 'speso': 1850.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Feb', 'incassato': 2800.0, 'speso': 1920.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Mar', 'incassato': 3100.0, 'speso': 2500.0, 'budget': 2100.0, 'isPassato': true},
+        {'mese': 'Apr', 'incassato': 2800.0, 'speso': 1600.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Mag', 'incassato': 2800.0, 'speso': 2400.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Giu', 'incassato': 3400.0, 'speso': 2150.0, 'budget': 2200.0, 'isPassato': true},
+        {'mese': 'Lug', 'incassato': 2800.0, 'speso': 1950.0, 'budget': 2000.0, 'isPassato': true},
+        {'mese': 'Ago', 'incassato': 2800.0, 'speso': 2400.0, 'budget': 2400.0, 'isPassato': false},
+        {'mese': 'Set', 'incassato': 2800.0, 'speso': 2000.0, 'budget': 2000.0, 'isPassato': false},
+        {'mese': 'Ott', 'incassato': 2800.0, 'speso': 2000.0, 'budget': 2000.0, 'isPassato': false},
+        {'mese': 'Nov', 'incassato': 2800.0, 'speso': 2100.0, 'budget': 2100.0, 'isPassato': false},
+        {'mese': 'Dic', 'incassato': 4200.0, 'speso': 2800.0, 'budget': 2800.0, 'isPassato': false},
       ],
     },
     {
@@ -60,15 +64,99 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
       'risparmioNetto': 14200.00,
       'incassato': 39000.00,
       'speso': 24800.00,
-      'bgImage': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=800&auto=format&fit=crop',
+      'bgImage': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=800&auto=format&fit=crop',
       'storicoMesi': [
-        {'mese': 'Gen', 'incassato': 3200.0, 'speso': 2000.0, 'pilotaggio': 2100.0, 'isPassato': false},
-        {'mese': 'Feb', 'incassato': 3200.0, 'speso': 1950.0, 'pilotaggio': 2100.0, 'isPassato': false},
+        {'mese': 'Gen', 'incassato': 3200.0, 'speso': 2000.0, 'budget': 2100.0, 'isPassato': false},
+        {'mese': 'Feb', 'incassato': 3200.0, 'speso': 1950.0, 'budget': 2100.0, 'isPassato': false},
       ],
     },
   ];
 
+  // ⚡ CALCOLATORE DINAMICO DATI REALI (COLLEGATO A SPESE REALI + PIANIFICAZIONE SPESE)
+  List<Map<String, dynamic>> _calcolaDatiReali(WalletProvider wallet) {
+    final List<String> nomiMesiBrevi = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+    final DateTime ora = DateTime.now();
+
+    final List<int> anni = [ora.year - 1, ora.year, ora.year + 1];
+    final List<String> immagini = [
+      'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=800&auto=format&fit=crop',
+    ];
+
+    return anni.asMap().entries.map((entry) {
+      final int i = entry.key;
+      final int anno = entry.value;
+
+      double totIncassato = 0.0;
+      double totSpeso = 0.0;
+
+      final List<Map<String, dynamic>> storicoMesi = List.generate(12, (mIdx) {
+        final int meseNum = mIdx + 1;
+        final DateTime dtMese = DateTime(anno, meseNum);
+        final bool isPassato = (anno < ora.year) || (anno == ora.year && meseNum <= ora.month);
+
+        // 1. Transazioni reali registrate nel mese
+        final txMese = wallet.transactions.where((t) => t.date.year == anno && t.date.month == meseNum);
+
+        final double incassatoMese = txMese.where((t) => t.isIncome).fold(0.0, (s, t) => s + t.amount);
+        final double spesoMese = txMese.where((t) => !t.isIncome).fold(0.0, (s, t) => s + t.amount);
+
+        // 2. Budget Obiettivo recuperato dalla Pianificazione Spese / Movimenti Previsti
+        final previstiMese = wallet.getMovimentiPrevisti(dtMese);
+        final double budgetObiettivoMese = previstiMese.where((t) => !t.isIncome).fold(0.0, (s, t) => s + t.amount);
+
+        totIncassato += incassatoMese;
+        totSpeso += spesoMese;
+
+        return {
+          'mese': nomiMesiBrevi[mIdx],
+          'incassato': incassatoMese,
+          'speso': spesoMese,
+          // Se non ci sono spese previste, usiamo uno standard basato sullo speso
+          'budget': budgetObiettivoMese > 0 ? budgetObiettivoMese : (spesoMese > 0 ? spesoMese * 1.05 : 2000.0),
+          'isPassato': isPassato,
+        };
+      });
+
+      final double risparmioNetto = totIncassato - totSpeso;
+
+      return {
+        'anno': anno == ora.year + 1 ? '$anno (Previsione)' : '$anno',
+        'risparmioNetto': risparmioNetto,
+        'incassato': totIncassato,
+        'speso': totSpeso,
+        'bgImage': immagini[i % immagini.length],
+        'storicoMesi': storicoMesi,
+      };
+    }).toList();
+  }
+
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(0).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '${importo < 0 ? '-' : ''}$intPart €';
+  }
+
+  void _apriUpgradePro(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProUpgradeSheet(
+          funzionalita: 'Panoramica Annuale e Previsioni',
+        ),
+      ),
+    );
+  }
+
   void _mostraReportAnalitico(Map<String, dynamic> annoData) {
+    final List<Map<String, dynamic>> mesi = List<Map<String, dynamic>>.from(annoData['storicoMesi']);
+    final int mesiVirtuosi = mesi.where((m) => (m['isPassato'] == true) && ((m['budget'] as double) >= (m['speso'] as double))).length;
+    final double mediaRisparmioMese = (annoData['risparmioNetto'] as double) / 12;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -76,31 +164,55 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Icon(Icons.analytics_rounded, color: Color(0xFF2DD4BF), size: 24),
+            const Icon(Icons.stars_rounded, color: Color(0xFF2DD4BF), size: 24),
             const SizedBox(width: 10),
-            Text('Report ${annoData['anno']}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Sintesi ${annoData['anno']}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('SINTESI ANNUALE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2DD4BF).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.workspace_premium_rounded, color: Color(0xFF2DD4BF), size: 16),
+                      const SizedBox(width: 8),
+                      Text('Media Risparmiata: ${_formattaValuta(mediaRisparmioMese)}/mese', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                      const SizedBox(width: 8),
+                      Text('$mesiVirtuosi mesi sotto il budget previsto! 👏', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('BILANCIO ANNUALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
             const SizedBox(height: 10),
-            _buildReportRow('Totale Entrate:', '+${annoData['incassato']} €', const Color(0xFF10B981)),
+            _buildReportRow('Totale Incassato:', '+${_formattaValuta(annoData['incassato'])}', const Color(0xFF10B981)),
             const SizedBox(height: 6),
-            _buildReportRow('Totale Spese:', '-${annoData['speso']} €', const Color(0xFFEF4444)),
+            _buildReportRow('Totale Speso:', '-${_formattaValuta(annoData['speso'])}', const Color(0xFFEF4444)),
             const SizedBox(height: 6),
-            _buildReportRow('Risparmio Netto:', '+${annoData['risparmioNetto']} €', const Color(0xFF2DD4BF)),
+            _buildReportRow('Risparmio Netto:', '+${_formattaValuta(annoData['risparmioNetto'])}', const Color(0xFF2DD4BF)),
             const Divider(color: Colors.white12, height: 24),
 
-            const Text('TOP CATEGORIE SPESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+            const Text('SINTESI ANNUALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
             const SizedBox(height: 10),
-            _buildReportCategory('Casa & Utenze', '8.400 €', '33%', const Color(0xFF2DD4BF)),
-            const SizedBox(height: 6),
-            _buildReportCategory('Svago & Viaggi', '5.200 €', '21%', const Color(0xFFF59E0B)),
-            const SizedBox(height: 6),
-            _buildReportCategory('Alimentari & Spesa', '4.100 €', '16%', const Color(0xFF3B82F6)),
+            _buildReportCategory('Spese Totali', '${_formattaValuta(annoData['speso'])}', '100%', const Color(0xFF2DD4BF)),
           ],
         ),
         actions: [
@@ -117,8 +229,8 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-        Text(value, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(value, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -138,7 +250,15 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final currentAnno = _anniData[_selectedYearIndex];
+    final walletProvider = context.watch<WalletProvider>();
+    final bool isUserPro = walletProvider.isPro; // 🔒 VERIFICA SE L'UTENTE È PRO
+
+    // ⚡ SE L'UTENTE È PRO USA I DATI REALI AL 100%, ALTRIMENTI MOSTRA LA DEMO
+    final List<Map<String, dynamic>> anniInUso = isUserPro 
+        ? _calcolaDatiReali(walletProvider) 
+        : _anniDemoData;
+
+    final currentAnno = anniInUso[_selectedYearIndex.clamp(0, anniInUso.length - 1)];
     final List<Map<String, dynamic>> storicoMesiInUso = List<Map<String, dynamic>>.from(currentAnno['storicoMesi']);
 
     return Scaffold(
@@ -148,40 +268,77 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'Il meglio per il tuo anno',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          'Panoramica Annuale',
+          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 12),
+            // 🌟 BANNER SOLO PER UTENTI NON PRO
+            if (!isUserPro) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+                child: InkWell(
+                  onTap: () => _apriUpgradePro(context),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFF59E0B).withOpacity(0.2),
+                          const Color(0xFF2DD4BF).withOpacity(0.15),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF59E0B), size: 18),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Anteprima Demo PRO • Tocca per attivare con i tuoi dati reali',
+                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFF59E0B), size: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
 
             // 1. CAROSELLO HERO CARD
             SizedBox(
-              height: 420,
+              height: 410,
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: _anniData.length,
+                itemCount: anniInUso.length,
                 onPageChanged: (index) {
                   setState(() {
                     _selectedYearIndex = index;
                   });
                 },
                 itemBuilder: (context, index) {
-                  final item = _anniData[index];
+                  final item = anniInUso[index];
                   final bool isSelected = index == _selectedYearIndex;
 
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    margin: EdgeInsets.symmetric(horizontal: 8, vertical: isSelected ? 0 : 16),
+                    margin: EdgeInsets.symmetric(horizontal: 8, vertical: isSelected ? 0 : 14),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(32),
+                      borderRadius: BorderRadius.circular(28),
                       image: DecorationImage(
                         image: NetworkImage(item['bgImage']),
                         fit: BoxFit.cover,
@@ -196,13 +353,13 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                     ),
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(28),
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.2),
-                            Colors.black.withOpacity(0.8),
+                            Colors.black.withOpacity(0.25),
+                            Colors.black.withOpacity(0.85),
                           ],
                         ),
                       ),
@@ -210,19 +367,19 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 6),
 
                           Column(
                             children: [
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  '${item['risparmioNetto'].toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
+                                  _formattaValuta(item['risparmioNetto']),
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 38,
+                                    fontSize: 36,
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: -1,
+                                    letterSpacing: -0.5,
                                   ),
                                 ),
                               ),
@@ -230,7 +387,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                               const Text('Risparmio Netto Accumulato', style: TextStyle(color: Colors.white70, fontSize: 12)),
                               const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.5),
                                   borderRadius: BorderRadius.circular(20),
@@ -238,19 +395,25 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                 ),
                                 child: Text(
                                   'Anno ${item['anno']}',
-                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
                           ),
 
                           GestureDetector(
-                            onTap: () => _mostraReportAnalitico(item),
+                            onTap: () {
+                              if (!isUserPro) {
+                                _apriUpgradePro(context);
+                              } else {
+                                _mostraReportAnalitico(item);
+                              }
+                            },
                             child: Container(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1C1C21).withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(24),
+                                color: const Color(0xFF1C1C21).withOpacity(0.88),
+                                borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: Colors.white.withOpacity(0.12)),
                               ),
                               child: Column(
@@ -262,26 +425,26 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                         child: Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.all(10),
+                                              padding: const EdgeInsets.all(8),
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withOpacity(0.1),
                                                 shape: BoxShape.circle,
                                               ),
-                                              child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 20),
+                                              child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 18),
                                             ),
-                                            const SizedBox(width: 10),
+                                            const SizedBox(width: 8),
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   const Text(
                                                     'Incassato', 
-                                                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                   ),
                                                   Text(
-                                                    '+${(item['incassato'] as double).toStringAsFixed(0)} €', 
+                                                    '+${_formattaValuta(item['incassato'])}', 
                                                     style: const TextStyle(color: Colors.white54, fontSize: 11),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
@@ -294,21 +457,29 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        '-${(item['speso'] as double).toStringAsFixed(0)} €',
-                                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.bold),
+                                        '-${_formattaValuta(item['speso'])}',
+                                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
-                                  const Divider(color: Colors.white12, height: 20),
+                                  const Divider(color: Colors.white12, height: 16),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
+                                    children: [
                                       Text(
-                                        'Visualizza report analitico',
-                                        style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold),
+                                        isUserPro ? 'Vedi dettagli dell\'anno' : '🔒 Mostra i tuoi dati reali',
+                                        style: TextStyle(
+                                          color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      SizedBox(width: 6),
-                                      Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2DD4BF), size: 12),
+                                      const SizedBox(width: 6),
+                                      Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                                        size: 11,
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -323,16 +494,41 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 16),
 
-            // 2. WIDGET GRAFICO DEDICATO CON LEGENDA E CURVA PILOTAGGIO GRIGIA
+            // 🚀 PULSANTE DI UPGRADE PRO (VISIBILE SOLO SE NON È PRO)
+            if (!isUserPro) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _apriUpgradePro(context),
+                    icon: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 20),
+                    label: const Text(
+                      'Passa a PRO per Calcoli Reali',
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2DD4BF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // 2. GRAFICO DEL BUDGET OBIETTIVO
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: const Color(0xFF141417),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Column(
@@ -343,8 +539,8 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                       children: [
                         const Expanded(
                           child: Text(
-                            'Questo anno hai speso...', 
-                            style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500),
+                            'Uscite Totali dell\'Anno', 
+                            style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -354,28 +550,28 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                           children: [
                             _buildLegendaItem('Reale', const Color(0xFF2DD4BF)),
                             const SizedBox(width: 8),
-                            _buildLegendaItem('Pilotaggio', Colors.white38),
+                            _buildLegendaItem('Budget', Colors.white38),
                           ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      '${(currentAnno['speso'] as double).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} €',
-                      style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                      _formattaValuta(currentAnno['speso']),
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: const [
-                        Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF2DD4BF), size: 22),
-                        Text('1.480 € vs target pilotaggio', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
+                        Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2DD4BF), size: 16),
+                        SizedBox(width: 6),
+                        Text('Analisi uscite calcolata 🎉', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
-                    // GRAFICO CON PILOTAGGIO GRIGIO E REALE VERDE
                     SizedBox(
-                      height: 120,
+                      height: 110,
                       width: double.infinity,
                       child: CustomPaint(
                         painter: _FuturisticTrendPainter(datiMesi: storicoMesiInUso),
@@ -386,17 +582,17 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
 
             // 3. STORICO MESI
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
-                'STORICO MESI (${currentAnno['anno']})',
-                style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                'STORICO MESE PER MESE (${currentAnno['anno']})',
+                style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             ListView.builder(
               shrinkWrap: true,
@@ -406,21 +602,21 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
               itemBuilder: (context, index) {
                 final m = storicoMesiInUso[index];
                 final bool isPassato = m['isPassato'] == true;
-                final double delta = m['pilotaggio'] - m['speso'];
+                final double delta = (m['budget'] as double) - (m['speso'] as double);
                 final bool isVirtuoso = delta >= 0;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: const Color(0xFF141417),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: Colors.white.withOpacity(0.06)),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: isPassato
                               ? (isVirtuoso ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEF4444).withOpacity(0.12))
@@ -434,17 +630,17 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                           color: isPassato
                               ? (isVirtuoso ? const Color(0xFF10B981) : const Color(0xFFEF4444))
                               : Colors.white38,
-                          size: 20,
+                          size: 18,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                                 if (!isPassato) ...[
                                   const SizedBox(width: 6),
                                   Container(
@@ -453,7 +649,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                       color: Colors.white10,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                                    child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ],
@@ -461,8 +657,8 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                             const SizedBox(height: 2),
                             Text(
                               isPassato
-                                  ? 'In: +${m['incassato'].toStringAsFixed(0)} € • Out: -${m['speso'].toStringAsFixed(0)} €'
-                                  : 'Target Pilotaggio: ${m['pilotaggio'].toStringAsFixed(0)} €',
+                                  ? 'In: +${_formattaValuta(m['incassato'])} • Out: -${_formattaValuta(m['speso'])}'
+                                  : 'Budget Stimato: ${_formattaValuta(m['budget'])}',
                               style: const TextStyle(color: Colors.white38, fontSize: 10),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -473,14 +669,14 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                       const SizedBox(width: 8),
                       Text(
                         isPassato
-                            ? '${isVirtuoso ? '+' : ''}${delta.toStringAsFixed(0)} €'
-                            : '${m['speso'].toStringAsFixed(0)} €',
+                            ? '${isVirtuoso ? '+' : ''}${_formattaValuta(delta)}'
+                            : _formattaValuta(m['speso']),
                         style: TextStyle(
                           color: isPassato
                               ? (isVirtuoso ? const Color(0xFF2DD4BF) : const Color(0xFFEF4444))
                               : Colors.white54,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -520,7 +716,7 @@ class _FuturisticTrendPainter extends CustomPainter {
     final double stepX = size.width / (datiMesi.length == 1 ? 1 : datiMesi.length - 1);
 
     List<Offset> puntiSpesoPassati = [];
-    List<Offset> puntiPilotaggioTotali = [];
+    List<Offset> puntiBudgetTotali = [];
     List<Offset> puntiFuturi = [];
 
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
@@ -528,16 +724,16 @@ class _FuturisticTrendPainter extends CustomPainter {
     for (int i = 0; i < datiMesi.length; i++) {
       final double x = i * stepX;
       final double spesoVal = datiMesi[i]['speso'];
-      final double pilotVal = datiMesi[i]['pilotaggio'];
+      final double budgetVal = datiMesi[i]['budget'];
       final bool isPassato = datiMesi[i]['isPassato'] == true;
 
       final double ySpeso = heightGraph - ((spesoVal / 3200.0) * heightGraph).clamp(0.0, heightGraph);
-      final double yPilot = heightGraph - ((pilotVal / 3200.0) * heightGraph).clamp(0.0, heightGraph);
+      final double yBudget = heightGraph - ((budgetVal / 3200.0) * heightGraph).clamp(0.0, heightGraph);
 
       final offsetSpeso = Offset(x, ySpeso);
-      final offsetPilot = Offset(x, yPilot);
+      final offsetBudget = Offset(x, yBudget);
 
-      puntiPilotaggioTotali.add(offsetPilot);
+      puntiBudgetTotali.add(offsetBudget);
 
       if (isPassato) {
         puntiSpesoPassati.add(offsetSpeso);
@@ -560,18 +756,16 @@ class _FuturisticTrendPainter extends CustomPainter {
       textPainter.paint(canvas, Offset(x - (textPainter.width / 2).clamp(0, x), heightGraph + 6));
     }
 
-    // 1. CURVA PILOTAGGIO COMPLETA (GRIGIA E DISCRETA)
-    if (puntiPilotaggioTotali.length >= 2) {
-      final pathPilot = _creaPathMorbido(puntiPilotaggioTotali);
-      final paintPilot = Paint()
+    if (puntiBudgetTotali.length >= 2) {
+      final pathBudget = _creaPathMorbido(puntiBudgetTotali);
+      final paintBudget = Paint()
         ..color = Colors.white38
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
 
-      canvas.drawPath(pathPilot, paintPilot);
+      canvas.drawPath(pathBudget, paintBudget);
     }
 
-    // 2. CURVA REALE SPESA (VERDE SFUMATA PER I MESI PASSATI)
     if (puntiSpesoPassati.length >= 2) {
       final pathPassato = _creaPathMorbido(puntiSpesoPassati);
 
@@ -585,7 +779,7 @@ class _FuturisticTrendPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF2DD4BF).withOpacity(0.4),
+            const Color(0xFF2DD4BF).withOpacity(0.35),
             const Color(0xFF2DD4BF).withOpacity(0.0),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, heightGraph));
@@ -595,20 +789,19 @@ class _FuturisticTrendPainter extends CustomPainter {
       final paintLineaVerde = Paint()
         ..color = const Color(0xFF2DD4BF)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.0
+        ..strokeWidth = 2.8
         ..strokeCap = StrokeCap.round;
 
       canvas.drawPath(pathPassato, paintLineaVerde);
     }
 
-    // 3. CURVA FUTURA TRATTEGGIATA GRIGIA
     if (puntiFuturi.length >= 2) {
       final pathFuturo = _creaPathMorbido(puntiFuturi);
 
       final paintLineaFutura = Paint()
         ..color = Colors.white38
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
+        ..strokeWidth = 1.8;
 
       _disegnaLineaTratteggiata(canvas, pathFuturo, paintLineaFutura);
     }
