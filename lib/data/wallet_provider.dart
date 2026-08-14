@@ -153,7 +153,7 @@ class WalletProvider with ChangeNotifier {
   bool get isPro => _userTier == UserTier.pro;
   bool get isPremium => _userTier == UserTier.premium;
 
-  bool get isProUser => _userTier != UserTier.free; // Mantiene la compatibilità con il vecchio codice
+  bool get isProUser => _userTier != UserTier.free;
   bool get canUseOCR => _userTier == UserTier.pro || _userTier == UserTier.premium;
   bool get canSendSDI => _userTier == UserTier.premium;
 
@@ -162,6 +162,7 @@ class WalletProvider with ChangeNotifier {
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
+
   void cycleUserTier() {
     if (_userTier == UserTier.free) {
       _userTier = UserTier.pro;
@@ -173,7 +174,7 @@ class WalletProvider with ChangeNotifier {
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
-  // 🔄 METODI DI RETROCOMPATIBILITÀ (Per non rompere le altre schermate)
+
   void impostaStatoPro(bool valore) {
     _userTier = valore ? UserTier.pro : UserTier.free;
     _salvaDatiInLocalStorage();
@@ -196,7 +197,6 @@ class WalletProvider with ChangeNotifier {
     cycleUserTier(); 
   }
 
-  // 🏛️ PARAMETRI FISCALI UNIFICATI
   String _codiceAteco = '62.02.00';
   String get codiceAteco => _codiceAteco;
 
@@ -233,7 +233,7 @@ class WalletProvider with ChangeNotifier {
 
   int _mesiAttiviIncasso = 10;
   int get mesiAttivi => _mesiAttiviIncasso;
-  double get nettoTargetMensile => _nettoTargetMensile; // 👈 Incolla qui
+  double get nettoTargetMensile => _nettoTargetMensile;
 
   int? _annoAperturaPiva = 2024;
   int? get annoAperturaPiva => _annoAperturaPiva;
@@ -241,7 +241,6 @@ class WalletProvider with ChangeNotifier {
   int? _meseAperturaPiva = 1;
   int? get meseAperturaPiva => _meseAperturaPiva;
 
-  // 🧮 CALCOLO SOGLIA RAGGUAGLIATA AD ANNO
   double get sogliaForfettarioReale {
     final int annoCorrente = DateTime.now().year;
     if (_annoAperturaPiva == annoCorrente && _meseAperturaPiva != null) {
@@ -381,6 +380,123 @@ class WalletProvider with ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
+  // 📌 LISTA SPESE PIANIFICATE
+  List<Map<String, dynamic>> _vociPianificate = [
+    {
+      'id': '1',
+      'nome': 'Affitto / Mutuo',
+      'categoria': 'Bisogni (50%)',
+      'sottocategoria': 'Casa/Affitto',
+      'previsto': 650.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '2',
+      'nome': 'Bollette & Utenze',
+      'categoria': 'Bisogni (50%)',
+      'sottocategoria': 'Canoni/Bollette',
+      'previsto': 140.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '3',
+      'nome': 'Spesa Alimentare',
+      'categoria': 'Bisogni (50%)',
+      'sottocategoria': 'Alimentari',
+      'previsto': 350.00,
+      'tipo': 'variabile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '4',
+      'nome': 'Assicurazione Auto',
+      'categoria': 'Bisogni (50%)',
+      'sottocategoria': 'Auto',
+      'previsto': 120.00,
+      'tipo': 'annuale_spalmata',
+      'totaleAnnuale': 1440.00,
+      'meseScadenza': 'SET',
+    },
+    {
+      'id': '5',
+      'nome': 'Ristoranti & Uscite',
+      'categoria': 'Svago (30%)',
+      'sottocategoria': 'Divertimento',
+      'previsto': 200.00,
+      'tipo': 'variabile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '6',
+      'nome': 'Hobby & Palestra',
+      'categoria': 'Svago (30%)',
+      'sottocategoria': 'Divertimento',
+      'previsto': 80.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '7',
+      'nome': 'Abbonamenti Streaming',
+      'categoria': 'Svago (30%)',
+      'sottocategoria': 'Canoni/Bollette',
+      'previsto': 30.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '8',
+      'nome': 'Fondo Emergenze',
+      'categoria': 'Risparmio (20%)',
+      'sottocategoria': 'Altro',
+      'previsto': 300.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+    {
+      'id': '9',
+      'nome': 'Accantonamento Vacanze',
+      'categoria': 'Risparmio (20%)',
+      'sottocategoria': 'Viaggi',
+      'previsto': 200.00,
+      'tipo': 'mensile',
+      'frequenzaMensile': 'tutti',
+    },
+  ];
+
+  List<Map<String, dynamic>> get vociPianificate => List.unmodifiable(_vociPianificate);
+
+  void aggiungiSpesaPianificata(Map<String, dynamic> voce) {
+    _vociPianificate.add(voce);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  void rimuoviSpesaPianificata(String id) {
+    _vociPianificate.removeWhere((v) => v['id'] == id);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  void azzeraPianificazioneSpese() {
+    _vociPianificate.clear();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  List<Map<String, dynamic>> _fattureDaIncassare = [];
+  List<Map<String, dynamic>> get fattureDaIncassare => List.unmodifiable(_fattureDaIncassare);
+
+  List<Map<String, dynamic>> _fattureIncassate = [];
+  List<Map<String, dynamic>> get fattureIncassate => List.unmodifiable(_fattureIncassate);
+  List<String> _skippedPredictions = [];
+
+  WalletProvider() {
+    _caricaDatiDaLocalStorage();
+  }
+
   int _stringToWeekday(String day) {
     switch (day) {
       case 'Lunedì': return 1;
@@ -487,17 +603,6 @@ class WalletProvider with ChangeNotifier {
     
     previsti.sort((a, b) => a.date.compareTo(b.date));
     return previsti;
-  }
-
-  List<Map<String, dynamic>> _fattureDaIncassare = [];
-  List<Map<String, dynamic>> get fattureDaIncassare => List.unmodifiable(_fattureDaIncassare);
-
-  List<Map<String, dynamic>> _fattureIncassate = [];
-  List<Map<String, dynamic>> get fattureIncassate => List.unmodifiable(_fattureIncassate);
-  List<String> _skippedPredictions = [];
-
-  WalletProvider() {
-    _caricaDatiDaLocalStorage();
   }
 
   void deleteAccount(String accountId) {
@@ -701,6 +806,12 @@ class WalletProvider with ChangeNotifier {
         _skippedPredictions = decoded.map((s) => s.toString()).toList();
       }
 
+      final vociPianificateStr = prefs.getString('vociPianificate');
+      if (vociPianificateStr != null) {
+        final List decoded = jsonDecode(vociPianificateStr);
+        _vociPianificate = decoded.map((v) => Map<String, dynamic>.from(v)).toList();
+      }
+
       _aggiornaTasseVirtuali();
       notifyListeners();
     } catch (e) {
@@ -740,6 +851,7 @@ class WalletProvider with ChangeNotifier {
       await prefs.setString('fattureDaIncassare', jsonEncode(_fattureDaIncassare));
       await prefs.setString('fattureIncassate', jsonEncode(_fattureIncassate));
       await prefs.setString('skippedPredictions', jsonEncode(_skippedPredictions));
+      await prefs.setString('vociPianificate', jsonEncode(_vociPianificate));
 
       await _salvaDatiSuCloud();
     } catch (e) {
@@ -770,6 +882,7 @@ class WalletProvider with ChangeNotifier {
         'transactions': _transactions.map((t) => t.toJson()).toList(),
         'fattureDaIncassare': _fattureDaIncassare,
         'fattureIncassate': _fattureIncassate,
+        'vociPianificate': _vociPianificate,
         'lastUpdate': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -1119,6 +1232,7 @@ class WalletProvider with ChangeNotifier {
     _transactions.clear();
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();
+    _vociPianificate.clear();
 
     _aggiornaTasseVirtuali();
     notifyListeners();
@@ -1317,12 +1431,12 @@ class WalletProvider with ChangeNotifier {
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }
-  // 🙈 MEMORIA TIP DEL CONSULENTE CHIUSI DALL'UTENTE
+
   final Set<String> _dismissedTipKeys = {};
   Set<String> get dismissedTipKeys => _dismissedTipKeys;
 
   void dismissAdvisorTip(String key) {
     _dismissedTipKeys.add(key);
-    notifyListeners(); // 🔄 Aggiorna l'app e nasconde il tip in tutte le schermate
+    notifyListeners();
   }
 }

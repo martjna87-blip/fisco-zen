@@ -968,7 +968,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     return AppBottomSheet(
       title: titoloModal,
       badgeText: 'Wallet',
-      badgeColor: const Color(0xFF2DD4BF),
+      badgeColor: const Color(0xFF2DD4BF), 
       child: Container(
         height: screenHeight * 0.55, // 🔒 55% FISSO
         child: Column(
@@ -1267,15 +1267,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             color: _vistaRiepilogo == 'categoria' ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(
-                            child: Text(
-                              'Categoria',
-                              style: TextStyle(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.grid_view_rounded,
+                                size: 12,
                                 color: _vistaRiepilogo == 'categoria' ? Colors.black : Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Categoria',
+                                style: TextStyle(
+                                  color: _vistaRiepilogo == 'categoria' ? Colors.black : Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1292,15 +1301,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             color: _vistaRiepilogo == 'bussola' ? const Color(0xFF2DD4BF) : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(
-                            child: Text(
-                              'Bussola',
-                              style: TextStyle(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.explore_outlined,
+                                size: 12,
                                 color: _vistaRiepilogo == 'bussola' ? Colors.black : Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Bussola',
+                                style: TextStyle(
+                                  color: _vistaRiepilogo == 'bussola' ? Colors.black : Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1317,15 +1335,24 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                             color: _vistaRiepilogo == 'data' ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(
-                            child: Text(
-                              'Data',
-                              style: TextStyle(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 12,
                                 color: _vistaRiepilogo == 'data' ? Colors.black : Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Data',
+                                style: TextStyle(
+                                  color: _vistaRiepilogo == 'data' ? Colors.black : Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
