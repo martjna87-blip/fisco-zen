@@ -11,6 +11,7 @@ import '../widgets_shared/app_image_picker.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '../screens/0_1_pro_upgrade.dart';
 import '../services/document_scanner_service.dart';
+import 'package:flutter/services.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
@@ -341,6 +342,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
+  // ⚠️ POP-UP ALERT DI SICUREZZA PRIMA DELL'ELIMINAZIONE TOTALE DELLO STORICO
   void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc, VoidCallback onConcluso) {
     showDialog(
       context: context,
@@ -390,6 +392,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
+  // 🛑 POP-UP ELIMINAZIONE MOVIMENTI REALI/PASSATI
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
@@ -425,7 +428,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   width: double.infinity,
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      side: const BorderSide(color: Color(0xFF2DD4BF)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
@@ -439,7 +442,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         type: NotificationType.warning,
                       );
                     },
-                    child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11)),
+                    child: const Text('Mantieni questa, cancella le future', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 11)),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -447,7 +450,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   width: double.infinity,
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      side: const BorderSide(color: Color(0xFF2DD4BF)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
@@ -459,7 +462,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         context, 'Movimento eliminato solo per questo mese! 🎉',
                       );
                     },
-                    child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11)),
+                    child: const Text('Elimina questa, mantieni le future', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 11)),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -472,14 +475,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     onPressed: () {
+                      context.read<WalletProvider>().stopRecurrence(id);
                       context.read<WalletProvider>().deleteTransaction(id);
                       Navigator.pop(ctx);
                       setState(() {});
                       AppNotifications.mostraInAlto(
-                        context, 'Movimento "$desc" e futuri eliminati! 🎉',
+                        context, 'Movimento "$desc" e futuri eliminati! (Storico passato salvo)',
                       );
                     },
-                    child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                    child: const Text('Elimina questa e le future (Salva il passato)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -511,6 +515,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
+  // 🔮 POP-UP ELIMINAZIONE PREVISIONI FUTURE
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
@@ -526,7 +531,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Stai modificando la previsione per "$desc".\nLo storico dei mesi passati non verrà toccato. Scegli cosa fare:',
+                'Stai modificando la previsione per "$desc".\nScegli come procedere:',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -570,17 +575,38 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
                   onPressed: () {
                     final provider = Provider.of<WalletProvider>(context, listen: false);
-                    provider.stopRecurrence(parentId);
+                    provider.stopRecurrenceFromDate(parentId, meseRiferimento);
                     Navigator.pop(ctx);
                     setState(() {});
 
                     AppNotifications.mostraInAlto(
                       context,
-                      'Ricorrenza disdetta per i mesi futuri! Lo storico passato è salvo.',
+                      'Ricorrenza disdetta da questo mese in poi! Lo storico passato è salvo.',
                       type: NotificationType.warning,
                     );
                   },
-                  child: const Text('Elimina questa e tutte le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  child: const Text('Elimina questa e tutte le future (Salva il passato)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                  label: const Text(
+                    'Elimina TUTTE (comprese le passate)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _mostraAlertConfermaEliminazioneTotale(context, parentId, desc, () {
+                      setState(() {});
+                    });
+                  },
                 ),
               ),
             ],
@@ -1129,7 +1155,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'isFattura': isFatturaPiva, 
         'isGiroconto': isGiroconto,
         'isRecurrent': tx.isRecurrent,
-        'isPrevisto': false, 
+        'isPrevisto': false,
       };
     }).toList();
 
@@ -1169,7 +1195,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'isFattura': false,
         'isGiroconto': false,
         'isRecurrent': true,
-        'isPrevisto': tx.date.isAfter(DateTime.now()), 
+        'isPrevisto': true, // 👈 Identifica che la fonte è una regola di previsione
       };
     }).toList();
 
@@ -1590,6 +1616,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
                                   final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
+                                  // 💡 DETERMINA LO STILE VISIVO IN BASE ALLA DATA CORRENTE
+                                  final bool isFuturo = dt.isAfter(DateTime.now());
+
                                   final rowContent = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                                     child: Row(
@@ -1598,28 +1627,26 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         Expanded(
                                           child: Row(
                                             children: [
-                                              // ✨ 1. ICONA A SINISTRA (Verde acqua se passato, grigia se futuro)
                                               if (isRecurrent) ...[
                                                 Icon(
                                                   Icons.sync_rounded, 
                                                   size: 13, 
-                                                  color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF),
+                                                  color: isFuturo ? Colors.white38 : const Color(0xFF2DD4BF),
                                                 ),
                                                 const SizedBox(width: 6),
                                               ],
-                                              // ✨ 2. TESTO (Normale/Colorato se passato, Corsivo/Grigio se futuro)
                                               Expanded(
                                                 child: Text(
                                                   _vistaRiepilogo == 'bussola'
                                                       ? '$desc ($catSpecifica)'
                                                       : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
                                                   style: TextStyle(
-                                                    color: isPrevisto 
+                                                    color: isFuturo 
                                                         ? Colors.white38 
                                                         : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
                                                     fontSize: 11, 
-                                                    fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal,
-                                                    fontWeight: isPrevisto ? FontWeight.normal : FontWeight.w600,
+                                                    fontStyle: isFuturo ? FontStyle.italic : FontStyle.normal,
+                                                    fontWeight: isFuturo ? FontWeight.normal : FontWeight.w600,
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -1628,7 +1655,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        // ✨ 3. IMPORTO (Brillante se passato, Opaco al 40% se futuro)
                                         Text(
                                           isGiroconto 
                                               ? _formatValuta(imp)
@@ -1636,7 +1662,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                           style: TextStyle(
                                             color: isGiroconto
                                                 ? const Color(0xFF3B82F6)
-                                                : (isPrevisto 
+                                                : (isFuturo 
                                                   ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFF10B981).withOpacity(0.4))
                                                   : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
                                             fontSize: 11,
@@ -1647,10 +1673,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     ),
                                   );
 
-                                  // ✨ 4. FATTURE INTOCCABILI
                                   if (isFattura) return rowContent;
 
-                                  // ✨ 5. CESTINO CON SWIPE-TO-DELETE E REGOLE POP-UP
                                   return Dismissible(
                                     key: Key('riepilogo_dismiss_${id}_$parentId'),
                                     direction: DismissDirection.endToStart,
@@ -1733,6 +1757,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         controller: _amountController,
                         focusNode: _amountFocusNode,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          ThousandsSeparatorInputFormatter(), // 👈 AGGIUNTA QUESTA RIGA
+                        ],
                         autofocus: true,
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -2486,5 +2513,41 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         ),
       ),
     );
+  }
+} // 👈 Questa parentesi chiude _AddMovementSheetState
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+
+    String cleanText = newValue.text.replaceAll('.', '');
+    List<String> parts = cleanText.split(',');
+    String integerPart = parts[0];
+    String? decimalPart = parts.length > 1 ? parts.sublist(1).join('') : null;
+
+    if (integerPart.isNotEmpty) {
+      final doubleNumber = double.tryParse(integerPart);
+      if (doubleNumber != null) {
+        final formattedInteger = integerPart.replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+
+        String resultText = formattedInteger;
+        if (decimalPart != null) {
+          resultText += ',${decimalPart.length > 2 ? decimalPart.substring(0, 2) : decimalPart}';
+        }
+
+        return TextEditingValue(
+          text: resultText,
+          selection: TextSelection.collapsed(offset: resultText.length),
+        );
+      }
+    }
+    return newValue;
   }
 }
