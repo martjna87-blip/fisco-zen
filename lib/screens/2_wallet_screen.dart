@@ -80,6 +80,347 @@ class _WalletScreenState extends State<WalletScreen> {
     });
   }
 
+  // 🛑 ALERT DI SICUREZZA PER ELIMINAZIONE TOTALE STORICO
+  void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc) {
+    showDialog(
+      context: context,
+      builder: (ctxAlert) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 8),
+            Text('⚠️ ELIMINAZIONE TOTALE', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Sei sicuro di voler eliminare TUTTI i movimenti di "$desc"?\n\n🚨 Verrà cancellato anche lo STORICO PASSATO nei mesi precedenti. L\'operazione è irreversibile.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctxAlert),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              context.read<WalletProvider>().deleteTransaction(id);
+              Navigator.pop(ctxAlert);
+              setState(() {});
+              AppNotifications.mostraInAlto(
+                context,
+                'Intera serie di "$desc" eliminata (compreso lo storico passato)',
+                type: NotificationType.error,
+              );
+            },
+            child: const Text('SÌ, ELIMINA TUTTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔄 GESTIONE REGOLE RICORRENZA ED ELIMINAZIONE SINGOLA
+  void _gestisciEliminazioneMovimento(BuildContext context, dynamic tx) {
+    final bool isRecurrent = tx.isRecurrent ?? false;
+    final String desc = tx.title ?? 'Movimento';
+    final String id = tx.id as String;
+    final DateTime date = tx.date as DateTime;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(isRecurrent ? Icons.event_repeat_rounded : Icons.warning_amber_rounded, color: const Color(0xFFEF4444), size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isRecurrent ? 'Gestisci Ricorrenza' : 'Elimina Movimento',
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRecurrent
+                  ? 'Stai eliminando "$desc" (ricorrente).\nScegli come procedere:'
+                  : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà aggiornato.',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            if (isRecurrent) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF2DD4BF)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().deleteButKeepRecurrence(id);
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    AppNotifications.mostraInAlto(context, 'Movimento eliminato solo per questo mese! 🎉');
+                  },
+                  child: const Text('Elimina solo questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().stopRecurrenceFromDate(id, date);
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    AppNotifications.mostraInAlto(
+                      context,
+                      'Ricorrenza disdetta da questo mese in poi! (Storico salvato)',
+                      type: NotificationType.warning,
+                    );
+                  },
+                  child: const Text('Elimina questa e future (Salva passato)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                  label: const Text('Elimina TUTTE (comprese le passate)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _mostraAlertConfermaEliminazioneTotale(context, id, desc);
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: isRecurrent
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    context.read<WalletProvider>().deleteTransaction(id);
+                    Navigator.pop(ctx);
+                    setState(() {});
+                    AppNotifications.mostraInAlto(context, 'Movimento "$desc" eliminato 🎉');
+                  },
+                  child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+      ),
+    );
+  }
+// 💳 MOSTRA MODALE MOVIMENTI FILTRATI PER SINGOLO CONTO (CON SWIPE-TO-DELETE E LIVE UPDATE)
+  void _mostraMovimentiConto(BuildContext context, dynamic acc) {
+    AppBottomSheet.mostra(
+      context: context,
+      child: Consumer<WalletProvider>(
+        builder: (context, walletProvider, child) {
+          // 💡 Calcola i movimenti in tempo reale. Se uno viene eliminato, la lista si aggiorna subito!
+          final txsConto = walletProvider.transactions
+              .where((tx) => tx.accountId == acc.id)
+              .toList();
+              
+          txsConto.sort((a, b) => b.date.compareTo(a.date));
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF18181B), 
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
+            ),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.55,
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ➖ BARRETTA DI TRASCINAMENTO (INDICATORE SWIPE-DOWN)
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (acc.color as Color).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.account_balance_wallet_rounded, color: acc.color as Color, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Movimenti: ${acc.title}',
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              acc.subtitle as String,
+                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (txsConto.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Nessun movimento registrato per questo conto.',
+                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                        ),
+                      ),
+                    )
+                  else
+                    ...txsConto.map((tx) {
+                      final bool isIncome = tx.isIncome;
+                      final Color color = isIncome ? oceanCyan : const Color(0xFFF43F5E);
+                      final String sign = isIncome ? '+' : '-';
+                      final String dateStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}/${tx.date.year}';
+
+                      return Dismissible(
+                        key: Key('modal_dismiss_${tx.id}'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          margin: const EdgeInsets.only(bottom: 8), // Allinea lo sfondo al bordo
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+                        ),
+                        confirmDismiss: (direction) async {
+                          // Chiama la stessa funzione sicura del Wallet principale
+                          _gestisciEliminazioneMovimento(context, tx);
+                          return false; 
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                  color: color,
+                                  size: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      tx.title,
+                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (tx.isRecurrent ?? false) ...[
+                                    const SizedBox(width: 6),
+                                    Icon(Icons.sync_rounded, color: oceanCyan.withOpacity(0.8), size: 13),
+                                  ],
+                                ],
+                              ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '$dateStr • ${tx.category}',
+                                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '$sign${_formattaValuta(tx.amount)}',
+                                style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final String currentBackgroundUrl = _sfondiSettimanali[_testIndex % _sfondiSettimanali.length];
@@ -343,7 +684,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               child: _buildGlassMiniCard(
                                 icon: Icons.add_circle_outline_rounded,
                                 title: 'Storico\nMovimenti',
-                                value: 'Registra',
+                                value: 'Riepilogo',
                                 iconColor: oceanCyan,
                                 onTap: () => AppBottomSheet.mostra(context: context, child: const AddMovementSheet(initialTab: 'riepilogo')),
                               ),
@@ -427,7 +768,14 @@ class _WalletScreenState extends State<WalletScreen> {
 
                             return Column(
                               children: [
-                                _buildAccountRow(icon: iconaConto, title: acc.title, subtitle: acc.subtitle, amount: _formattaValuta(acc.amount), color: acc.color),
+                                _buildAccountRow(
+                                  icon: iconaConto,
+                                  title: acc.title,
+                                  subtitle: acc.subtitle,
+                                  amount: _formattaValuta(acc.amount),
+                                  color: acc.color,
+                                  onTap: () => _mostraMovimentiConto(context, acc),
+                                ),
                                 if (!isLast) Divider(color: Colors.white.withOpacity(0.1), height: 1, indent: 20, endIndent: 20),
                               ],
                             );
@@ -509,9 +857,32 @@ class _WalletScreenState extends State<WalletScreen> {
                               return movimentiUnici.asMap().entries.map((entry) {
                                 final txData = entry.value;
                                 final isLast = entry.key == movimentiUnici.length - 1;
+                                final tx = txData['tx'];
+
                                 return Column(
                                   children: [
-                                    _buildTransactionRow(tx: txData['tx'], fromAccountId: txData['fromAccountId'], toAccountId: txData['toAccountId']),
+                                    Dismissible(
+                                      key: Key('dismiss_${tx.id}_${entry.key}'),
+                                      direction: DismissDirection.endToStart,
+                                      background: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(right: 20),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEF4444).withOpacity(0.85),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+                                      ),
+                                      confirmDismiss: (direction) async {
+                                        _gestisciEliminazioneMovimento(context, tx);
+                                        return false;
+                                      },
+                                      child: _buildTransactionRow(
+                                        tx: tx,
+                                        fromAccountId: txData['fromAccountId'],
+                                        toAccountId: txData['toAccountId'],
+                                      ),
+                                    ),
                                     if (!isLast) Divider(color: Colors.white.withOpacity(0.1), height: 1, indent: 20, endIndent: 20),
                                   ],
                                 );
@@ -680,6 +1051,25 @@ class _WalletScreenState extends State<WalletScreen> {
                       Text(_isVistaAnnuale ? '${_dataFiltroRipartizione.year}' : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
                       InkWell(onTap: () => _cambiaPeriodoRipartizione(1), child: Icon(Icons.chevron_right_rounded, color: oceanCyan)),
+                      if (_dataFiltroRipartizione.year != DateTime.now().year || _dataFiltroRipartizione.month != DateTime.now().month) ...[
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => setState(() => _dataFiltroRipartizione = DateTime.now()),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: oceanCyan.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              'Oggi',
+                              style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   Row(
@@ -744,25 +1134,35 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildAccountRow({required IconData icon, required String title, required String subtitle, required String amount, required Color color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.2), shape: BoxShape.circle), child: Icon(icon, color: color, size: 18)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-              ],
+  Widget _buildAccountRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String amount,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(0.2), shape: BoxShape.circle), child: Icon(icon, color: color, size: 18)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                ],
+              ),
             ),
-          ),
-          Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-        ],
+            Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+          ],
+        ),
       ),
     );
   }
@@ -791,7 +1191,22 @@ class _WalletScreenState extends State<WalletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tx.title.replaceAll('⚠️', '').replaceAll('🛡️', '').trim(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        tx.title.replaceAll('⚠️', '').replaceAll('🛡️', '').trim(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (tx.isRecurrent ?? false) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.sync_rounded, color: oceanCyan.withOpacity(0.8), size: 14),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(detail.split('-').first.trim(), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],

@@ -94,26 +94,31 @@ class AppBottomSheet extends StatelessWidget {
                           ),
                         ),
                         if (badgeText != null) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: (badgeColor ?? const Color(0xFF2DD4BF)).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: (badgeColor ?? const Color(0xFF2DD4BF)).withOpacity(0.4),
-                              ),
-                            ),
-                            child: Text(
-                              badgeText!,
-                              style: TextStyle(
-                                color: badgeTextColor ?? badgeColor ?? const Color(0xFF2DD4BF),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: badgeColor ?? const Color(0xFF2DD4BF),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    badgeText!.toUpperCase(),
+                    style: TextStyle(
+                      color: (badgeColor ?? const Color(0xFF2DD4BF)).withOpacity(0.85),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ],
                       ],
                     ),
                   ),

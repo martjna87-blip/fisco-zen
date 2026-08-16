@@ -67,28 +67,40 @@ class FiscOnApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FiscON',
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('it', 'IT'),
-      ],
-      locale: const Locale('it', 'IT'),
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF101012),
-        bottomSheetTheme: const BottomSheetThemeData(
-          backgroundColor: Color(0xFF1E1E2C),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    return Consumer<WalletProvider>(
+      builder: (context, wallet, child) {
+        return MaterialApp(
+          title: 'FiscON',
+          debugShowCheckedModeBanner: false,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('it', 'IT'),
+          ],
+          locale: const Locale('it', 'IT'),
+          theme: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: const Color(0xFF101012),
+            bottomSheetTheme: const BottomSheetThemeData(
+              backgroundColor: Color(0xFF1E1E2C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+            ),
           ),
-        ),
-      ),
-      home: const SplashScreen(),
+          builder: (context, childWidget) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(wallet.textScaleFactor),
+              ),
+              child: childWidget!,
+            );
+          },
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

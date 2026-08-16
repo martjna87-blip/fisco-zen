@@ -1,319 +1,377 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-// 🇮🇹 FORMATTATORE CHE INSERISCE IN AUTOMATICO LE BARRE NELLA DATA (es. 05/08/2026)
-class _DateSlashFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (text.length > 8) text = text.substring(0, 8);
+enum _VistaDatePicker { giorno, mese, anno }
 
-    var newText = '';
-    for (int i = 0; i < text.length; i++) {
-      if (i == 2 || i == 4) {
-        newText += '/';
-      }
-      newText += text[i];
-    }
+class AppDatePicker extends StatefulWidget {
+  final DateTime initialDate;
 
-    return TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
-}
+  const AppDatePicker({
+    super.key,
+    required this.initialDate,
+  });
 
-class AppDatePicker {
-  /// 📅 Mostra il calendario FiscON con tasto "Oggi" (Reset rapido al mese odierno) e Matita ✏️
   static Future<DateTime?> selezionaData(
     BuildContext context, {
     required DateTime dataIniziale,
-    DateTime? primaData,
-    DateTime? ultimaData,
-  }) async {
-    return await showDialog<DateTime>(
+  }) {
+    return showDialog<DateTime>(
       context: context,
-      builder: (BuildContext ctx) {
-        return _AppDatePickerDialog(
-          initialDate: dataIniziale,
-          firstDate: primaData ?? DateTime(2020),
-          lastDate: ultimaData ?? DateTime(2035),
-        );
-      },
+      builder: (ctx) => AppDatePicker(initialDate: dataIniziale),
     );
   }
-}
-
-class _AppDatePickerDialog extends StatefulWidget {
-  final DateTime initialDate;
-  final DateTime firstDate;
-  final DateTime lastDate;
-
-  const _AppDatePickerDialog({
-    required this.initialDate,
-    required this.firstDate,
-    required this.lastDate,
-  });
 
   @override
-  State<_AppDatePickerDialog> createState() => _AppDatePickerDialogState();
+  State<AppDatePicker> createState() => _AppDatePickerState();
 }
 
-class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
+class _AppDatePickerState extends State<AppDatePicker> {
   late DateTime _selectedDate;
-  bool _isTextInputMode = false;
-  final TextEditingController _textController = TextEditingController();
-  String? _errorText;
+  late DateTime _displayedDate;
+  _VistaDatePicker _vistaCorrente = _VistaDatePicker.giorno;
 
-  // 🔑 KEY PER FORZARE IL RESET DEL CALENDARIO AL MESE CORRENTE QUANDO SI PREME "OGGI"
-  int _calendarResetKey = 0;
+  final List<String> _mesiBrevi = [
+    'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+    'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
+  ];
+
+  final List<String> _mesiEstesi = [
+    'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+    'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'
+  ];
 
   @override
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate;
-    _textController.text = _formatDate(_selectedDate);
+    _displayedDate = widget.initialDate;
   }
 
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
-  }
-
-  String _formatDate(DateTime dt) {
-    final g = dt.day.toString().padLeft(2, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    return '$g/$m/${dt.year}';
-  }
-
-  void _parseAndConfirmTextDate() {
-    final text = _textController.text.trim();
-    final parti = text.split('/');
-    if (parti.length == 3) {
-      final giorno = int.tryParse(parti[0]);
-      final mese = int.tryParse(parti[1]);
-      final anno = int.tryParse(parti[2]);
-
-      if (giorno != null && mese != null && anno != null) {
-        try {
-          final dt = DateTime(anno, mese, giorno);
-          if (dt.isAfter(widget.firstDate.subtract(const Duration(days: 1))) &&
-              dt.isBefore(widget.lastDate.add(const Duration(days: 1)))) {
-            Navigator.of(context).pop(dt);
-            return;
-          }
-        } catch (_) {}
-      }
-    }
-
-    setState(() {
-      _errorText = 'Data non valida. Usa GG/MM/AAAA';
-    });
+  String _formattaDataTesto(DateTime dt) {
+    final gg = dt.day.toString().padLeft(2, '0');
+    final mm = dt.month.toString().padLeft(2, '0');
+    return '$gg/$mm/${dt.year}';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2DD4BF),
-          onPrimary: Colors.black,
-          surface: Color(0xFF18181B),
-          onSurface: Colors.white,
-        ),
-        dialogBackgroundColor: const Color(0xFF18181B),
-      ),
-      child: Dialog(
-        backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Container(
-          width: 330,
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 📌 1. HEADER CON DATA SELEZIONATA E PULSANTE MATITA ✏️ / CALENDARIO 📅
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'SELEZIONA DATA',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(_selectedDate),
-                        style: const TextStyle(
-                          color: Color(0xFF2DD4BF),
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _isTextInputMode = !_isTextInputMode;
-                        _errorText = null;
-                        if (_isTextInputMode) {
-                          _textController.text = _formatDate(_selectedDate);
-                        }
-                      });
-                    },
-                    tooltip: _isTextInputMode ? 'Scegli dal calendario' : 'Scrivi data manualmente',
-                    icon: Icon(
-                      _isTextInputMode ? Icons.calendar_today_rounded : Icons.edit_rounded,
-                      color: const Color(0xFF2DD4BF),
-                      size: 22,
-                    ),
-                  ),
-                ],
+    return Dialog(
+      backgroundColor: const Color(0xFF18181B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        width: 320,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'SELEZIONA DATA',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
               ),
-
-              const SizedBox(height: 12),
-              Divider(color: Colors.white.withOpacity(0.08), height: 1),
-              const SizedBox(height: 12),
-
-              // 📌 2. BODY: CALENDARIO OPPURE CAMPO DI TESTO CON MATITA ✏️
-              if (_isTextInputMode) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-                  child: TextField(
-                    controller: _textController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [_DateSlashFormatter()],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Data (GG/MM/AAAA)',
-                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-                      hintText: '05/08/2026',
-                      hintStyle: const TextStyle(color: Colors.white24, fontSize: 16),
-                      errorText: _errorText,
-                      prefixIcon: const Icon(Icons.edit_calendar_rounded, color: Color(0xFF2DD4BF)),
-                      filled: true,
-                      fillColor: Colors.black.withOpacity(0.4),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF2DD4BF)),
-                      ),
-                    ),
-                    onSubmitted: (_) => _parseAndConfirmTextDate(),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formattaDataTesto(_selectedDate),
+                  style: const TextStyle(
+                    color: Color(0xFF2DD4BF),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ] else ...[
-                // 📅 CALENDARIO CON KEY DINAMICA PER RESET ISTANTANEO AL TAP SU "OGGI"
-                SizedBox(
-                  height: 260,
-                  child: CalendarDatePicker(
-                    key: ValueKey(_calendarResetKey), // 👈 Quando cambia, il calendario torna in modalità giorno e sul mese corrente!
-                    initialDate: _selectedDate,
-                    firstDate: widget.firstDate,
-                    lastDate: widget.lastDate,
-                    onDateChanged: (DateTime newDate) {
-                      setState(() {
-                        _selectedDate = newDate;
-                      });
-                    },
-                  ),
+                const Icon(Icons.edit_outlined, color: Color(0xFF2DD4BF), size: 18),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white12, height: 1),
+            const SizedBox(height: 12),
+
+            // Header navigazione mese/anno
+            _buildHeaderNavigazione(),
+
+            const SizedBox(height: 12),
+
+            // Contenuto dinamico (Giorno -> Mese -> Anno)
+            if (_vistaCorrente == _VistaDatePicker.giorno) _buildGrigliaGiorni(),
+            if (_vistaCorrente == _VistaDatePicker.mese) _buildGrigliaMesi(),
+            if (_vistaCorrente == _VistaDatePicker.anno) _buildGrigliaAnni(),
+
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white12, height: 1),
+            const SizedBox(height: 12),
+
+            // Footer Pulsanti
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    final oggi = DateTime.now();
+                    setState(() {
+                      _selectedDate = oggi;
+                      _displayedDate = oggi;
+                      _vistaCorrente = _VistaDatePicker.giorno;
+                    });
+                  },
+                  icon: const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                  label: const Text('Oggi', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Annulla', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2DD4BF),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(context, _selectedDate),
+                      child: const Text('Conferma', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 8),
-              Divider(color: Colors.white.withOpacity(0.08), height: 1),
-              const SizedBox(height: 12),
-
-              // 📌 3. FOOTER: TASTO "OGGI" A SINISTRA E ANNULLA/CONFERMA A DESTRA
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // ⚡ PULSANTE "OGGI" (FUNZIONA DA RESET AL MESE ODIERNO SENZA CHIUDERE)
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _selectedDate = DateTime.now();
-                        _calendarResetKey++; // 👈 Forza il reset della vista al mese di oggi
-                        if (_isTextInputMode) {
-                          _textController.text = _formatDate(_selectedDate);
-                        }
-                      });
-                    },
-                    icon: const Icon(Icons.today_rounded, color: Color(0xFF2DD4BF), size: 18),
-                    label: const Text(
-                      'Oggi',
-                      style: TextStyle(
-                        color: Color(0xFF2DD4BF),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-
-                  // AZIONI DESTRA: ANNULLA & CONFERMA
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(null),
-                        child: const Text(
-                          'Annulla',
-                          style: TextStyle(color: Colors.white54, fontSize: 13),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2DD4BF),
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        ),
-                        onPressed: () {
-                          if (_isTextInputMode) {
-                            _parseAndConfirmTextDate();
-                          } else {
-                            Navigator.of(context).pop(_selectedDate);
-                          }
-                        },
-                        child: const Text(
-                          'Conferma',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+  Widget _buildHeaderNavigazione() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        InkWell(
+          onTap: () {
+            setState(() {
+              if (_vistaCorrente == _VistaDatePicker.giorno) {
+                _vistaCorrente = _VistaDatePicker.anno;
+              } else if (_vistaCorrente == _VistaDatePicker.anno) {
+                _vistaCorrente = _VistaDatePicker.giorno;
+              } else {
+                _vistaCorrente = _VistaDatePicker.giorno;
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${_mesiEstesi[_displayedDate.month - 1]} ${_displayedDate.year}',
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _vistaCorrente == _VistaDatePicker.giorno ? Icons.arrow_drop_down_rounded : Icons.arrow_drop_up_rounded,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_vistaCorrente == _VistaDatePicker.giorno)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  setState(() {
+                    _displayedDate = DateTime(_displayedDate.year, _displayedDate.month - 1);
+                  });
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  setState(() {
+                    _displayedDate = DateTime(_displayedDate.year, _displayedDate.month + 1);
+                  });
+                },
               ),
             ],
           ),
-        ),
+      ],
+    );
+  }
+
+  // 1️⃣ Vista Anni: Cliccando su un anno passa alla selezione del MESE
+  Widget _buildGrigliaAnni() {
+    final int annoCorrente = DateTime.now().year;
+    final List<int> anni = List.generate(12, (index) => (annoCorrente - 5) + index);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 2.2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
       ),
+      itemCount: anni.length,
+      itemBuilder: (context, index) {
+        final anno = anni[index];
+        final isSelected = _displayedDate.year == anno;
+
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _displayedDate = DateTime(anno, _displayedDate.month);
+              _vistaCorrente = _VistaDatePicker.mese; // 👈 Passa direttamente alla vista Mesi!
+            });
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$anno',
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 2️⃣ Vista Mesi: Cliccando su un mese passa alla selezione del GIORNO
+  Widget _buildGrigliaMesi() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 2.2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: 12,
+      itemBuilder: (context, index) {
+        final meseIndex = index + 1;
+        final isSelected = _displayedDate.month == meseIndex;
+
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _displayedDate = DateTime(_displayedDate.year, meseIndex);
+              _vistaCorrente = _VistaDatePicker.giorno; // 👈 Passa alla vista Giorni!
+            });
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              _mesiBrevi[index],
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 3️⃣ Vista Giorni Calendario
+  Widget _buildGrigliaGiorni() {
+    final int primoGiornoSettimana = DateTime(_displayedDate.year, _displayedDate.month, 1).weekday;
+    final int giorniNelMese = DateTime(_displayedDate.year, _displayedDate.month + 1, 0).day;
+    final List<String> giorniSettimana = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: giorniSettimana
+              .map((g) => SizedBox(
+                    width: 32,
+                    child: Text(
+                      g,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+          ),
+          itemCount: (primoGiornoSettimana - 1) + giorniNelMese,
+          itemBuilder: (context, index) {
+            if (index < primoGiornoSettimana - 1) {
+              return const SizedBox.shrink();
+            }
+
+            final giornoNum = index - (primoGiornoSettimana - 1) + 1;
+            final dataCella = DateTime(_displayedDate.year, _displayedDate.month, giornoNum);
+            final isSelected = _selectedDate.year == dataCella.year &&
+                _selectedDate.month == dataCella.month &&
+                _selectedDate.day == dataCella.day;
+
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedDate = dataCella;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2DD4BF) : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$giornoNum',
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : Colors.white,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

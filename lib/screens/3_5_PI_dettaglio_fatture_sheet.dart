@@ -76,7 +76,11 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
               }
 
               Navigator.pop(ctx);
-              setState(() {});
+              setState(() {
+                if (id != null) {
+                  _expandedFattureIds.remove(id);
+                }
+              });
               AppNotifications.mostraInAlto(
                 context, 
                 'Fattura di "${fattura['cliente']}" eliminata 🎉',
@@ -151,7 +155,8 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final screenHeight = MediaQuery.of(context).size.height;
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    final listaTutteIncassate = widget.fattureIncassate ?? walletProvider.fattureIncassate;
+    // 💡 Legge direttamente lo stato aggiornato dal provider in tempo reale
+    final listaTutteIncassate = walletProvider.fattureIncassate;
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
     final fattureInSospeso = walletProvider.fattureDaIncassare;
 

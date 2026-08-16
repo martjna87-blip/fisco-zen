@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>FiscON richiede l'accesso alla fotocamera per scattare foto agli scontrini, fatture o per la tua foto profilo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FiscON richiede l'accesso alla galleria per permetterti di caricare le immagini degli scontrini, fatture o la foto profilo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,9 +70,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-    <string>FiscON richiede l'accesso alla galleria per permetterti di caricare le immagini degli scontrini, fatture o la foto profilo.</string>
-    <key>NSCameraUsageDescription</key>
-    <string>FiscON richiede l'accesso alla fotocamera per scattare foto agli scontrini, fatture o per la tua foto profilo.</string>
 </dict>
 </plist>

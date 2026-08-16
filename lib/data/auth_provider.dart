@@ -7,7 +7,6 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
 
   AuthProvider() {
-    // Martina, questo ascoltatore rileva in automatico se l'utente è loggato o meno
     _auth.authStateChanges().listen((User? user) {
       _user = user;
       notifyListeners();
@@ -19,7 +18,7 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get userId => _user?.uid;
 
-  // Martina, registra un nuovo utente con email e password
+  // Registra un nuovo utente con email e password
   Future<String?> signUpWithEmail({
     required String email,
     required String password,
@@ -31,7 +30,7 @@ class AuthProvider with ChangeNotifier {
         password: password.trim(),
       );
       _setLoading(false);
-      return null; // Ritorna null se la registrazione va a buon fine
+      return null;
     } on FirebaseAuthException catch (e) {
       _setLoading(false);
       return _handleAuthError(e.code);
@@ -41,7 +40,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Martina, effettua il login dell'utente
+  // Effettua il login dell'utente
   Future<String?> signInWithEmail({
     required String email,
     required String password,
@@ -53,7 +52,7 @@ class AuthProvider with ChangeNotifier {
         password: password.trim(),
       );
       _setLoading(false);
-      return null; // Ritorna null se il login ha successo
+      return null;
     } on FirebaseAuthException catch (e) {
       _setLoading(false);
       return _handleAuthError(e.code);
@@ -63,7 +62,23 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Martina, disconnette l'utente dall'applicazione
+  // 🔑 NUOVO METODO: Invia email di ripristino password
+  Future<String?> resetPassword(String email) async {
+    try {
+      _setLoading(true);
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      _setLoading(false);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      _setLoading(false);
+      return _handleAuthError(e.code);
+    } catch (e) {
+      _setLoading(false);
+      return "Si è verificato un errore imprevisto. Riprova.";
+    }
+  }
+
+  // Disconnette l'utente dall'applicazione
   Future<void> signOut() async {
     await _auth.signOut();
   }
@@ -73,7 +88,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Martina, mappa i messaggi di errore di Firebase in italiano chiaro
+  // Mappa i messaggi di errore di Firebase in italiano
   String _handleAuthError(String errorCode) {
     switch (errorCode) {
       case 'user-not-found':

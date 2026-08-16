@@ -91,6 +91,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
   bool _initializedAteco = false;
   bool _calcolaAncheAccontoF24 = true;
+  bool _isNumeroSuggerito = true;
 
   @override
   void initState() {
@@ -127,6 +128,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         orElse: () => {'descrizione': 'Consulenza & Digital'},
       );
       _atecoNome = '$_atecoCodice - ${matchIniziale['descrizione']} (${(_atecoCoef * 100).toInt()}%)';
+
+      // 🔢 INSERISCE IL NUMERO FATTURA AUTOMATICO PRECALCOLATO
+      if (_numeroController.text.isEmpty) {
+        _numeroController.text = wallet.prossimoNumeroFattura;
+        _isNumeroSuggerito = true;
+      }
 
       _initializedAteco = true;
     }
@@ -361,7 +368,16 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                 Expanded(
                   child: TextField(
                     controller: _numeroController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(
+                      color: _isNumeroSuggerito ? Colors.white38 : Colors.white,
+                      fontSize: 13,
+                      fontWeight: _isNumeroSuggerito ? FontWeight.normal : FontWeight.bold,
+                    ),
+                    onChanged: (_) {
+                      if (_isNumeroSuggerito) {
+                        setState(() => _isNumeroSuggerito = false);
+                      }
+                    },
                     decoration: _buildInputDecoration('N° Fattura', Icons.tag_rounded),
                   ),
                 ),
@@ -752,21 +768,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'RIPARTIZIONE F24 & CUSCINETTO',
-                style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-              ),
-              GestureDetector(
-                onTap: () => setState(() => _calcolaAncheAccontoF24 = !_calcolaAncheAccontoF24),
-                child: Text(
-                  _calcolaAncheAccontoF24 ? 'Incl. Acconti (100% Tasse / 80% INPS)' : 'Solo Saldo Anno Corrente',
-                  style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-                ),
-              ),
-            ],
+          const Text(
+            'RIPARTIZIONE F24 & CUSCINETTO',
+            style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
           ),
           const SizedBox(height: 12),
 

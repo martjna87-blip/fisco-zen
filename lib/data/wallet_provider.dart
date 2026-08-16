@@ -197,6 +197,16 @@ class WalletProvider with ChangeNotifier {
     cycleUserTier(); 
   }
 
+  // 🔍 SCALA TESTO GLOBALE (1.0 = 100%, 1.15 = 115%, 1.25 = 125%)
+  double _textScaleFactor = 1.0;
+  double get textScaleFactor => _textScaleFactor;
+
+  void setTextScaleFactor(double scale) {
+    _textScaleFactor = scale;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
   String _codiceAteco = '62.02.00';
   String get codiceAteco => _codiceAteco;
 
@@ -493,6 +503,44 @@ class WalletProvider with ChangeNotifier {
   List<Map<String, dynamic>> get fattureIncassate => List.unmodifiable(_fattureIncassate);
   List<String> _skippedPredictions = [];
 
+  // 🔢 CALCOLA IL PROSSIMO NUMERO FATTURA INTELLIGENTE (con prefissi, suffissi e zeri)
+  String get prossimoNumeroFattura {
+    final annoCorrente = DateTime.now().year.toString();
+    final tutteLeFatture = [..._fattureDaIncassare, ..._fattureIncassate];
+
+    final fattureAnno = tutteLeFatture.where((f) {
+      final dataStr = f['data'] as String? ?? '';
+      return dataStr.contains(annoCorrente);
+    }).toList();
+
+    if (fattureAnno.isEmpty) return '1';
+
+    final ultimaFattura = fattureAnno.last;
+    final ultimoNumeroStr = (ultimaFattura['numero'] as String? ?? '').trim();
+
+    if (ultimoNumeroStr.isEmpty) return '1';
+
+    // Cerca prefisso, cifre e suffisso (es. "FATT-003/A" -> "FATT-", "003", "/A")
+    final regExp = RegExp(r'^(.*?)(\d+)(.*)$');
+    final match = regExp.firstMatch(ultimoNumeroStr);
+
+    if (match != null) {
+      final prefisso = match.group(1) ?? '';
+      final cifreStr = match.group(2) ?? '';
+      final soffisso = match.group(3) ?? '';
+
+      final numero = int.tryParse(cifreStr) ?? 0;
+      final prossimoNumero = numero + 1;
+
+      // Preserva gli zeri iniziali se presenti (es. 003 -> 004)
+      final cifreFormattate = prossimoNumero.toString().padLeft(cifreStr.length, '0');
+
+      return '$prefisso$cifreFormattate$soffisso';
+    }
+
+    return '1';
+  }
+
   WalletProvider() {
     _caricaDatiDaLocalStorage();
   }
@@ -519,7 +567,6 @@ class WalletProvider with ChangeNotifier {
 
   List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
-    final oggi = DateTime.now();
     final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
     for (var tx in ricorrenti) {
@@ -546,9 +593,10 @@ class WalletProvider with ChangeNotifier {
 
           bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
 
-          if (dataVirtuale.isAfter(oggi) && !isStessoMeseCreazione) {
+          // 💡 Rimosso il blocco `isAfter(oggi)` per permettere la generazione nei mesi intermedi
+          if (!isStessoMeseCreazione) {
             previsti.add(TransactionModel(
-              id: 'prev_${tx.id}_${dataVirtuale.month}', 
+              id: 'prev_${tx.id}_${dataVirtuale.year}_${dataVirtuale.month}', 
               title: tx.title,
               subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', 
               amount: tx.amount,
@@ -577,7 +625,7 @@ class WalletProvider with ChangeNotifier {
               continue;
             }
 
-            if (checkDate.isAfter(oggi) && checkDate.isAfter(tx.date)) {
+            if (checkDate.isAfter(tx.date)) {
               numOccorrenze++;
               primaDataValida ??= checkDate; 
             }
@@ -587,7 +635,7 @@ class WalletProvider with ChangeNotifier {
         if (numOccorrenze > 0) {
           final String etichettaOccorrenze = tx.isIncome ? 'entrate' : 'uscite';
           previsti.add(TransactionModel(
-            id: 'prev_${tx.id}_${meseRiferimento.month}', 
+            id: 'prev_${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}', 
             title: '${tx.title} ($numOccorrenze $etichettaOccorrenze)', 
             subtitle: 'Previsto', 
             amount: tx.amount * numOccorrenze, 
@@ -761,6 +809,8 @@ class WalletProvider with ChangeNotifier {
       aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
       _aliquotaInps = aliquotaInps;
 
+      _textScaleFactor = prefs.getDouble('textScaleFactor') ?? 1.0; // 👈 LETTURA SCALA
+
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 0.0;
       _accontiVersati = accontiVersatiAnnoPrecedente;
 
@@ -828,6 +878,8 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('aliquotaImposta', aliquotaImposta);
       await prefs.setDouble('aliquotaInps', aliquotaInps);
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
+      
+      await prefs.setDouble('textScaleFactor', _textScaleFactor); // 👈 SCRITTURA SCALA
 
       await prefs.setBool('onboarding_completed', true);
       await prefs.setString('codiceAteco', _codiceAteco);
@@ -1131,6 +1183,37 @@ class WalletProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // 🛡️ FERMA LA RICORRENZA DA UN MESE SPECIFICO SALVANDO IL PASSATO
+  void stopRecurrenceFromDate(String id, DateTime meseRiferimento) {
+    final idx = _transactions.indexWhere((t) => t.id == id);
+    if (idx != -1) {
+      final tx = _transactions[idx];
+
+      if (tx.date.year == meseRiferimento.year && tx.date.month == meseRiferimento.month) {
+        stopRecurrence(id);
+      } else {
+        final dataFine = DateTime(meseRiferimento.year, meseRiferimento.month, 1).subtract(const Duration(days: 1));
+        _transactions[idx] = TransactionModel(
+          id: tx.id,
+          title: tx.title,
+          subtitle: tx.subtitle,
+          amount: tx.amount,
+          isIncome: tx.isIncome,
+          category: tx.category,
+          date: tx.date,
+          accountId: tx.accountId,
+          isRecurrent: true,
+          frequenza: tx.frequenza,
+          giornoRicorrenza: tx.giornoRicorrenza,
+          dataFineRicorrenza: dataFine,
+        );
+        _salvaDatiInLocalStorage();
+        notifyListeners();
+      }
+    }
+  }
+
 
   void skipPrediction(String parentId, DateTime meseRiferimento) {
     final key = '${parentId}_${meseRiferimento.year}_${meseRiferimento.month}';

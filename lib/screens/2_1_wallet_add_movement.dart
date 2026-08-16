@@ -341,6 +341,55 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
+  void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc, VoidCallback onConcluso) {
+    showDialog(
+      context: context,
+      builder: (ctxAlert) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
+        icon: Icons.warning_rounded,
+        iconColor: const Color(0xFFEF4444),
+        titolo: '⚠️ ELIMINAZIONE TOTALE',
+        testoAnnulla: 'Annulla',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sei sicuro di voler eliminare TUTTI i movimenti di "$desc"?\n\n'
+              '🚨 Verrà cancellato anche lo STORICO PASSATO nei mesi precedenti. L\'operazione è irreversibile.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: () {
+                  context.read<WalletProvider>().deleteTransaction(id);
+                  Navigator.pop(ctxAlert);
+                  onConcluso();
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Intera serie di "$desc" eliminata (compreso lo storico passato)',
+                    type: NotificationType.error,
+                  );
+                },
+                child: const Text(
+                  'SÌ, ELIMINA ANCHE LO STORICO PASSATO',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
@@ -431,6 +480,27 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       );
                     },
                     child: const Text('Elimina questa e le future', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                    label: const Text(
+                      'Elimina TUTTE (comprese le passate)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _mostraAlertConfermaEliminazioneTotale(context, id, desc, () {
+                        setState(() {});
+                      });
+                    },
                   ),
                 ),
               ],
@@ -665,7 +735,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   ),
 
                   const SizedBox(height: 14),
-                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -968,9 +1038,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     return AppBottomSheet(
       title: titoloModal,
       badgeText: 'Wallet',
-      badgeColor: const Color(0xFF2DD4BF), 
+      badgeColor: const Color(0xFF2DD4BF),
       child: Container(
-        height: screenHeight * 0.55, // 🔒 55% FISSO
+        height: screenHeight * 0.55, 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1059,7 +1129,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'isFattura': isFatturaPiva, 
         'isGiroconto': isGiroconto,
         'isRecurrent': tx.isRecurrent,
-        'isPrevisto': false,
+        'isPrevisto': false, 
       };
     }).toList();
 
@@ -1099,7 +1169,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'isFattura': false,
         'isGiroconto': false,
         'isRecurrent': true,
-        'isPrevisto': true,
+        'isPrevisto': tx.date.isAfter(DateTime.now()), 
       };
     }).toList();
 
@@ -1111,11 +1181,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }).toList();
 
     final double totaleEntrate = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == false && m['isPrevisto'] == false && m['isGiroconto'] == false)
+        .where((m) => m['isSpesa'] == false && m['isGiroconto'] == false) 
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
     final double totaleSpese = movimentiMeseSelezionato
-        .where((m) => m['isSpesa'] == true && m['isPrevisto'] == false && m['isGiroconto'] == false)
+        .where((m) => m['isSpesa'] == true && m['isGiroconto'] == false) 
         .fold(0.0, (sum, m) => sum + (m['imp'] as double));
 
     final Map<String, List<Map<String, dynamic>>> perCategoria = {};
@@ -1169,35 +1239,66 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       });
                     },
                   ),
-                  // ✨ SELETTORE MESE CLICCABILE
-                  InkWell(
-                    onTap: () async {
-                      final DateTime? picked = await AppDatePicker.selezionaData(
-                        context,
-                        dataIniziale: _meseSelezionatoRiepilogo,
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _meseSelezionatoRiepilogo = picked;
-                          _categoriaEspansaIndex = null;
-                        });
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _formattaMeseAnno(_meseSelezionatoRiepilogo).toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: () async {
+                          final DateTime? picked = await AppDatePicker.selezionaData(
+                            context,
+                            dataIniziale: _meseSelezionatoRiepilogo,
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _meseSelezionatoRiepilogo = picked;
+                              _categoriaEspansaIndex = null;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _formattaMeseAnno(_meseSelezionatoRiepilogo).toUpperCase(),
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF2DD4BF), size: 20),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF2DD4BF), size: 20),
-                        ],
+                        ),
                       ),
-                    ),
+                      if (_meseSelezionatoRiepilogo.year != DateTime.now().year || _meseSelezionatoRiepilogo.month != DateTime.now().month) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _meseSelezionatoRiepilogo = DateTime.now();
+                              _categoriaEspansaIndex = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2DD4BF).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.5)),
+                            ),
+                            child: const Text(
+                              'Oggi',
+                              style: TextStyle(
+                                color: Color(0xFF2DD4BF),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2DD4BF), size: 16),
@@ -1245,7 +1346,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -1364,7 +1464,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           ),
         ),
         const SizedBox(height: 12),
-
         movimentiMeseSelezionato.isEmpty
             ? Container(
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -1386,7 +1485,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    // ✨ PULSANTE DI AZIONE PER STATO VUOTO
                     ElevatedButton.icon(
                       onPressed: () => setState(() => _tipoMovimento = 'uscita'),
                       icon: const Icon(Icons.add_rounded, size: 16, color: Colors.black),
@@ -1417,12 +1515,20 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     final double totGruppo = listaMovs.fold(0.0, (sum, m) {
                       final imp = m['imp'] as double;
                       final isSpesa = m['isSpesa'] as bool;
-                      final isPrevisto = m['isPrevisto'] as bool;
                       final isGiroconto = m['isGiroconto'] as bool? ?? false;
-                      if (isPrevisto || isGiroconto) return sum;
+                      if (isGiroconto) return sum;
                       return sum + (isSpesa ? -imp : imp);
                     });
                     final bool isEspansa = _categoriaEspansaIndex == index;
+
+                    final bool isGruppoSpesa = listaMovs.any((m) => m['isSpesa'] == true);
+                    final String segnoGruppo = isCategoriaGiroconto 
+                        ? '⇄ ' 
+                        : (totGruppo < 0 
+                            ? '-' 
+                            : (totGruppo > 0 
+                                ? '+' 
+                                : (isGruppoSpesa ? '-' : '+')));
 
                     return Container(
                       decoration: const BoxDecoration(
@@ -1453,13 +1559,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     ),
                                   ),
                                   Text(
-                                    isCategoriaGiroconto
-                                        ? '⇄ ${_formatValuta(totGruppo)}'
-                                        : '${totGruppo >= 0 ? '+' : '-'}${_formatValuta(totGruppo)}',
+                                    '$segnoGruppo${_formatValuta(totGruppo)}',
                                     style: TextStyle(
                                       color: isCategoriaGiroconto 
                                           ? const Color(0xFF3B82F6)
-                                          : (totGruppo >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                          : (segnoGruppo == '+' ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -1486,27 +1590,36 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
                                   final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                  final rowContent = Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Expanded(
                                           child: Row(
                                             children: [
+                                              // ✨ 1. ICONA A SINISTRA (Verde acqua se passato, grigia se futuro)
                                               if (isRecurrent) ...[
-                                                Icon(Icons.repeat_rounded, size: 12, color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF)),
-                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.sync_rounded, 
+                                                  size: 13, 
+                                                  color: isPrevisto ? Colors.white38 : const Color(0xFF2DD4BF),
+                                                ),
+                                                const SizedBox(width: 6),
                                               ],
+                                              // ✨ 2. TESTO (Normale/Colorato se passato, Corsivo/Grigio se futuro)
                                               Expanded(
                                                 child: Text(
                                                   _vistaRiepilogo == 'bussola'
                                                       ? '$desc ($catSpecifica)'
                                                       : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
                                                   style: TextStyle(
-                                                    color: isPrevisto ? Colors.white38 : Colors.white60, 
+                                                    color: isPrevisto 
+                                                        ? Colors.white38 
+                                                        : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
                                                     fontSize: 11, 
-                                                    fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal
+                                                    fontStyle: isPrevisto ? FontStyle.italic : FontStyle.normal,
+                                                    fontWeight: isPrevisto ? FontWeight.normal : FontWeight.w600,
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -1514,7 +1627,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                             ],
                                           ),
                                         ),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 8),
+                                        // ✨ 3. IMPORTO (Brillante se passato, Opaco al 40% se futuro)
                                         Text(
                                           isGiroconto 
                                               ? _formatValuta(imp)
@@ -1523,34 +1637,41 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                             color: isGiroconto
                                                 ? const Color(0xFF3B82F6)
                                                 : (isPrevisto 
-                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.5) : const Color(0xFF10B981).withOpacity(0.5))
+                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFF10B981).withOpacity(0.4))
                                                   : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        if (!isFattura) ...[
-                                          const SizedBox(width: 6),
-                                          InkWell(
-                                            onTap: () {
-                                              if (isPrevisto) {
-                                                _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
-                                              } else {
-                                                _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
-                                              }
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEF4444).withOpacity(0.15),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 14),
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
+                                  );
+
+                                  // ✨ 4. FATTURE INTOCCABILI
+                                  if (isFattura) return rowContent;
+
+                                  // ✨ 5. CESTINO CON SWIPE-TO-DELETE E REGOLE POP-UP
+                                  return Dismissible(
+                                    key: Key('riepilogo_dismiss_${id}_$parentId'),
+                                    direction: DismissDirection.endToStart,
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444).withOpacity(0.85),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 16),
+                                    ),
+                                    confirmDismiss: (direction) async {
+                                      if (isPrevisto) {
+                                        _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
+                                      } else {
+                                        _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
+                                      }
+                                      return false;
+                                    },
+                                    child: rowContent,
                                   );
                                 }).toList(),
                               ),
@@ -1588,7 +1709,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           children: [
             if (isSpesa) const SizedBox(height: 10),
             
-            // ✨ GLOW LUMINOSO SULL'IMPORTO QUANDO DIGITI
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1732,7 +1852,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         showCheckmark: false,
                         selected: isSelected,
                         avatar: Icon(item['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF2DD4BF)),
-                        // ✨ AFFORDANCE MODIFICA: ICONA MATITA DISCRETA SULLE CHIP
                         label: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -2207,7 +2326,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
             ),
             const SizedBox(height: 20),
 
-            // ✨ PULSANTE SOLIDO CON ICONA BIANCA E TESTO BIANCO
             SizedBox(
               width: double.infinity,
               height: 48,

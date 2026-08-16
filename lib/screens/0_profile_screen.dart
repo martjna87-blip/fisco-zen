@@ -341,6 +341,60 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
+                  _buildSectionHeader('PREFERENZE & ACCESSIBILITÀ', coloreOttanio),
+                  const SizedBox(height: 12),
+                  _buildCardGroup([
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: coloreOttanio.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.format_size_rounded, color: coloreOttanio, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Dimensione Testo',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Ingrandimento globale dell\'interfaccia',
+                                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              _buildTextScaleOption(walletProvider, '100%\nNormale', 1.0),
+                              const SizedBox(width: 8),
+                              _buildTextScaleOption(walletProvider, '115%\nMedio', 1.15),
+                              const SizedBox(width: 8),
+                              _buildTextScaleOption(walletProvider, '125%\nGrande', 1.25),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ], coloreCard),
+
+                  const SizedBox(height: 28),
+
                   _buildSectionHeader('LEGALE & PRIVACY', coloreOttanio),
                   const SizedBox(height: 12),
                   _buildCardGroup([
@@ -500,6 +554,39 @@ class ProfileScreen extends StatelessWidget {
         size: 18,
       ),
       onTap: onTap,
+    );
+  }
+
+  Widget _buildTextScaleOption(WalletProvider walletProvider, String label, double scaleValue) {
+    final bool isSelected = (walletProvider.textScaleFactor - scaleValue).abs() < 0.01;
+    const coloreOttanio = Color(0xFF2DD4BF);
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => walletProvider.setTextScaleFactor(scaleValue),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? coloreOttanio.withOpacity(0.18) : Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? coloreOttanio : Colors.white.withOpacity(0.08),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? coloreOttanio : Colors.white60,
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
