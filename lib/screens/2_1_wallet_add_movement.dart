@@ -236,7 +236,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       AppNotifications.mostraInAlto(
         context,
-        '🔍 Lettura intelligente scontrino in corso...',
+        '🔍 Lettura intelligente documento in corso...',
         type: NotificationType.warning,
       );
 
@@ -257,6 +257,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         if (result.data != null) {
           _dataSelezionata = result.data!;
         }
+        // ✨ AGGIORNAMENTO CATEGORIA DA AI VISION
+        if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
+          _sottocategoriaSelezionata = result.categoriaSuggerita!;
+        }
+
         _tipoMovimento = 'uscita';
         _suggerisciCategoriaAuto();
         _isAnalyzing = false;
@@ -264,7 +269,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       if (mounted) {
         final messaggio = result.metodoUsato == 'AI_VISION'
-            ? '🤖 Scontrino analizzato con AI Vision Pro!'
+            ? '🤖 Documento analizzato con AI Vision!'
             : '⚡ Importo estratto con scansione rapida.';
 
         AppNotifications.mostraInAlto(context, messaggio);
@@ -274,7 +279,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       if (mounted) {
         AppNotifications.mostraInAlto(
           context,
-          'Impossibile leggere lo scontrino. Riprova!',
+          'Impossibile leggere il documento. Riprova!',
           type: NotificationType.error,
         );
       }

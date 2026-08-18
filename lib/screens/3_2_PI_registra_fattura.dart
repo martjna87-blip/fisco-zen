@@ -234,59 +234,67 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     );
   }
   
-  Future<void> _scattaFoto() async {
-    final XFile? photo = await AppImagePickerSheet.mostra(
+  Future<void> _avviaScansioneFattura() async {
+  try {
+    final XFile? image = await AppImagePickerSheet.mostra(
       context,
       titolo: 'Scansiona Fattura',
     );
 
-    if (photo != null) {
+    if (image == null) return;
+
+    setState(() => _isAnalyzing = true);
+
+    AppNotifications.mostraInAlto(
+      context,
+      '🔍 Lettura AI della fattura in corso...',
+      type: NotificationType.warning,
+    );
+
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+
+    final result = await DocumentScannerService.scanDocument(
+      imagePath: image.path,
+      wallet: walletProvider,
+    );
+
+    setState(() {
+      // 1. Importo totale fattura comprensivo di IVA
+      if (result.importo != null) {
+        _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+      }
+      // 2. Ragione Sociale / Intestatario
+      if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+        _ragioneSocialeController.text = result.ragioneSociale!;
+      }
+      // 3. Partita IVA / Codice Fiscale
+      if (result.piva != null && result.piva!.isNotEmpty) {
+        _pivaClienteController.text = result.piva!;
+      }
+      // 4. Data emissione fattura
+      if (result.data != null) {
+        _dataSelezionata = result.data!;
+      }
+      _isAnalyzing = false;
+    });
+
+    if (mounted) {
       AppNotifications.mostraInAlto(
         context,
-        '🔍 Lettura del documento in corso...',
-        type: NotificationType.warning,
+        '🤖 Fattura e dati fiscali estratti con AI Vision!',
       );
-
-      try {
-        final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-        
-        final result = await DocumentScannerService.scanDocument(
-          imagePath: photo.path,
-          wallet: walletProvider,
-        );
-
-        setState(() {
-          if (result.importo != null) {
-            _importoController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
-          }
-          if (result.piva != null && result.piva!.isNotEmpty) {
-            _pivaClienteController.text = result.piva!;
-            _inviaSdi = true; 
-          }
-          if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
-            _clienteController.text = result.ragioneSociale!;
-          }
-          if (result.data != null) {
-            _dataSelezionata = result.data!;
-          }
-        });
-
-        final messaggio = result.metodoUsato == 'AI_VISION'
-            ? '🤖 Documento analizzato con AI Vision Pro!'
-            : '⚡ Dati estratti con scansione rapida.';
-
-        AppNotifications.mostraInAlto(context, messaggio, type: NotificationType.success);
-
-      } catch (e) {
-        debugPrint('Errore scansione: $e');
-        AppNotifications.mostraInAlto(
-          context,
-          'Non sono riuscito a leggere bene la foto. Riprova!',
-          type: NotificationType.error,
-        );
-      }
+    }
+  } catch (e) {
+    setState(() => _isAnalyzing = false);
+    if (mounted) {
+      AppNotifications.mostraInAlto(
+        context,
+        'Impossibile leggere la fattura. Riprova!',
+        type: NotificationType.error,
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
