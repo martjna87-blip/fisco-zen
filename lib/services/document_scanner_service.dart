@@ -1,13 +1,17 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_vertexai/firebase_vertexai.dart';
 import '../data/wallet_provider.dart';
+
+enum TipoDocumentoScan { scontrino, fattura }
 
 class ScanResult {
   final double? importo;
   final String? ragioneSociale;
   final DateTime? data;
   final String? categoriaSuggerita;
+  final String? bussolaSuggerita; // 🎯 Nuova voce per la Bussola
   final bool isFattura;
   final String? piva;
   final String metodoUsato;
@@ -17,6 +21,7 @@ class ScanResult {
     this.ragioneSociale,
     this.data,
     this.categoriaSuggerita,
+    this.bussolaSuggerita,
     this.isFattura = false,
     this.piva,
     required this.metodoUsato,
@@ -24,91 +29,128 @@ class ScanResult {
 }
 
 class DocumentScannerService {
+  // 🔗 URL Proxy Cloudflare
+  static const String _proxyUrl = 'https://fiscon-ai-proxy.martjna87.workers.dev';
+
   static Future<ScanResult> scanDocument({
     required String imagePath,
     required WalletProvider wallet,
+    TipoDocumentoScan tipo = TipoDocumentoScan.scontrino,
+    Function(String status)? onProgress,
   }) async {
     try {
+      onProgress?.call('📁 1/3: Lettura file...');
       final file = XFile(imagePath);
-      final imageBytes = await file.readAsBytes();
+      final bytes = await file.readAsBytes();
 
-      if (imageBytes.isEmpty) {
-        throw Exception("Immagine non trovata o vuota.");
-      }
+      if (bytes.isEmpty) throw Exception("Immagine vuota o non accessibile.");
 
-      // ✨ Configurazione nativa: forza Gemini a rispondere ESCLUSIVAMENTE in JSON
-      final model = FirebaseVertexAI.instance.generativeModel(
-        model: 'gemini-1.5-flash',
-        generationConfig: GenerationConfig(
-          responseMimeType: 'application/json',
-        ),
-      );
+      final String base64Image = base64Encode(bytes);
+      String mimeType = 'image/jpeg';
+      if (imagePath.toLowerCase().endsWith('.png')) mimeType = 'image/png';
 
-      final prompt = TextPart('''
-Sei un assistente contabile esperto nell'analisi di scontrini, ricevute fiscali e FATTURE italiane.
-Analizza il documento fornito ed estrai ESATTAMENTE questi dati:
+      onProgress?.call('🤖 2/3: Analisi AI in corso...');
 
+      final String promptText = tipo == TipoDocumentoScan.scontrino
+    ? '''
+Analizza questo SCONTRINO ed estrai questo JSON esatto:
 {
-  "importo": 120.50,
-  "merchant": "Nome Negozio o Fornitore",
+  "importo": 69.00,
+  "merchant": "Trattoria Il Gabbiano",
   "piva": "12345678901",
   "date": "YYYY-MM-DD",
-  "category": "Alimentari",
-  "is_fattura": false
+  "category": "Ristoranti & Bar",
+  "bussola": "30% Svago & Desideri"
 }
+Regole:
+- "importo": numero decimale lordo con punto.
+- "category": UNA tra [Alimentari, Ristoranti & Bar, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
+- "bussola": UNA tra ["50% Spese Fisse", "30% Svago & Desideri", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Svago & Desideri"; per spesa supermercato, affitto o bollette usa "50% Spese Fisse".
+'''
+    : '''
+Analizza questa FATTURA ed estrai questo JSON esatto:
+{
+  "importo": 450.00,
+  "merchant": "Ragione Sociale",
+  "piva": "12345678901",
+  "date": "YYYY-MM-DD",
+  "category": "Acquisti",
+  "bussola": "50% Spese Fisse"
+}
+''';
 
-Regole importanti:
-1. "importo": numero decimale con punto (es. 120.50) del totale lordo da pagare.
-2. "merchant": ragione sociale o nome del punto vendita.
-3. "piva": Partita IVA o Codice Fiscale dell'esercente/fornitore se visibile, altrimenti null.
-4. "date": data in formato YYYY-MM-DD, altrimenti null.
-5. "category": UNA sola tra [Alimentari, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
-6. "is_fattura": true se è una fattura fiscale con P.IVA/N. Documento, false se scontrino/ricevuta.
-''');
+      final payload = {
+        "contents": [
+          {
+            "parts": [
+              {"text": promptText},
+              {
+                "inline_data": {
+                  "mime_type": mimeType,
+                  "data": base64Image
+                }
+              }
+            ]
+          }
+        ],
+        "generationConfig": {
+          "response_mime_type": "application/json"
+        }
+      };
 
-      // Detect del formato reale dell'immagine per iOS (JPEG, PNG o HEIC)
-      String mimeType = 'image/jpeg';
-      final pathLower = imagePath.toLowerCase();
-      if (pathLower.endsWith('.png')) {
-        mimeType = 'image/png';
-      } else if (pathLower.endsWith('.heic') || pathLower.endsWith('.heif')) {
-        mimeType = 'image/heic';
+      final response = await http.post(
+        Uri.parse(_proxyUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(payload),
+      ).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException("Connessione scaduta. Riprova."),
+      );
+
+      onProgress?.call('⚡ 3/3: Estrazione dati...');
+
+      final Map<String, dynamic> resData = jsonDecode(response.body);
+
+      // Gestione trasparenti degli errori restituibili da Google o Cloudflare
+      if (response.statusCode != 200 || resData.containsKey('error')) {
+        final errObj = resData['error'];
+        String errorMsg = "Errore HTTP (${response.statusCode})";
+        if (errObj is String) {
+          errorMsg = errObj;
+        } else if (errObj is Map && errObj.containsKey('message')) {
+          errorMsg = errObj['message'].toString();
+        }
+        throw Exception(errorMsg);
       }
 
-      final imagePart = InlineDataPart(mimeType, imageBytes);
+      final String textContent = resData['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
 
-      final response = await model.generateContent([
-        Content.multi([prompt, imagePart])
-      ]);
-
-      final textResponse = response.text?.trim() ?? '';
-
-      if (textResponse.isEmpty) {
-        throw Exception("L'AI non ha restituito alcun testo.");
+      if (textContent.isEmpty) {
+        throw Exception("Risposta AI vuota o bloccata dai filtri.");
       }
 
-      // Pulizia ed estrazione sicura del blocco JSON {...}
-      String cleanJson = textResponse;
-      final startIdx = cleanJson.indexOf('{');
-      final endIdx = cleanJson.lastIndexOf('}');
-      if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
-        cleanJson = cleanJson.substring(startIdx, endIdx + 1);
+      final startIdx = textContent.indexOf('{');
+      final endIdx = textContent.lastIndexOf('}');
+      if (startIdx == -1 || endIdx == -1 || endIdx < startIdx) {
+        throw Exception("Formato JSON non valido nella risposta AI.");
       }
 
+      final cleanJson = textContent.substring(startIdx, endIdx + 1);
       final Map<String, dynamic> data = jsonDecode(cleanJson);
 
       return ScanResult(
-        importo: double.tryParse(data['importo']?.toString() ?? ''),
-        ragioneSociale: data['merchant'] as String?,
-        piva: data['piva'] as String?,
-        data: data['date'] != null ? DateTime.tryParse(data['date'].toString()) : null,
-        categoriaSuggerita: data['category'] as String?,
-        isFattura: data['is_fattura'] as bool? ?? false,
-        metodoUsato: 'AI_VISION',
-      );
+  importo: double.tryParse(data['importo']?.toString() ?? ''),
+  ragioneSociale: data['merchant'] as String?,
+  piva: data['piva'] as String?,
+  data: data['date'] != null ? DateTime.tryParse(data['date'].toString()) : null,
+  categoriaSuggerita: data['category'] as String?,
+  bussolaSuggerita: data['bussola'] as String?, // 🎯 Ritorna la bussola estratta
+  isFattura: tipo == TipoDocumentoScan.fattura,
+  metodoUsato: 'AI_VISION',
+);
     } catch (e) {
       print('❌ Errore Scansione AI: $e');
-      throw Exception('Impossibile analizzare il documento con Gemini: $e');
+      rethrow;
     }
   }
 }

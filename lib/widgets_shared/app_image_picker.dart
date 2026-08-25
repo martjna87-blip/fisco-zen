@@ -54,7 +54,8 @@ class AppImagePickerSheet {
                 onTap: () async {
                   final XFile? foto = await picker.pickImage(
                     source: ImageSource.camera,
-                    imageQuality: 80, // Comprime leggermente per risparmiare spazio
+                    imageQuality: 70, // ⚡ Ottimizzato per AI: peso ridotto del 90%
+                    maxWidth: 1200,   // ⚡ Risoluzione massima ideale per testo scontrini
                   );
                   if (context.mounted) Navigator.pop(context, foto);
                 },
@@ -72,7 +73,8 @@ class AppImagePickerSheet {
                 onTap: () async {
                   final XFile? foto = await picker.pickImage(
                     source: ImageSource.gallery,
-                    imageQuality: 80,
+                    imageQuality: 70,
+                    maxWidth: 1200,
                   );
                   if (context.mounted) Navigator.pop(context, foto);
                 },

@@ -55,6 +55,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Casa/Affitto',
     'Canoni/Bollette',
     'Alimentari',
+    'Ristoranti & Bar',
     'Acquisti',
     'Divertimento',
     'Auto',
@@ -223,68 +224,92 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
-  Future<void> _avviaScansioneIntelligente() async {
-    try {
-      final XFile? image = await AppImagePickerSheet.mostra(
-        context,
-        titolo: 'Scansiona Documento',
-      );
+  Future<void> _avviaScansioneIntelligente({TipoDocumentoScan tipo = TipoDocumentoScan.scontrino}) async {
+  try {
+    final XFile? image = await AppImagePickerSheet.mostra(
+      context,
+      titolo: tipo == TipoDocumentoScan.scontrino ? 'Scansiona Scontrino' : 'Scansiona Fattura',
+    );
 
-      if (image == null) return;
+    if (image == null) return;
 
-      setState(() => _isAnalyzing = true);
+    setState(() => _isAnalyzing = true);
 
-      AppNotifications.mostraInAlto(
-        context,
-        '🔍 Lettura intelligente documento in corso...',
-        type: NotificationType.warning,
-      );
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
 
-      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-
-      final result = await DocumentScannerService.scanDocument(
-        imagePath: image.path,
-        wallet: walletProvider,
-      );
-
-      setState(() {
-        if (result.importo != null) {
-          _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+    final result = await DocumentScannerService.scanDocument(
+      imagePath: image.path,
+      wallet: walletProvider,
+      tipo: tipo, // Passa se scontrino o fattura
+      onProgress: (statoText) {
+        if (mounted) {
+          AppNotifications.mostraInAlto(
+            context,
+            statoText,
+            type: NotificationType.warning,
+          );
         }
-        if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
-          _noteController.text = result.ragioneSociale!;
-        }
-        if (result.data != null) {
-          _dataSelezionata = result.data!;
-        }
-        // ✨ AGGIORNAMENTO CATEGORIA DA AI VISION
-        if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
+      },
+    );
+
+    setState(() {
+      if (result.importo != null) {
+        _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+      }
+      if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+        _noteController.text = result.ragioneSociale!;
+      }
+      if (result.data != null) {
+        _dataSelezionata = result.data!;
+      }
+
+      // 🎯 Auto-compilazione Categoria Specifica
+      if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
+        if (_sottocategorieSpesa.contains(result.categoriaSuggerita)) {
           _sottocategoriaSelezionata = result.categoriaSuggerita!;
         }
-
-        _tipoMovimento = 'uscita';
-        _suggerisciCategoriaAuto();
-        _isAnalyzing = false;
-      });
-
-      if (mounted) {
-        final messaggio = result.metodoUsato == 'AI_VISION'
-            ? '🤖 Documento analizzato con AI Vision!'
-            : '⚡ Importo estratto con scansione rapida.';
-
-        AppNotifications.mostraInAlto(context, messaggio);
       }
-    } catch (e) {
-      setState(() => _isAnalyzing = false);
-      if (mounted) {
-        AppNotifications.mostraInAlto(
-          context,
-          'Impossibile leggere il documento. Riprova!',
-          type: NotificationType.error,
-        );
+
+      // 🎯 Auto-compilazione Bussola Spese (50%, 30%, 20%)
+      if (result.bussolaSuggerita != null && result.bussolaSuggerita!.isNotEmpty) {
+        if (_categorieSpesa.contains(result.bussolaSuggerita)) {
+          _categoriaSelezionata = result.bussolaSuggerita!;
+        }
       }
+
+      _tipoMovimento = 'uscita';
+      _isAnalyzing = false;
+    });
+
+    if (mounted) {
+      AppNotifications.mostraInAlto(
+        context,
+        '🤖 Documento analizzato con successo!',
+      );
+    }
+  } catch (e) {
+    setState(() => _isAnalyzing = false);
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          title: const Text('Errore Scansione AI', style: TextStyle(color: Colors.white)),
+          content: Text(
+            e.toString().replaceAll('Exception: ', ''),
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK', style: TextStyle(color: Color(0xFF2DD4BF))),
+            ),
+          ],
+        ),
+      );
     }
   }
+}
 
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
