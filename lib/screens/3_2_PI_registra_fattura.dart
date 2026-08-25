@@ -10,9 +10,8 @@ import '../screens/0_1_pro_upgrade.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/document_scanner_service.dart';
 import '../widgets_shared/app_image_picker.dart';
-import '../data/ateco_database.dart'; // 👈 ECCO IL COLLEGAMENTO AL DATABASE CENTRALIZZATO!
+import '../data/ateco_database.dart';
 
-// 🇮🇹 FORMATTATORE VALUTA ITALIANA (1.000,00)
 class ItalianCurrencyFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -78,6 +77,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   final _codiceSdiController = TextEditingController();
   final _descrizioneController = TextEditingController();
   bool _inviaSdi = false;
+  bool _isAnalyzing = false; // ✨ Corretto
 
   DateTime _dataSelezionata = DateTime.now();
   bool _isAtecoEspanso = false;
@@ -122,14 +122,12 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       _atecoCoef = _defaultAtecoCoef;
       _atecoCodice = _defaultAtecoCodice;
 
-      // 👇 USIAMO IL NUOVO DATABASE PER CERCARE IL NOME INIZIALE
       final matchIniziale = AtecoDatabase.lista.firstWhere(
         (item) => item['codice'] == _atecoCodice,
         orElse: () => {'descrizione': 'Consulenza & Digital'},
       );
       _atecoNome = '$_atecoCodice - ${matchIniziale['descrizione']} (${(_atecoCoef * 100).toInt()}%)';
 
-      // 🔢 INSERISCE IL NUMERO FATTURA AUTOMATICO PRECALCOLATO
       if (_numeroController.text.isEmpty) {
         _numeroController.text = wallet.prossimoNumeroFattura;
         _isNumeroSuggerito = true;
@@ -233,68 +231,64 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉',
     );
   }
-  
+
   Future<void> _avviaScansioneFattura() async {
-  try {
-    final XFile? image = await AppImagePickerSheet.mostra(
-      context,
-      titolo: 'Scansiona Fattura',
-    );
+    try {
+      final XFile? image = await AppImagePickerSheet.mostra(
+        context,
+        titolo: 'Scansiona Fattura',
+      );
 
-    if (image == null) return;
+      if (image == null) return;
 
-    setState(() => _isAnalyzing = true);
+      setState(() => _isAnalyzing = true);
 
-    AppNotifications.mostraInAlto(
-      context,
-      '🔍 Lettura AI della fattura in corso...',
-      type: NotificationType.warning,
-    );
-
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-
-    final result = await DocumentScannerService.scanDocument(
-      imagePath: image.path,
-      wallet: walletProvider,
-    );
-
-    setState(() {
-      // 1. Importo totale fattura comprensivo di IVA
-      if (result.importo != null) {
-        _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
-      }
-      // 2. Ragione Sociale / Intestatario
-      if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
-        _ragioneSocialeController.text = result.ragioneSociale!;
-      }
-      // 3. Partita IVA / Codice Fiscale
-      if (result.piva != null && result.piva!.isNotEmpty) {
-        _pivaClienteController.text = result.piva!;
-      }
-      // 4. Data emissione fattura
-      if (result.data != null) {
-        _dataSelezionata = result.data!;
-      }
-      _isAnalyzing = false;
-    });
-
-    if (mounted) {
       AppNotifications.mostraInAlto(
         context,
-        '🤖 Fattura e dati fiscali estratti con AI Vision!',
+        '🔍 Lettura AI della fattura in corso...',
+        type: NotificationType.warning,
       );
-    }
-  } catch (e) {
-    setState(() => _isAnalyzing = false);
-    if (mounted) {
-      AppNotifications.mostraInAlto(
-        context,
-        'Impossibile leggere la fattura. Riprova!',
-        type: NotificationType.error,
+
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+
+      final result = await DocumentScannerService.scanDocument(
+        imagePath: image.path,
+        wallet: walletProvider,
       );
+
+      setState(() {
+        if (result.importo != null) {
+          _importoController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
+        }
+        if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+          _clienteController.text = result.ragioneSociale!;
+        }
+        if (result.piva != null && result.piva!.isNotEmpty) {
+          _pivaClienteController.text = result.piva!;
+        }
+        if (result.data != null) {
+          _dataSelezionata = result.data!;
+        }
+        _isAnalyzing = false;
+      });
+
+      if (mounted) {
+        AppNotifications.mostraInAlto(
+          context,
+          '🤖 Fattura e dati fiscali estratti con AI Vision!',
+        );
+      }
+    } catch (e) {
+      setState(() => _isAnalyzing = false);
+      if (mounted) {
+        AppNotifications.mostraInAlto(
+          context,
+          'Impossibile leggere la fattura. Riprova!',
+          type: NotificationType.error,
+        );
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +305,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📸 HEADER: INSERIMENTO MANUALE VS SCANNER
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -330,7 +323,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     if (!wallet.canUseOCR) {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
                     } else {
-                      await _scattaFoto(); 
+                      await _avviaScansioneFattura(); // ✨ Corretto
                     }
                   },
                   borderRadius: BorderRadius.circular(10),
@@ -370,7 +363,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             ),
             const SizedBox(height: 12),
 
-            // N° FATTURA + DATA 
             Row(
               children: [
                 Expanded(
@@ -421,7 +413,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             ),
             const SizedBox(height: 10),
 
-            // CLIENTE
             TextField(
               controller: _clienteController,
               style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -429,7 +420,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             ),
             const SizedBox(height: 10),
 
-            // IMPORTO LORDO
             TextField(
               controller: _importoController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -438,7 +428,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
               decoration: _buildInputDecoration('Importo Lordo (€)', Icons.euro_symbol_rounded),
             ),
 
-            // SELETTORE ATECO INLINE
             const SizedBox(height: 12),
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
@@ -521,8 +510,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                               physics: const BouncingScrollPhysics(),
                               children: (() {
                                 final query = _searchAtecoController.text.toLowerCase().replaceAll('.', '').trim();
-                                
-                                // 👇 FILTRIAMO DALLA LISTA CENTRALIZZATA!
+
                                 final atecoFiltrati = AtecoDatabase.lista.where((item) {
                                   return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) ||
                                       item['descrizione'].toString().toLowerCase().contains(query);
@@ -604,7 +592,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
               ),
             ),
 
-            // TOGGLE FATTURAZIONE ELETTRONICA SDI
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -670,7 +657,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                     TextField(controller: _codiceSdiController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('Codice SDI (7 cifre) o PEC', Icons.mark_email_read_outlined)),
                     const SizedBox(height: 8),
                     TextField(controller: _descrizioneController, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _buildInputDecoration('Descrizione Prestazione', Icons.description_outlined)),
-                    
+
                     if (richiedeBollo) ...[
                       const SizedBox(height: 10),
                       Container(
@@ -699,7 +686,6 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
               ),
             ),
 
-            // CARD RIPARTIZIONE PREVIEW
             _buildRipartizionePreviewCard(context),
 
             const SizedBox(height: 16),

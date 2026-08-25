@@ -52,7 +52,7 @@ Analizza il documento fornito ed estrai ESATTAMENTE questi dati in formato JSON 
 Rispondi ESCLUSIVAMENTE con il JSON, senza blocchi di codice markdown, senza testo introduttivo.
 ''');
 
-      final imagePart = DataPart('image/jpeg', imageBytes);
+      final imagePart = InlineDataPart('image/jpeg', imageBytes);
       
       final response = await model.generateContent([
         Content.multi([prompt, imagePart])
