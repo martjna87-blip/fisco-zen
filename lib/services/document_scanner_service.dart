@@ -65,7 +65,7 @@ Analizza questo SCONTRINO ed estrai questo JSON esatto:
 Regole:
 - "importo": numero decimale lordo con punto.
 - "category": UNA tra [Alimentari, Ristoranti & Bar, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
-- "bussola": UNA tra ["50% Spese Fisse", "30% Svago & Desideri", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Svago & Desideri"; per spesa supermercato, affitto o bollette usa "50% Spese Fisse".
+- "bussola": UNA tra ["50% Spese Fisse", "30% Spese Variabili", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Svago & Desideri"; per spesa supermercato, affitto o bollette usa "50% Spese Fisse".
 '''
     : '''
 Analizza questa FATTURA ed estrai questo JSON esatto:

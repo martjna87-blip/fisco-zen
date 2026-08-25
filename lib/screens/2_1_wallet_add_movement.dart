@@ -92,7 +92,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'
   ];
 
-  final List<String> _categorieSpesa = ['50% Spese Fisse', '30% Spese Variabili', '20% Risparmio'];
+  final List<String> _categorieSpesa = [
+  '50% Spese Fisse', 
+  '30% Spese Variabili', 
+  '20% Risparmio'
+];
 
   final List<String> _opzioniFrequenza = [
     'Ogni settimana',
@@ -114,7 +118,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     {'label': 'Mutuo', 'icon': Icons.account_balance_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
     {'label': 'Bollette', 'icon': Icons.bolt_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
     {'label': 'Assicurazione', 'icon': Icons.verified_user_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
-    {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Divertimento'},
+    {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Ristoranti & Bar'},
     {'label': 'Carburante', 'icon': Icons.local_gas_station_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Auto'},
     {'label': 'Palestra / Sport', 'icon': Icons.fitness_center_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Divertimento'},
   ];
