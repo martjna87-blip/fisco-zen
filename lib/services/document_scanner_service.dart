@@ -29,40 +29,70 @@ class DocumentScannerService {
     required WalletProvider wallet,
   }) async {
     try {
-      final imageBytes = await XFile(imagePath).readAsBytes();
+      final file = XFile(imagePath);
+      final imageBytes = await file.readAsBytes();
 
-      // ✨ Inizializzazione sicura tramite Firebase (senza API Key visibili)
+      if (imageBytes.isEmpty) {
+        throw Exception("Immagine non trovata o vuota.");
+      }
+
+      // ✨ Configurazione nativa: forza Gemini a rispondere ESCLUSIVAMENTE in JSON
       final model = FirebaseVertexAI.instance.generativeModel(
         model: 'gemini-1.5-flash',
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+        ),
       );
 
       final prompt = TextPart('''
 Sei un assistente contabile esperto nell'analisi di scontrini, ricevute fiscali e FATTURE italiane.
-Analizza il documento fornito ed estrai ESATTAMENTE questi dati in formato JSON puro:
+Analizza il documento fornito ed estrai ESATTAMENTE questi dati:
 
 {
-  "importo": <numero decimale con punto, es. 120.50. Cerca il Totale Documento / Totale da Pagare comprensivo di IVA>,
-  "merchant": "<nome del negozio o Ragione Sociale/Fornitore della fattura>",
-  "piva": "<Partita IVA o Codice Fiscale dell'esercente/fornitore se visibile, altrimenti null>",
-  "date": "<data del documento in formato YYYY-MM-DD. Se non chiaramente visibile usa null>",
-  "category": "<scegli UNA sola categoria tra: Alimentari, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro>",
-  "is_fattura": <true se si tratta di una fattura con P.IVA o numero documento, false se è uno scontrino>
+  "importo": 120.50,
+  "merchant": "Nome Negozio o Fornitore",
+  "piva": "12345678901",
+  "date": "YYYY-MM-DD",
+  "category": "Alimentari",
+  "is_fattura": false
 }
 
-Rispondi ESCLUSIVAMENTE con il JSON, senza blocchi di codice markdown, senza testo introduttivo.
+Regole importanti:
+1. "importo": numero decimale con punto (es. 120.50) del totale lordo da pagare.
+2. "merchant": ragione sociale o nome del punto vendita.
+3. "piva": Partita IVA o Codice Fiscale dell'esercente/fornitore se visibile, altrimenti null.
+4. "date": data in formato YYYY-MM-DD, altrimenti null.
+5. "category": UNA sola tra [Alimentari, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
+6. "is_fattura": true se è una fattura fiscale con P.IVA/N. Documento, false se scontrino/ricevuta.
 ''');
 
-      final imagePart = InlineDataPart('image/jpeg', imageBytes);
-      
+      // Detect del formato reale dell'immagine per iOS (JPEG, PNG o HEIC)
+      String mimeType = 'image/jpeg';
+      final pathLower = imagePath.toLowerCase();
+      if (pathLower.endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (pathLower.endsWith('.heic') || pathLower.endsWith('.heif')) {
+        mimeType = 'image/heic';
+      }
+
+      final imagePart = InlineDataPart(mimeType, imageBytes);
+
       final response = await model.generateContent([
         Content.multi([prompt, imagePart])
       ]);
 
       final textResponse = response.text?.trim() ?? '';
-      
+
+      if (textResponse.isEmpty) {
+        throw Exception("L'AI non ha restituito alcun testo.");
+      }
+
+      // Pulizia ed estrazione sicura del blocco JSON {...}
       String cleanJson = textResponse;
-      if (cleanJson.startsWith('```')) {
-        cleanJson = cleanJson.replaceAll(RegExp(r'^```[a-z]*\n?'), '').replaceAll(RegExp(r'\n?```$'), '');
+      final startIdx = cleanJson.indexOf('{');
+      final endIdx = cleanJson.lastIndexOf('}');
+      if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+        cleanJson = cleanJson.substring(startIdx, endIdx + 1);
       }
 
       final Map<String, dynamic> data = jsonDecode(cleanJson);
@@ -77,7 +107,7 @@ Rispondi ESCLUSIVAMENTE con il JSON, senza blocchi di codice markdown, senza tes
         metodoUsato: 'AI_VISION',
       );
     } catch (e) {
-      print('Errore Scansione AI: $e');
+      print('❌ Errore Scansione AI: $e');
       throw Exception('Impossibile analizzare il documento con Gemini: $e');
     }
   }
