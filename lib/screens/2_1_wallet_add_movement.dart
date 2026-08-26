@@ -1183,15 +1183,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                tx.title.toLowerCase().contains('giroconto') ||
                                tx.title.toLowerCase().contains('salvadanaio');
 
-      String regolaBussola = '50% Spese Fisse';
-      final catLower = tx.category.toLowerCase();
-      if (catLower.contains('30') || catLower.contains('svag') || catLower.contains('divertiment') || catLower.contains('variabil')) {
-        regolaBussola = '30% Spese Variabili';
-      } else if (catLower.contains('20') || catLower.contains('risparm') || catLower.contains('invest')) {
-        regolaBussola = '20% Risparmio';
-      } else if (tx.isIncome) {
-        regolaBussola = 'Entrate';
-      }
+      String regolaBussola = tx.isIncome 
+          ? 'Entrate' 
+          : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
 
       return {
         'id': tx.id,
@@ -1223,15 +1217,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         }
       }
 
-      String regolaBussola = '50% Spese Fisse';
-      final catLower = tx.category.toLowerCase();
-      if (catLower.contains('30') || catLower.contains('svag') || catLower.contains('divertiment') || catLower.contains('variabil')) {
-        regolaBussola = '30% Spese Variabili';
-      } else if (catLower.contains('20') || catLower.contains('risparm') || catLower.contains('invest')) {
-        regolaBussola = '20% Risparmio';
-      } else if (tx.isIncome) {
-        regolaBussola = 'Entrate';
-      }
+      String regolaBussola = tx.isIncome 
+          ? 'Entrate' 
+          : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
 
       return {
         'id': tx.id,
