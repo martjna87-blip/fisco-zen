@@ -391,9 +391,25 @@ class WalletProvider with ChangeNotifier {
     final ora = DateTime.now();
     return _transactions.where((tx) {
       if (tx.isIncome) return false;
+
+      // Filtra solo le transazioni del mese e dell'anno corrente
       if (tx.date.year != ora.year || tx.date.month != ora.month) return false;
 
-      final bussolaAssegnata = _mappaSottocategoriaABussola[tx.category] ?? 'Bisogni';
+      // 1. Cerca nella Mappa di Coerenza
+      String bussolaAssegnata = _mappaSottocategoriaABussola[tx.category] ?? '';
+
+      // 2. Fallback per la massima compatibilità (riconosce anche vecchie diciture)
+      if (bussolaAssegnata.isEmpty) {
+        final cat = tx.category.toLowerCase();
+        if (cat.contains('30') || cat.contains('svag') || cat.contains('ristorant') || cat.contains('divertiment') || cat.contains('variabil')) {
+          bussolaAssegnata = 'Svago';
+        } else if (cat.contains('20') || cat.contains('risparm') || cat.contains('invest')) {
+          bussolaAssegnata = 'Risparmi';
+        } else {
+          bussolaAssegnata = 'Bisogni';
+        }
+      }
+
       return bussolaAssegnata == targetBussola;
     }).fold(0.0, (sum, tx) => sum + tx.amount);
   }
