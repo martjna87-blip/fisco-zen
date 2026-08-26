@@ -724,6 +724,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     String catTemp = item['cat'] ?? '50% Spese Fisse';
     String sottoCatTemp = item['sottoCat'] ?? (isExpense ? 'Supermercato' : 'Stipendio');
 
+    bool isCatEspansa = false;
+    bool isSottoCatEspansa = false;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -775,18 +778,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   if (isExpense) ...[
                     const Text('REGOLA BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    DropdownButtonFormField<String>(
-                      value: catTemp,
-                      dropdownColor: const Color(0xFF121214),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.black.withOpacity(0.4),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                      ),
-                      items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => catTemp = v);
+                    _buildInlineSelector(
+                      icon: Icons.pie_chart_outline_rounded,
+                      iconColor: const Color(0xFF2DD4BF),
+                      selectedValue: catTemp,
+                      isExpanded: isCatEspansa,
+                      onToggle: () => setDialogState(() => isCatEspansa = !isCatEspansa),
+                      items: _categorieSpesa,
+                      onSelect: (val) {
+                        setDialogState(() {
+                          catTemp = val;
+                          isCatEspansa = false;
+                        });
                       },
                     ),
                     const SizedBox(height: 12),
@@ -794,19 +797,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                   Text(isExpense ? 'CATEGORIA SPECIFICA' : 'TIPOLOGIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    value: sottoCatTemp,
-                    dropdownColor: const Color(0xFF121214),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.black.withOpacity(0.4),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                    ),
-                    items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (v) {
-                      if (v != null) setDialogState(() => sottoCatTemp = v);
+                  _buildInlineSelector(
+                    icon: isExpense ? Icons.category_outlined : Icons.add_chart_outlined,
+                    iconColor: const Color(0xFF2DD4BF),
+                    selectedValue: sottoCatTemp,
+                    isExpanded: isSottoCatEspansa,
+                    onToggle: () => setDialogState(() => isSottoCatEspansa = !isSottoCatEspansa),
+                    items: isExpense ? _sottocategorieSpesa : _sottocategorieEntrata,
+                    onSelect: (val) {
+                      setDialogState(() {
+                        sottoCatTemp = val;
+                        isSottoCatEspansa = false;
+                      });
                     },
                   ),
 
@@ -968,6 +970,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     String categoriaNuova = '50% Spese Fisse';
     String sottoCatNuova = isExpense ? 'Acquisti' : 'Stipendio';
 
+    bool isCatEspansa = false;
+    bool isSottoCatEspansa = false;
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1023,18 +1028,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   if (isExpense) ...[
                     const Text('REGOLA BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    DropdownButtonFormField<String>(
-                      value: categoriaNuova,
-                      dropdownColor: const Color(0xFF121214),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.black.withOpacity(0.4),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                      ),
-                      items: _categorieSpesa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => categoriaNuova = v);
+                    _buildInlineSelector(
+                      icon: Icons.pie_chart_outline_rounded,
+                      iconColor: const Color(0xFF2DD4BF),
+                      selectedValue: categoriaNuova,
+                      isExpanded: isCatEspansa,
+                      onToggle: () => setDialogState(() => isCatEspansa = !isCatEspansa),
+                      items: _categorieSpesa,
+                      onSelect: (val) {
+                        setDialogState(() {
+                          categoriaNuova = val;
+                          isCatEspansa = false;
+                        });
                       },
                     ),
                     const SizedBox(height: 12),
@@ -1042,19 +1047,18 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
                   Text(isExpense ? 'CATEGORIA SPECIFICA' : 'TIPOLOGIA ENTRATA', style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    value: sottoCatNuova,
-                    dropdownColor: const Color(0xFF121214),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.black.withOpacity(0.4),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                    ),
-                    items: (isExpense ? _sottocategorieSpesa : _sottocategorieEntrata)
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (v) {
-                      if (v != null) setDialogState(() => sottoCatNuova = v);
+                  _buildInlineSelector(
+                    icon: isExpense ? Icons.category_outlined : Icons.add_chart_outlined,
+                    iconColor: const Color(0xFF2DD4BF),
+                    selectedValue: sottoCatNuova,
+                    isExpanded: isSottoCatEspansa,
+                    onToggle: () => setDialogState(() => isSottoCatEspansa = !isSottoCatEspansa),
+                    items: isExpense ? _sottocategorieSpesa : _sottocategorieEntrata,
+                    onSelect: (val) {
+                      setDialogState(() {
+                        sottoCatNuova = val;
+                        isSottoCatEspansa = false;
+                      });
                     },
                   ),
 
