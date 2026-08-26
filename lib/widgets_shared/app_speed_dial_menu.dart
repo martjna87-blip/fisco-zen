@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
@@ -36,7 +37,7 @@ class AppSpeedDialMenu extends StatefulWidget {
           opacity: CurvedAnimation(parent: anim1, curve: Curves.easeOut),
           child: ScaleTransition(
             scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
-            alignment: const Alignment(0, 0.85), // Parte dal tasto + in basso
+            alignment: const Alignment(0, 0.88), // Parte esattamente dal tasto +
             child: child,
           ),
         );
@@ -51,85 +52,100 @@ class AppSpeedDialMenu extends StatefulWidget {
 class _AppSpeedDialMenuState extends State<AppSpeedDialMenu> {
   @override
   Widget build(BuildContext context) {
+    // 🎯 Configurazione Voci del Ventaglio (Angoli in gradi, colori ed icone)
+    final List<Map<String, dynamic>> items = [
+      {
+        'label': 'Uscita',
+        'icon': Icons.arrow_upward_rounded,
+        'color': const Color(0xFFEF4444), // Rosso
+        'angle': -145.0, // Top-Left
+        'action': widget.onNuovaUscita,
+      },
+      {
+        'label': 'Fattura P.IVA',
+        'icon': Icons.receipt_long_rounded,
+        'color': const Color(0xFF3B82F6), // 🎯 Blu Zaffiro P.IVA
+        'angle': -90.0, // Top-Center
+        'action': widget.onNuovaFattura,
+      },
+      {
+        'label': 'Entrata',
+        'icon': Icons.arrow_downward_rounded,
+        'color': const Color(0xFF10B981), // Verde
+        'angle': -35.0, // Top-Right
+        'action': widget.onNuovaEntrata,
+      },
+    ];
+
+    const double radius = 115.0; // Distanza dal centro del tasto +
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // 1. SFONDO SFOCATO AL TAP SULLO SCHERMO CHIUDE IL MENU
+          // 1. SFONDO SFOCATO CON TAP PER CHIUDERE
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: Container(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withOpacity(0.35),
               ),
             ),
           ),
 
-          // 2. CONTENITORE PULSANTI (Posizionato in basso sopra la barra)
+          // 2. DISPOSIZIONE AD ARCO (VENTAGLIO)
           Positioned(
-            bottom: 30,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 📄 1. NUOVA FATTURA (P.IVA)
-                _buildActionTile(
-                  context: context,
-                  icon: Icons.receipt_long_rounded,
-                  color: const Color(0xFF2DD4BF),
-                  label: 'Nuova Fattura',
-                  subtitle: 'Emetti o registra compenso P.IVA',
-                  onTap: widget.onNuovaFattura,
-                ),
+            bottom: 38,
+            child: SizedBox(
+              width: 320,
+              height: 220,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                clipBehavior: Clip.none,
+                children: [
+                  // 🎯 Generazione dinamica dei pulsanti ad arco
+                  ...items.map((item) {
+                    final double angleRad = (item['angle'] as double) * (math.pi / 180.0);
+                    final double dx = math.cos(angleRad) * radius;
+                    final double dy = math.sin(angleRad) * radius;
 
-                const SizedBox(height: 12),
+                    return Transform.translate(
+                      offset: Offset(dx, dy),
+                      child: _buildFanButton(
+                        context: context,
+                        icon: item['icon'] as IconData,
+                        color: item['color'] as Color,
+                        label: item['label'] as String,
+                        onTap: item['action'] as VoidCallback,
+                      ),
+                    );
+                  }),
 
-                // 💰 2. NUOVA ENTRATA
-                _buildActionTile(
-                  context: context,
-                  icon: Icons.arrow_downward_rounded,
-                  color: const Color(0xFF10B981),
-                  label: 'Nuova Entrata',
-                  subtitle: 'Incasso o movimento in ingresso',
-                  onTap: widget.onNuovaEntrata,
-                ),
-
-                const SizedBox(height: 12),
-
-                // 💸 3. NUOVA USCITA
-                _buildActionTile(
-                  context: context,
-                  icon: Icons.arrow_upward_rounded,
-                  color: const Color(0xFFEF4444),
-                  label: 'Nuova Uscita',
-                  subtitle: 'Spesa, acquisto o spesa ricorrente',
-                  onTap: widget.onNuovaUscita,
-                ),
-
-                const SizedBox(height: 28),
-
-                // ❌ TASTO CHIUDI (Ruotato a 45°)
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2DD4BF),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2DD4BF).withOpacity(0.4),
-                          blurRadius: 16,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                  // ❌ TASTO CENTRALE DI CHIUSURA (Ruotato a 45°)
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF18181B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 16,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
                     ),
-                    child: const Icon(Icons.close_rounded, color: Colors.black, size: 28),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -137,78 +153,60 @@ class _AppSpeedDialMenuState extends State<AppSpeedDialMenu> {
     );
   }
 
-  Widget _buildActionTile({
+  Widget _buildFanButton({
     required BuildContext context,
     required IconData icon,
     required Color color,
     required String label,
-    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).pop(); // Chiude lo speed dial
-          onTap(); // Esegue l'azione desiderata
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 280,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1C21).withOpacity(0.95),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withOpacity(0.3), width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).pop();
+              onTap();
+            },
+            borderRadius: BorderRadius.circular(30),
+            child: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.45),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C21).withOpacity(0.90),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

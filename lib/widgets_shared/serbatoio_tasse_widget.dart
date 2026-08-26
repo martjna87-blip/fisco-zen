@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -522,6 +523,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
 class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with SingleTickerProviderStateMixin {
   late bool _isEspanso;
   late AnimationController _waveController;
+  double? _lastRiserva; // 👈 Rileva se l'importo viene modificato
 
   @override
   void initState() {
@@ -530,7 +532,19 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2800),
-    )..repeat();
+    );
+    _avviaAnimazioneTemporizzata();
+  }
+  Timer? _timerAnimazione;
+
+  void _avviaAnimazioneTemporizzata() {
+    if (_isEspanso) {
+      _timerAnimazione?.cancel(); // Cancella eventuali timer precedenti
+      _waveController.repeat();
+      _timerAnimazione = Timer(const Duration(seconds: 3), () {
+        if (mounted) _waveController.stop();
+      });
+    }
   }
 
   @override
@@ -550,6 +564,14 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
     final double riservaAccantonata = walletProvider.accounts
         .where((acc) => acc.title.toLowerCase().contains('salvadanaio tasse') || acc.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, acc) => sum + acc.amount);
+
+    // 🌊 Se l'importo del salvadanaio cambia, riattiva l'onda per 3 secondi
+    if (_lastRiserva != null && _lastRiserva != riservaAccantonata) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _avviaAnimazioneTemporizzata();
+      });
+    }
+    _lastRiserva = riservaAccantonata;
 
     final double mancanteReale = (tasseTotaliCalcolate - riservaAccantonata).clamp(0.0, double.infinity);
 
@@ -574,15 +596,9 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
         : const Color(0xFFF59E0B);
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: widget.cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: AnimatedSize(
+  duration: const Duration(milliseconds: 300),
+  padding: const EdgeInsets.all(18),
+  child: AnimatedSize(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         alignment: Alignment.topCenter,
@@ -599,6 +615,11 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                       if (widget.isCollapsible) {
                         setState(() {
                           _isEspanso = !_isEspanso;
+                          if (_isEspanso) {
+                            _avviaAnimazioneTemporizzata();
+                          } else {
+                            _waveController.stop();
+                          }
                         });
                       }
                     },
@@ -662,17 +683,19 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                             width: 120,
                             height: 120,
                             color: Colors.black.withOpacity(0.3),
-                            child: AnimatedBuilder(
-                              animation: _waveController,
-                              builder: (context, child) {
-                                return CustomPaint(
-                                  painter: _LiquidWavePainter(
-                                    animationValue: _waveController.value,
-                                    percentage: percentualeRatio,
-                                    fillColor: statusColor,
-                                  ),
-                                );
-                              },
+                            child: RepaintBoundary( // 👈 ISOLA I RIDISEGNI DELL'ONDA
+                              child: AnimatedBuilder(
+                                animation: _waveController,
+                                builder: (context, child) {
+                                  return CustomPaint(
+                                    painter: _LiquidWavePainter(
+                                      animationValue: _waveController.value,
+                                      percentage: percentualeRatio,
+                                      fillColor: statusColor,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),

@@ -65,28 +65,24 @@ class _MainMenuState extends State<MainMenu> {
   Widget _buildGlassBottomNav() {
     return Padding(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 14),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF141417).withOpacity(0.82),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(icon: Icons.receipt_long_rounded, index: 0, label: 'P.IVA'),
-                _buildNavItem(icon: Icons.account_balance_wallet_outlined, index: 1, label: 'Wallet'),
-                _buildCenterAddButton(context),
-                _buildNavItem(icon: Icons.notifications_none_rounded, index: 2, label: 'Avvisi'),
-                _buildNavItem(icon: Icons.person_outline_rounded, index: 3, label: 'Profilo'),
-              ],
-            ),
+      child: RepaintBoundary( // 🛡️ Isola il rendering della bottom bar dal resto della pagina
+        child: Container(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141417).withOpacity(0.92),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(icon: Icons.receipt_long_rounded, index: 0, label: 'P.IVA'),
+              _buildNavItem(icon: Icons.account_balance_wallet_outlined, index: 1, label: 'Wallet'),
+              _buildCenterAddButton(context),
+              _buildNavItem(icon: Icons.notifications_none_rounded, index: 2, label: 'Avvisi'),
+              _buildNavItem(icon: Icons.person_outline_rounded, index: 3, label: 'Profilo'),
+            ],
           ),
         ),
       ),

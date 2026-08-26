@@ -652,7 +652,24 @@ class _WalletScreenState extends State<WalletScreen> {
                           icon: Icons.payments_rounded,
                           color: oceanCyan,
                           value: _formattaInt(nettoRealeSpendibile),
-                          onTap: () {},
+                          onTap: () {}, // 👈 Il tap semplice non fa nulla (o inserisci un'azione)
+                          onLongPress: () { // 👈 La spiegazione si apre SOLO tenendo premuto
+                            AppPopupWrapper.mostraInfo(
+                              context: context,
+                              icon: Icons.payments_rounded,
+                              color: oceanCyan,
+                              titolo: 'Netto Reale Spendibile',
+                              descrizione:
+                                  'È la liquidità che puoi spendere in totale serenità. '
+                                  'Calcolata sottraendo al tuo saldo le tasse stimate e la quota accantonata per i tuoi mesi di pausa/ferie (${walletProvider.mesiAttivi} mesi lavorativi su 12).',
+                              formula:
+                                  '💰 Saldi Conti: ${_formattaInt(sommaContiLiquidi)}\n'
+                                  '🛡️ Riserva Tasse: -${_formattaInt(residuoTasseDaCoprire)}\n'
+                                  '🏖️ Fondo Mesi Off: -${_formattaInt(cuscinettoFerie)}\n'
+                                  '──────────────────────\n'
+                                  '✨ Netto Spendibile: ${_formattaInt(nettoRealeSpendibile)}',
+                            );
+                          },
                         ),
                         const SizedBox(width: 12),
                         _buildGlassBadge(
@@ -907,26 +924,23 @@ class _WalletScreenState extends State<WalletScreen> {
     BorderRadius? borderRadius,
   }) {
     final radius = borderRadius ?? BorderRadius.circular(24);
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), 
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06), 
-            borderRadius: radius,
-            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.5),
-          ),
-          child: child,
+    return RepaintBoundary( // 🛡️ Evita il re-paint in cascata
+      child: Container(
+        padding: padding ?? const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF18181C).withOpacity(0.75), // 🎨 Effetto vetro scuro a costo zero GPU
+          borderRadius: radius,
+          border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
         ),
+        child: child,
       ),
     );
   }
 
-  Widget _buildGlassBadge({required IconData icon, required Color color, required String value, bool isTasse = false, bool isProtetta = false, required VoidCallback onTap}) {
+  Widget _buildGlassBadge({required IconData icon, required Color color, required String value, bool isTasse = false, bool isProtetta = false, required VoidCallback onTap, VoidCallback? onLongPress}) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress ?? onTap,
       child: _buildGlassContainer(
         padding: const EdgeInsets.only(left: 6, right: 16, top: 6, bottom: 6),
         borderRadius: BorderRadius.circular(30),
@@ -1175,7 +1189,10 @@ class _WalletScreenState extends State<WalletScreen> {
     IconData icon = Icons.receipt_long_rounded;
     Color color = tx.isIncome ? oceanCyan : const Color(0xFFF43F5E);
     String amountStr = (tx.isIncome ? '+' : '-') + _formattaValuta(tx.amount).replaceAll('+', '').replaceAll('-', '');
-    String detail = tx.subtitle;
+    
+    // 💳 Inserisce il nome del conto associato al movimento
+    String nomeConto = getNome(fromAccountId ?? tx.accountId);
+    String detail = nomeConto.isNotEmpty ? '$nomeConto • ${tx.subtitle}' : tx.subtitle;
 
     if (titleLower.contains('accantonamento')) { icon = Icons.shield_rounded; color = taxBlue; detail = 'Verso Salvadanaio Tasse'; amountStr = _formattaValuta(tx.amount); }
     else if (titleLower.contains('sblocco')) { icon = Icons.shield_outlined; color = goldAccent; detail = 'Da Salvadanaio Tasse'; amountStr = _formattaValuta(tx.amount); }

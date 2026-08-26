@@ -19,6 +19,7 @@ import 'data/ateco_uploader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  //debugPrintRebuildDirtyWidgets = true; // 👈 AGGIUNGI QUESTA RIGA QUI
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

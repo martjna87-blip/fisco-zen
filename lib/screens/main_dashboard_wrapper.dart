@@ -21,13 +21,9 @@ class MainDashboardWrapper extends StatefulWidget {
 }
 
 class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
-  // Gestisce lo scorrimento
   final PageController _pageController = PageController(initialPage: 0);
-  
-  // 📍 Variabile per tenere traccia della pagina attuale
   int _currentPage = 0; 
 
-  // Animazione per far scivolare il Wallet se premi il bottone
   void _scorriVersoWallet() {
     _pageController.animateToPage(
       1, 
@@ -44,68 +40,57 @@ class _MainDashboardWrapperState extends State<MainDashboardWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Se l'utente non ha la P.IVA, vede solo il Wallet normale (nessun carosello)
     if (!widget.hasPartitaIva) {
       return const WalletScreen(isPiva: false);
     }
 
-    // Se l'utente HA la P.IVA, vede il carosello
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F12),
-      // 📍 Usiamo uno Stack per sovrapporre i pallini sopra le pagine
       body: Stack(
         children: [
           PageView(
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
-            // 📍 Quando scorri, aggiorna la pagina attiva
             onPageChanged: (index) {
               setState(() {
                 _currentPage = index;
               });
             },
             children: [
-              // Pagina Sinistra: P.IVA
               HomeScreen(
                 codiceAtecoIniziale: widget.codiceAtecoIniziale,
                 coefficienteIniziale: widget.coefficienteIniziale,
                 aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
                 onSwipeToWallet: _scorriVersoWallet, 
               ),
-              
-              // Pagina Destra: Wallet
               const WalletScreen(isPiva: true),
             ],
           ),
 
-          // 📍 INDICATORE DI PAGINA
+          // 📍 INDICATORE DI PAGINA (ISOLATO PER PRESTAZIONI)
           Positioned(
-            bottom: 10, // Distanza dal fondo dello schermo
+            bottom: 10,
             left: 0,
             right: 0,
-            child: SafeArea(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(2, (index) {
-                  final bool isSelected = _currentPage == index;
-                  
-                  // 🎨 Colore dinamico: Verde Acqua (0) per P.IVA, Viola Ametista (1) per il Wallet
-                  final Color activeColor = (_currentPage == 0) 
-                      ? const Color(0xFF2DD4BF) 
-                      : const Color(0xFFA855F7);
+            child: RepaintBoundary(
+              child: SafeArea(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(2, (index) {
+                    final bool isSelected = _currentPage == index;
 
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    height: 8,
-                    // Il pallino attivo diventa una "pillola" allungata, quello inattivo resta tondo
-                    width: isSelected ? 24 : 8, 
-                    decoration: BoxDecoration(
-  color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.2), // 🌊 Verde Acqua brillante
-  borderRadius: BorderRadius.circular(4),
-),
-                  );
-                }),
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 8,
+                      width: isSelected ? 24 : 8, 
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    );
+                  }),
+                ),
               ),
             ),
           ),

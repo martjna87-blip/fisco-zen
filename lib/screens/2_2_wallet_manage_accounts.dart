@@ -896,20 +896,31 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 ),
                 Row(
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: _mostraDialogNuovoConto,
-                      icon: const Icon(Icons.add_rounded, color: Colors.black, size: 14),
-                      label: const Text(
-                        'Nuovo',
-                        style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2DD4BF),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    InkWell(
+                      onTap: _mostraDialogNuovoConto,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        elevation: 0,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2DD4BF).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Nuovo conto',
+                              style: TextStyle(
+                                color: Color(0xFF2DD4BF),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -999,49 +1010,44 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        if (mostraPiva && isPrincipal) ...[
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            children: [
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    _formattaValuta(contoPostTasse),
+                                                    style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    _formattaValuta(account.virtualTaxAmount),
+                                                    style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        _formattaValuta(account.amount),
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                      if (mostraPiva && isPrincipal) ...[
-                                        const SizedBox(height: 4),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _formattaValuta(contoPostTasse),
-                                                  style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _formattaValuta(account.virtualTaxAmount),
-                                                  style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
+                                  Text(
+                                    _formattaValuta(account.amount),
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                   ),
                                   PopupMenuButton<String>(
                                     icon: const Icon(Icons.more_vert_rounded, color: Colors.white54, size: 20),

@@ -118,7 +118,9 @@ class FluidWavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant FluidWavePainter oldDelegate) => true;
+  bool shouldRepaint(covariant FluidWavePainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
 }
 
 // Classe di supporto per la proiezione 3D
