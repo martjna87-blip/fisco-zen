@@ -137,6 +137,20 @@ class TransactionModel {
 class WalletProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+  final Map<String, String> _mappaSottocategoriaABussola = {
+    'Casa/Affitto': 'Bisogni',
+    'Mutuo': 'Bisogni',
+    'Canoni/Bollette': 'Bisogni',
+    'Supermercato': 'Bisogni',
+    'Auto': 'Bisogni',
+    'Salute & Benessere': 'Bisogni',
+    'Alimentari': 'Bisogni',
+    'Ristoranti & Bar': 'Svago',
+    'Divertimento': 'Svago',
+    'Acquisti': 'Svago',
+    'Viaggi': 'Svago',
+    'Altro': 'Svago',
+  };
 
   List<AccountModel> _accounts = [
     AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
@@ -372,14 +386,51 @@ class WalletProvider with ChangeNotifier {
 
   double get nettoSpendibile => patrimonioNetto - fondoTasseDaVersare;
 
-  double _spesoBisogni = 0.00;
-  double get spesoBisogni => _spesoBisogni;
+  // 🎯 Calcolo dinamico in tempo reale per il grafico della Home
+  // 🎯 Helper universale: analizza titolo, sottotitolo e categoria per una classificazione perfetta
+  String ottieniBussolaSemplificata(TransactionModel tx) {
+    final testoCompleto = '${tx.category} ${tx.title} ${tx.subtitle}'.toLowerCase();
 
-  double _spesoSvago = 0.00;
-  double get spesoSvago => _spesoSvago;
+    // 1. Risparmi (20%)
+    if (testoCompleto.contains('20%') ||
+        testoCompleto.contains('risparm') ||
+        testoCompleto.contains('invest')) {
+      return 'Risparmi';
+    }
 
-  double _spesoRisparmi = 0.00;
-  double get spesoRisparmi => _spesoRisparmi;
+    // 2. Svago / Spese Variabili (30%)
+    if (testoCompleto.contains('30%') ||
+        testoCompleto.contains('svag') ||
+        testoCompleto.contains('variabil') ||
+        testoCompleto.contains('ristorant') ||
+        testoCompleto.contains('trattoria') ||
+        testoCompleto.contains('pizzeria') ||
+        testoCompleto.contains('pub') ||
+        testoCompleto.contains('bar') ||
+        testoCompleto.contains('divertiment') ||
+        testoCompleto.contains('acquisti') ||
+        testoCompleto.contains('viaggi')) {
+      return 'Svago';
+    }
+
+    // 3. Default: Bisogni / Spese Fisse (50%)
+    return 'Bisogni';
+  }
+
+  // 🎯 Calcolo dinamico retroattivo in tempo reale per la Home
+  double getSpesoBussola(String targetBussola) {
+    final ora = DateTime.now();
+    return _transactions.where((tx) {
+      if (tx.isIncome) return false;
+      if (tx.date.year != ora.year || tx.date.month != ora.month) return false;
+
+      return ottieniBussolaSemplificata(tx) == targetBussola;
+    }).fold(0.0, (sum, tx) => sum + tx.amount);
+  }
+
+  double get spesoBisogni => getSpesoBussola('Bisogni');
+  double get spesoSvago => getSpesoBussola('Svago');
+  double get spesoRisparmi => getSpesoBussola('Risparmi');
 
   double _fatturatoTotale = 0.00;
   double get fatturatoTotale => _fatturatoTotale;
@@ -821,9 +872,7 @@ class WalletProvider with ChangeNotifier {
       _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2024;
       _meseAperturaPiva = prefs.getInt('meseAperturaPiva') ?? 1;
 
-      _spesoBisogni = prefs.getDouble('spesoBisogni') ?? 0.0;
-      _spesoSvago = prefs.getDouble('spesoSvago') ?? 0.0;
-      _spesoRisparmi = prefs.getDouble('spesoRisparmi') ?? 0.0;
+      
       _fatturatoTotale = prefs.getDouble('fatturatoTotale') ?? 0.0;
 
       final accountsStr = prefs.getString('accounts');
@@ -893,9 +942,7 @@ class WalletProvider with ChangeNotifier {
         await prefs.setInt('meseAperturaPiva', _meseAperturaPiva!);
       }
 
-      await prefs.setDouble('spesoBisogni', _spesoBisogni);
-      await prefs.setDouble('spesoSvago', _spesoSvago);
-      await prefs.setDouble('spesoRisparmi', _spesoRisparmi);
+      
       await prefs.setDouble('fatturatoTotale', _fatturatoTotale);
 
       await prefs.setString('accounts', jsonEncode(_accounts.map((a) => a.toJson()).toList()));
@@ -925,10 +972,7 @@ class WalletProvider with ChangeNotifier {
         'fatturatoStimatoAnnuo': _fatturatoStimatoAnnuo,
         'mesiAttiviIncasso': _mesiAttiviIncasso,
         'annoAperturaPiva': _annoAperturaPiva,
-        'meseAperturaPiva': _meseAperturaPiva,
-        'spesoBisogni': _spesoBisogni,
-        'spesoSvago': _spesoSvago,
-        'spesoRisparmi': _spesoRisparmi,
+        'meseAperturaPiva': _meseAperturaPiva,        
         'fatturatoTotale': _fatturatoTotale,
         'accounts': _accounts.map((a) => a.toJson()).toList(),
         'transactions': _transactions.map((t) => t.toJson()).toList(),
@@ -1015,9 +1059,6 @@ class WalletProvider with ChangeNotifier {
       targetAccount.amount += amount;
     } else {
       targetAccount.amount -= amount;
-      if (category == 'Bisogni') _spesoBisogni += amount;
-      if (category == 'Svago') _spesoSvago += amount;
-      if (category == 'Risparmi') _spesoRisparmi += amount;
     }
 
     _aggiornaTasseVirtuali();
@@ -1151,9 +1192,7 @@ class WalletProvider with ChangeNotifier {
         targetAccount.amount -= tx.amount;
       } else {
         targetAccount.amount += tx.amount;
-        if (tx.category == 'Bisogni') _spesoBisogni = (_spesoBisogni - tx.amount).clamp(0.0, double.infinity);
-        if (tx.category == 'Svago') _spesoSvago = (_spesoSvago - tx.amount).clamp(0.0, double.infinity);
-        if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
+        
       }
 
       _aggiornaTasseVirtuali();
@@ -1234,9 +1273,7 @@ class WalletProvider with ChangeNotifier {
         targetAccount.amount -= tx.amount;
       } else {
         targetAccount.amount += tx.amount;
-        if (tx.category == 'Bisogni') _spesoBisogni = (_spesoBisogni - tx.amount).clamp(0.0, double.infinity);
-        if (tx.category == 'Svago') _spesoSvago = (_spesoSvago - tx.amount).clamp(0.0, double.infinity);
-        if (tx.category == 'Risparmi') _spesoRisparmi = (_spesoRisparmi - tx.amount).clamp(0.0, double.infinity);
+        
       }
 
       _transactions[idx] = TransactionModel(
@@ -1308,9 +1345,6 @@ class WalletProvider with ChangeNotifier {
     ];
 
     isPartitaIVA = true; 
-    _spesoBisogni = 0.00;
-    _spesoSvago = 0.00;
-    _spesoRisparmi = 0.00;
     _fatturatoTotale = 0.00;
     _transactions.clear();
     _fattureDaIncassare.clear();
@@ -1502,9 +1536,6 @@ class WalletProvider with ChangeNotifier {
       AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
     ];
 
-    _spesoBisogni = 0.00;
-    _spesoSvago = 0.00;
-    _spesoRisparmi = 0.00;
     _fatturatoTotale = 0.00;
     _transactions.clear();
     _fattureDaIncassare.clear();

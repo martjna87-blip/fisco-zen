@@ -470,10 +470,10 @@ class _WalletScreenState extends State<WalletScreen> {
     double spesoRealeRisparmio = 0;
 
     for (var tx in txsFiltrate) {
-      final cat = tx.category.toLowerCase();
-      if (cat.contains('30') || cat.contains('svag') || cat.contains('divertiment') || cat.contains('variabil')) {
+      final bussola = walletProvider.ottieniBussolaSemplificata(tx);
+      if (bussola == 'Svago') {
         spesoRealeSvago += tx.amount;
-      } else if (cat.contains('20') || cat.contains('risparm') || cat.contains('invest')) {
+      } else if (bussola == 'Risparmi') {
         spesoRealeRisparmio += tx.amount;
       } else {
         spesoRealeBisogni += tx.amount;

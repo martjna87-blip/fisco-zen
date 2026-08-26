@@ -52,7 +52,7 @@ class DocumentScannerService {
       onProgress?.call('🤖 2/3: Analisi AI in corso...');
 
       final String promptText = tipo == TipoDocumentoScan.scontrino
-    ? '''
+          ? '''
 Analizza questo SCONTRINO ed estrai questo JSON esatto:
 {
   "importo": 69.00,
@@ -60,14 +60,14 @@ Analizza questo SCONTRINO ed estrai questo JSON esatto:
   "piva": "12345678901",
   "date": "YYYY-MM-DD",
   "category": "Ristoranti & Bar",
-  "bussola": "30% Svago & Desideri"
+  "bussola": "30% Spese Variabili"
 }
 Regole:
 - "importo": numero decimale lordo con punto.
-- "category": UNA tra [Alimentari, Ristoranti & Bar, Casa/Affitto, Canoni/Bollette, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
-- "bussola": UNA tra ["50% Spese Fisse", "30% Spese Variabili", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Svago & Desideri"; per spesa supermercato, affitto o bollette usa "50% Spese Fisse".
+- "category": UNA ESATTA tra [Casa/Affitto, Mutuo, Canoni/Bollette, Supermercato, Ristoranti & Bar, Acquisti, Divertimento, Auto, Viaggi, Salute & Benessere, Altro].
+- "bussola": UNA ESATTA tra ["50% Spese Fisse", "30% Spese Variabili", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Spese Variabili"; per supermercato, affitto o bollette usa "50% Spese Fisse".
 '''
-    : '''
+          : '''
 Analizza questa FATTURA ed estrai questo JSON esatto:
 {
   "importo": 450.00,
@@ -75,7 +75,7 @@ Analizza questa FATTURA ed estrai questo JSON esatto:
   "piva": "12345678901",
   "date": "YYYY-MM-DD",
   "category": "Acquisti",
-  "bussola": "50% Spese Fisse"
+  "bussola": "30% Spese Variabili"
 }
 ''';
 
