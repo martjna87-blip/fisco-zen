@@ -5,6 +5,7 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_secondary_popup.dart';
+import '../widgets_shared/app_datepicker.dart'; // 👈 IMPORT DATEPICKER
 
 class ManageAccountsSheet extends StatefulWidget {
   final bool? isPiva;
@@ -26,6 +27,14 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       (Match m) => '${m[1]}.',
     );
     return '$intPart,${parti[1]} €';
+  }
+
+  String _formattaDataInItaliano(DateTime date) {
+    final List<String> mesi = [
+      'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+      'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${mesi[date.month - 1]} ${date.year}';
   }
 
   @override
@@ -519,6 +528,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
     String daConto = accounts[0].title;
     String aConto = accounts[1].title;
+    DateTime dataGiroconto = DateTime.now(); // 👈 DATA INIZIALE
     bool isDaContoEspanso = false;
     bool isAContoEspanso = false;
 
@@ -574,6 +584,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   aAccountId: accA.id,
                   importo: importo,
                   isAccantonamentoTasse: false,
+                  date: dataGiroconto, // 👈 PASSAGGIO DATA SELEZIONATA
                 );
 
                 Navigator.pop(context);
@@ -630,6 +641,41 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     },
                   ),
                   const SizedBox(height: 12),
+
+                  // 📅 SELETTORE DATA GIROCONTO
+                  const Text('DATA TRASFERIMENTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await AppDatePicker.selezionaData(
+                        context,
+                        dataIniziale: dataGiroconto,
+                      );
+                      if (picked != null) {
+                        setDialogState(() => dataGiroconto = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 14),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formattaDataInItaliano(dataGiroconto),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   TextField(
                     controller: importoController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -758,7 +804,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       badgeText: 'Wallet',
       badgeColor: const Color(0xFF2DD4BF),
       child: Container(
-        height: screenHeight * 0.55, // 🔒 55% FISSO
+        height: screenHeight * 0.55,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

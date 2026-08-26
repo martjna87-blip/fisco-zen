@@ -1477,6 +1477,7 @@ class WalletProvider with ChangeNotifier {
     required String aAccountId,
     required double importo,
     required bool isAccantonamentoTasse,
+    DateTime? date, // 👈 NUOVO PARAMETRO DATA
   }) {
     final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
     final accA = _accounts.firstWhere((a) => a.id == aAccountId);
@@ -1498,8 +1499,8 @@ class WalletProvider with ChangeNotifier {
     }
 
     final String baseId = DateTime.now().millisecondsSinceEpoch.toString();
+    final DateTime dataFinale = date ?? DateTime.now();
 
-    // Registra addebito sul conto emittente
     addTransaction(
       customId: '${baseId}_da',
       title: titoloDa,
@@ -1507,9 +1508,9 @@ class WalletProvider with ChangeNotifier {
       isIncome: false,
       category: 'Giroconto',
       accountId: accDa.id,
+      date: dataFinale, // 👈 PASSAGGIO DATA PERSONALIZZATA
     );
 
-    // Registra accredito sul conto ricevente
     addTransaction(
       customId: '${baseId}_verso',
       title: titoloA,
@@ -1517,6 +1518,7 @@ class WalletProvider with ChangeNotifier {
       isIncome: true,
       category: 'Giroconto',
       accountId: accA.id,
+      date: dataFinale, // 👈 PASSAGGIO DATA PERSONALIZZATA
     );
 
     _aggiornaTasseVirtuali();
