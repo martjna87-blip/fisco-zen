@@ -850,6 +850,12 @@ class WalletProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      final tierStr = prefs.getString('userTier') ?? 'free';
+      _userTier = UserTier.values.firstWhere(
+        (t) => t.name == tierStr,
+        orElse: () => UserTier.free,
+      );
+
       isPartitaIVA = prefs.getBool('isPartitaIVA') ?? true;
       coeffRedditivita = prefs.getDouble('coeffRedditivita') ?? 0.78;
       _coefficienteRedditivita = coeffRedditivita;
@@ -922,6 +928,7 @@ class WalletProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      await prefs.setString('userTier', _userTier.name);
       await prefs.setBool('isPartitaIVA', isPartitaIVA);
       await prefs.setDouble('coeffRedditivita', coeffRedditivita);
       await prefs.setDouble('aliquotaImposta', aliquotaImposta);
@@ -962,6 +969,7 @@ class WalletProvider with ChangeNotifier {
     if (_userId == null) return;
     try {
       await _firestore.collection('utenti').doc(_userId).set({
+        'userTier': _userTier.name,
         'isPartitaIVA': isPartitaIVA,
         'coeffRedditivita': coeffRedditivita,
         'aliquotaImposta': aliquotaImposta,
