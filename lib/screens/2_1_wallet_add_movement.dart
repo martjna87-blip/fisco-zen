@@ -53,8 +53,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   final List<String> _sottocategorieSpesa = [
     'Casa/Affitto',
+    'Mutuo',
     'Canoni/Bollette',
-    'Alimentari',
+    'Supermercato',
     'Ristoranti & Bar',
     'Acquisti',
     'Divertimento',
@@ -63,7 +64,23 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Salute & Benessere',
     'Altro',
   ];
-  String _sottocategoriaSelezionata = 'Alimentari';
+
+  // 🎯 Mappa di Coerenza: collega univocamente ogni Categoria Specifica alla sua Bussola
+  final Map<String, String> _mappaSottocategoriaABussola = {
+    'Casa/Affitto': '50% Spese Fisse',
+    'Mutuo': '50% Spese Fisse',
+    'Canoni/Bollette': '50% Spese Fisse',
+    'Supermercato': '50% Spese Fisse',
+    'Auto': '50% Spese Fisse',
+    'Salute & Benessere': '50% Spese Fisse',
+    'Ristoranti & Bar': '30% Spese Variabili',
+    'Divertimento': '30% Spese Variabili',
+    'Acquisti': '30% Spese Variabili',
+    'Viaggi': '30% Spese Variabili',
+    'Altro': '30% Spese Variabili',
+  };
+
+  String _sottocategoriaSelezionata = 'Supermercato';
 
   final List<String> _sottocategorieEntrata = [
     'Stipendio',
@@ -93,10 +110,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
 
   final List<String> _categorieSpesa = [
-  '50% Spese Fisse', 
-  '30% Spese Variabili', 
-  '20% Risparmio'
-];
+    '50% Spese Fisse', 
+    '30% Spese Variabili', 
+    '20% Risparmio'
+  ];
 
   final List<String> _opzioniFrequenza = [
     'Ogni settimana',
@@ -113,9 +130,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
 
   final List<Map<String, dynamic>> _speseFrequenti = [
-    {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Alimentari'},
+    {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Supermercato'},
     {'label': 'Affitto', 'icon': Icons.home_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
-    {'label': 'Mutuo', 'icon': Icons.account_balance_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
+    {'label': 'Mutuo', 'icon': Icons.account_balance_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Mutuo'},
     {'label': 'Bollette', 'icon': Icons.bolt_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
     {'label': 'Assicurazione', 'icon': Icons.verified_user_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
     {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Ristoranti & Bar'},
@@ -198,122 +215,124 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     if (testo.isEmpty) return;
 
     final paroleFisse = ['affitto', 'mutuo', 'bolletta', 'luce', 'gas', 'internet', 'assicurazione', 'carburante', 'supermercato', 'spesa'];
-    final paroleVariabili = ['ristorante', 'bar', 'palestra', 'sport', 'cinema', 'svago', 'abiti', 'shopping', 'cena', 'pranzo'];
+    final paroleRistorazione = ['ristorante', 'trattoria', 'osteria', 'pizzeria', 'pub', 'bar', 'cena', 'pranzo', 'caffè'];
+    final paroleVariabili = ['palestra', 'sport', 'cinema', 'svago', 'abiti', 'shopping'];
     final paroleRisparmio = ['fondo', 'investimento', 'risparmio', 'pac', 'crypto', 'emerg'];
 
-    if (paroleFisse.any((p) => testo.contains(p))) {
-      if (_categoriaSelezionata != '50% Spese Fisse') {
-        setState(() => _categoriaSelezionata = '50% Spese Fisse');
+    if (paroleRistorazione.any((p) => testo.contains(p))) {
+      setState(() {
+        _sottocategoriaSelezionata = 'Ristoranti & Bar';
+        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+      });
+    } else if (paroleFisse.any((p) => testo.contains(p))) {
+      if (testo.contains('affitto')) {
+        _sottocategoriaSelezionata = 'Casa/Affitto';
+      } else if (testo.contains('mutuo')) {
+        _sottocategoriaSelezionata = 'Mutuo';
+      } else if (testo.contains('bollett') || testo.contains('luce') || testo.contains('gas')) {
+        _sottocategoriaSelezionata = 'Canoni/Bollette';
+      } else if (testo.contains('supermercad') || testo.contains('spesa')) {
+        _sottocategoriaSelezionata = 'Supermercato';
+      } else if (testo.contains('carburante') || testo.contains('auto')) {
+        _sottocategoriaSelezionata = 'Auto';
       }
+      setState(() {
+        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata] ?? '50% Spese Fisse';
+      });
     } else if (paroleVariabili.any((p) => testo.contains(p))) {
-      if (_categoriaSelezionata != '30% Spese Variabili') {
-        setState(() => _categoriaSelezionata = '30% Spese Variabili');
-      }
+      setState(() {
+        _sottocategoriaSelezionata = 'Divertimento';
+        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+      });
     } else if (paroleRisparmio.any((p) => testo.contains(p))) {
-      if (_categoriaSelezionata != '20% Risparmio') {
-        setState(() => _categoriaSelezionata = '20% Risparmio');
-      }
-    }
-
-    if (testo.contains('affitto') || testo.contains('mutuo')) {
-      _sottocategoriaSelezionata = 'Casa/Affitto';
-    } else if (testo.contains('bollett') || testo.contains('luce') || testo.contains('gas')) {
-      _sottocategoriaSelezionata = 'Canoni/Bollette';
-    } else if (testo.contains('supermercad') || testo.contains('spesa') || testo.contains('cibo')) {
-      _sottocategoriaSelezionata = 'Alimentari';
-    } else if (testo.contains('ristorante') || testo.contains('cinema') || testo.contains('bar')) {
-      _sottocategoriaSelezionata = 'Divertimento';
-    } else if (testo.contains('carburante') || testo.contains('auto')) {
-      _sottocategoriaSelezionata = 'Auto';
+      setState(() => _categoriaSelezionata = '20% Risparmio');
     }
   }
 
   Future<void> _avviaScansioneIntelligente({TipoDocumentoScan tipo = TipoDocumentoScan.scontrino}) async {
-  try {
-    final XFile? image = await AppImagePickerSheet.mostra(
-      context,
-      titolo: tipo == TipoDocumentoScan.scontrino ? 'Scansiona Scontrino' : 'Scansiona Fattura',
-    );
+    try {
+      final XFile? image = await AppImagePickerSheet.mostra(
+        context,
+        titolo: tipo == TipoDocumentoScan.scontrino ? 'Scansiona Scontrino' : 'Scansiona Fattura',
+      );
 
-    if (image == null) return;
+      if (image == null) return;
 
-    setState(() => _isAnalyzing = true);
+      setState(() => _isAnalyzing = true);
 
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
 
-    final result = await DocumentScannerService.scanDocument(
-      imagePath: image.path,
-      wallet: walletProvider,
-      tipo: tipo, // Passa se scontrino o fattura
-      onProgress: (statoText) {
-        if (mounted) {
-          AppNotifications.mostraInAlto(
-            context,
-            statoText,
-            type: NotificationType.warning,
-          );
+      final result = await DocumentScannerService.scanDocument(
+        imagePath: image.path,
+        wallet: walletProvider,
+        tipo: tipo,
+        onProgress: (statoText) {
+          if (mounted) {
+            AppNotifications.mostraInAlto(
+              context,
+              statoText,
+              type: NotificationType.warning,
+            );
+          }
+        },
+      );
+
+      setState(() {
+        if (result.importo != null) {
+          _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
         }
-      },
-    );
+        if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
+          _noteController.text = result.ragioneSociale!;
+        }
+        if (result.data != null) {
+          _dataSelezionata = result.data!;
+        }
 
-    setState(() {
-      if (result.importo != null) {
-        _amountController.text = result.importo!.toStringAsFixed(2).replaceAll('.', ',');
-      }
-      if (result.ragioneSociale != null && result.ragioneSociale!.isNotEmpty) {
-        _noteController.text = result.ragioneSociale!;
-      }
-      if (result.data != null) {
-        _dataSelezionata = result.data!;
-      }
-
-      // 🎯 Auto-compilazione Categoria Specifica
+        // 1. Assegna la Categoria rilevata dall'AI (se presente nelle nostre opzioni)
       if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
         if (_sottocategorieSpesa.contains(result.categoriaSuggerita)) {
           _sottocategoriaSelezionata = result.categoriaSuggerita!;
         }
       }
 
-      // 🎯 Auto-compilazione Bussola Spese (50%, 30%, 20%)
-      if (result.bussolaSuggerita != null && result.bussolaSuggerita!.isNotEmpty) {
-        if (_categorieSpesa.contains(result.bussolaSuggerita)) {
-          _categoriaSelezionata = result.bussolaSuggerita!;
-        }
+      // 2. Forza la sincronizzazione della Bussola tramite Mappa di Coerenza
+      if (_mappaSottocategoriaABussola.containsKey(_sottocategoriaSelezionata)) {
+        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
       }
 
-      _tipoMovimento = 'uscita';
-      _isAnalyzing = false;
-    });
+        _tipoMovimento = 'uscita';
+        _isAnalyzing = false;
+      });
 
-    if (mounted) {
-      AppNotifications.mostraInAlto(
-        context,
-        '🤖 Documento analizzato con successo!',
-      );
-    }
-  } catch (e) {
-    setState(() => _isAnalyzing = false);
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF18181B),
-          title: const Text('Errore Scansione AI', style: TextStyle(color: Colors.white)),
-          content: Text(
-            e.toString().replaceAll('Exception: ', ''),
-            style: const TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK', style: TextStyle(color: Color(0xFF2DD4BF))),
+      if (mounted) {
+        AppNotifications.mostraInAlto(
+          context,
+          '🤖 Documento analizzato con successo!',
+        );
+      }
+    } catch (e) {
+      setState(() => _isAnalyzing = false);
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF18181B),
+            title: const Text('Errore Scansione AI', style: TextStyle(color: Colors.white)),
+            content: Text(
+              e.toString().replaceAll('Exception: ', ''),
+              style: const TextStyle(color: Colors.white70),
             ),
-          ],
-        ),
-      );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK', style: TextStyle(color: Color(0xFF2DD4BF))),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
-}
 
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
@@ -376,7 +395,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
   }
 
-  // ⚠️ POP-UP ALERT DI SICUREZZA PRIMA DELL'ELIMINAZIONE TOTALE DELLO STORICO
   void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc, VoidCallback onConcluso) {
     showDialog(
       context: context,
@@ -426,7 +444,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🛑 POP-UP ELIMINAZIONE MOVIMENTI REALI/PASSATI
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
     showDialog(
       context: context,
@@ -549,7 +566,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  // 🔮 POP-UP ELIMINAZIONE PREVISIONI FUTURE
   void _confermaEliminazioneMovimentoFuturo(BuildContext context, String predictionId, String parentId, String desc, DateTime meseRiferimento) {
     showDialog(
       context: context,
@@ -685,7 +701,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       _noteController.text = item['label'];
       _iconaCorrente = item['icon'] as IconData;
       _categoriaSelezionata = item['cat'] ?? '50% Spese Fisse';
-      _sottocategoriaSelezionata = item['sottoCat'] ?? 'Alimentari';
+      _sottocategoriaSelezionata = item['sottoCat'] ?? 'Supermercato';
       _isPreferitoSelezionato = true;
     });
   }
@@ -706,7 +722,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     final TextEditingController nameController = TextEditingController(text: item['label']);
     IconData iconaTemp = item['icon'] as IconData;
     String catTemp = item['cat'] ?? '50% Spese Fisse';
-    String sottoCatTemp = item['sottoCat'] ?? (isExpense ? 'Alimentari' : 'Stipendio');
+    String sottoCatTemp = item['sottoCat'] ?? (isExpense ? 'Supermercato' : 'Stipendio');
 
     showDialog(
       context: context,
@@ -1229,7 +1245,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         'isFattura': false,
         'isGiroconto': false,
         'isRecurrent': true,
-        'isPrevisto': true, // 👈 Identifica che la fonte è una regola di previsione
+        'isPrevisto': true,
       };
     }).toList();
 
@@ -1650,7 +1666,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   final bool isRecurrent = m['isRecurrent'] as bool? ?? false;
                                   final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
-                                  // 💡 DETERMINA LO STILE VISIVO IN BASE ALLA DATA CORRENTE
                                   final bool isFuturo = dt.isAfter(DateTime.now());
 
                                   final rowContent = Padding(
@@ -1792,7 +1807,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                         focusNode: _amountFocusNode,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          ThousandsSeparatorInputFormatter(), // 👈 AGGIUNTA QUESTA RIGA
+                          ThousandsSeparatorInputFormatter(),
                         ],
                         autofocus: true,
                         textAlign: TextAlign.center,
@@ -2086,6 +2101,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           onSelect: (val) {
                             setState(() {
                               _sottocategoriaSelezionata = val;
+                              // 🎯 Aggiorna automaticamente la Bussola in base alla Categoria scelta
+                              if (_mappaSottocategoriaABussola.containsKey(val)) {
+                                _categoriaSelezionata = _mappaSottocategoriaABussola[val]!;
+                              }
                               _isSottocategoriaEspansa = false;
                             });
                           },
@@ -2548,7 +2567,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       ),
     );
   }
-} // 👈 Questa parentesi chiude _AddMovementSheetState
+}
 
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
