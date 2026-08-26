@@ -328,14 +328,16 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     )
                   else
-                    ...txsConto.map((tx) {
+                    ...txsConto.asMap().entries.map((entry) {
+                      final int index = entry.key;
+                      final tx = entry.value;
                       final bool isIncome = tx.isIncome;
                       final Color color = isIncome ? oceanCyan : const Color(0xFFF43F5E);
                       final String sign = isIncome ? '+' : '-';
                       final String dateStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}/${tx.date.year}';
 
                       return Dismissible(
-                        key: Key('modal_dismiss_${tx.id}'),
+                        key: Key('modal_dismiss_${tx.id}_$index'), // 🛡️ Chiave ora univoca con indice
                         direction: DismissDirection.endToStart,
                         background: Container(
                           margin: const EdgeInsets.only(bottom: 8), // Allinea lo sfondo al bordo

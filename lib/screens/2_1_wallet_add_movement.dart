@@ -65,7 +65,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Altro',
   ];
 
-  // 🎯 Mappa di Coerenza: collega univocamente ogni Categoria Specifica alla sua Bussola
   final Map<String, String> _mappaSottocategoriaABussola = {
     'Casa/Affitto': '50% Spese Fisse',
     'Mutuo': '50% Spese Fisse',
@@ -201,6 +200,36 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     super.dispose();
   }
 
+  void _eliminaMovimentoSicuro(BuildContext context, String id, {String? gemelloId}) {
+    final provider = context.read<WalletProvider>();
+    provider.deleteTransaction(id);
+    
+    // Elimina anche la transazione gemella se presente
+    if (gemelloId != null && gemelloId.isNotEmpty) {
+      provider.deleteTransaction(gemelloId);
+    } else {
+      final txs = provider.transactions;
+      try {
+        final targetTx = txs.firstWhere((t) => t.id == id);
+        final isGiroconto = targetTx.category == 'Giroconto' ||
+            targetTx.category == 'Trasferimento' ||
+            targetTx.title.toLowerCase().contains('giroconto') ||
+            targetTx.title.toLowerCase().contains('salvadanaio');
+
+        if (isGiroconto) {
+          final gemello = txs.firstWhere((t) =>
+              t.id != targetTx.id &&
+              t.isIncome != targetTx.isIncome &&
+              (t.amount - targetTx.amount).abs() < 0.01 &&
+              t.date.year == targetTx.date.year &&
+              t.date.month == targetTx.date.month &&
+              t.date.day == targetTx.date.day);
+          provider.deleteTransaction(gemello.id);
+        }
+      } catch (_) {}
+    }
+  }
+
   String _formatValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
@@ -288,17 +317,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           _dataSelezionata = result.data!;
         }
 
-        // 1. Assegna la Categoria rilevata dall'AI (se presente nelle nostre opzioni)
-      if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
-        if (_sottocategorieSpesa.contains(result.categoriaSuggerita)) {
-          _sottocategoriaSelezionata = result.categoriaSuggerita!;
+        if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
+          if (_sottocategorieSpesa.contains(result.categoriaSuggerita)) {
+            _sottocategoriaSelezionata = result.categoriaSuggerita!;
+          }
         }
-      }
 
-      // 2. Forza la sincronizzazione della Bussola tramite Mappa di Coerenza
-      if (_mappaSottocategoriaABussola.containsKey(_sottocategoriaSelezionata)) {
-        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
-      }
+        if (_mappaSottocategoriaABussola.containsKey(_sottocategoriaSelezionata)) {
+          _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+        }
 
         _tipoMovimento = 'uscita';
         _isAnalyzing = false;
@@ -423,7 +450,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 onPressed: () {
-                  context.read<WalletProvider>().deleteTransaction(id);
+                  _eliminaMovimentoSicuro(context, id);
                   Navigator.pop(ctxAlert);
                   onConcluso();
                   AppNotifications.mostraInAlto(
@@ -444,7 +471,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     );
   }
 
-  void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent) {
+  void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent, {String? gemelloId}) {
     showDialog(
       context: context,
       builder: (ctx) => AppSecondaryPopup(
@@ -457,7 +484,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         onConferma: isRecurrent
             ? null
             : () {
-                context.read<WalletProvider>().deleteTransaction(id);
+                _eliminaMovimentoSicuro(context, id, gemelloId: gemelloId);
                 Navigator.pop(ctx);
                 setState(() {});
                 AppNotifications.mostraInAlto(context, 'Movimento "$desc" eliminato 🎉');
@@ -470,7 +497,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               Text(
                 isRecurrent
                     ? 'Questa è una spesa/entrata ricorrente.\nScegli esattamente come vuoi procedere:'
-                    : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà stornato.',
+                    : 'Vuoi davvero eliminare "$desc"?\nI saldi dei conti verranno ripristinati.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               if (isRecurrent) ...[
@@ -506,7 +533,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     onPressed: () {
-                      context.read<WalletProvider>().deleteButKeepRecurrence(id);
+                      _eliminaMovimentoSicuro(context, id, gemelloId: gemelloId);
                       Navigator.pop(ctx);
                       setState(() {});
                       AppNotifications.mostraInAlto(
@@ -527,7 +554,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     ),
                     onPressed: () {
                       context.read<WalletProvider>().stopRecurrence(id);
-                      context.read<WalletProvider>().deleteTransaction(id);
+                      _eliminaMovimentoSicuro(context, id, gemelloId: gemelloId);
                       Navigator.pop(ctx);
                       setState(() {});
                       AppNotifications.mostraInAlto(
@@ -1177,35 +1204,90 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   Widget _buildSchermataRiepilogo() {
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    final List<Map<String, dynamic>> movimentiReali = walletProvider.transactions
+    // 🎯 Recupera il nome esatto del conto dall'ID reale (fine del testo 'Conto Origine')
+    String getAccountTitle(String? accountId) {
+      if (accountId == null) return 'Conto';
+      final matches = walletProvider.accounts.where((a) => a.id == accountId);
+      return matches.isNotEmpty ? matches.first.title : 'Conto';
+    }
+
+    final allTxs = walletProvider.transactions
         .where((tx) => !tx.title.startsWith('Accantonamento Tasse') && !tx.id.startsWith('rule_'))
-        .map((tx) {
-      final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
-      
+        .toList();
+
+    final List<Map<String, dynamic>> movimentiReali = [];
+    final Set<String> processedGirocontoIds = {};
+
+    for (var tx in allTxs) {
       final bool isGiroconto = tx.category == 'Giroconto' || 
                                tx.category == 'Trasferimento' || 
                                tx.title.toLowerCase().contains('giroconto') ||
                                tx.title.toLowerCase().contains('salvadanaio');
 
-      String regolaBussola = tx.isIncome 
-          ? 'Entrate' 
-          : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
+      if (isGiroconto) {
+        if (processedGirocontoIds.contains(tx.id)) continue;
 
-      return {
-        'id': tx.id,
-        'parentId': tx.id,
-        'desc': tx.title,
-        'imp': tx.amount,
-        'cat': tx.category,
-        'bussola': regolaBussola,
-        'data': tx.date,
-        'isSpesa': !tx.isIncome,
-        'isFattura': isFatturaPiva, 
-        'isGiroconto': isGiroconto,
-        'isRecurrent': tx.isRecurrent,
-        'isPrevisto': false,
-      };
-    }).toList();
+        dynamic gemello;
+        try {
+          gemello = allTxs.firstWhere((other) =>
+              other.id != tx.id &&
+              !processedGirocontoIds.contains(other.id) &&
+              other.isIncome != tx.isIncome &&
+              (other.amount - tx.amount).abs() < 0.01 &&
+              other.date.year == tx.date.year &&
+              other.date.month == tx.date.month &&
+              other.date.day == tx.date.day);
+        } catch (_) {
+          gemello = null;
+        }
+
+        processedGirocontoIds.add(tx.id);
+        if (gemello != null) processedGirocontoIds.add(gemello.id);
+
+        dynamic txDa = !tx.isIncome ? tx : gemello;
+        dynamic txVerso = tx.isIncome ? tx : gemello;
+
+        String nomeDa = txDa != null ? getAccountTitle(txDa.accountId as String?) : 'Conto';
+        String nomeVerso = txVerso != null ? getAccountTitle(txVerso.accountId as String?) : 'Conto';
+
+        movimentiReali.add({
+          'id': tx.id,
+          'gemelloId': gemello?.id,
+          'parentId': tx.id,
+          'desc': 'Da $nomeDa a $nomeVerso',
+          'imp': tx.amount,
+          'cat': 'Giroconto',
+          'bussola': 'Giroconto',
+          'data': tx.date,
+          'isSpesa': false,
+          'isFattura': false, 
+          'isGiroconto': true,
+          'isRecurrent': tx.isRecurrent,
+          'isPrevisto': false,
+        });
+      } else {
+        final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
+        String regolaBussola = tx.isIncome 
+            ? 'Entrate' 
+            : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
+
+        movimentiReali.add({
+          'id': tx.id,
+          'gemelloId': null,
+          'parentId': tx.id,
+          'desc': tx.title,
+          'imp': tx.amount,
+          'cat': tx.category,
+          'bussola': regolaBussola,
+          'data': tx.date,
+          'isSpesa': !tx.isIncome,
+          'isFattura': isFatturaPiva, 
+          'isGiroconto': false,
+          'isRecurrent': tx.isRecurrent,
+          'isPrevisto': false,
+        });
+      }
+    }
 
     final List<Map<String, dynamic>> previsti = walletProvider.getMovimentiPrevisti(_meseSelezionatoRiepilogo)
         .where((tx) => !_skippedPredictionIds.contains(tx.id))
@@ -1227,6 +1309,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       return {
         'id': tx.id,
+        'gemelloId': null,
         'parentId': parentId,
         'desc': tx.title,
         'imp': tx.amount,
@@ -1580,23 +1663,15 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                     final listaMovs = mappaCorrente[nomeGruppo]!;
                     final bool isCategoriaGiroconto = nomeGruppo.toLowerCase().contains('giroconto') || nomeGruppo.toLowerCase().contains('trasferimento');
 
-                    final double totGruppo = listaMovs.fold(0.0, (sum, m) {
+                    double totGruppo = listaMovs.fold(0.0, (sum, m) {
                       final imp = m['imp'] as double;
                       final isSpesa = m['isSpesa'] as bool;
                       final isGiroconto = m['isGiroconto'] as bool? ?? false;
-                      if (isGiroconto) return sum;
+                      if (isGiroconto) return sum + imp;
                       return sum + (isSpesa ? -imp : imp);
                     });
-                    final bool isEspansa = _categoriaEspansaIndex == index;
 
-                    final bool isGruppoSpesa = listaMovs.any((m) => m['isSpesa'] == true);
-                    final String segnoGruppo = isCategoriaGiroconto 
-                        ? '⇄ ' 
-                        : (totGruppo < 0 
-                            ? '-' 
-                            : (totGruppo > 0 
-                                ? '+' 
-                                : (isGruppoSpesa ? '-' : '+')));
+                    final bool isEspansa = _categoriaEspansaIndex == index;
 
                     return Container(
                       decoration: const BoxDecoration(
@@ -1627,11 +1702,13 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                     ),
                                   ),
                                   Text(
-                                    '$segnoGruppo${_formatValuta(totGruppo)}',
+                                    isCategoriaGiroconto
+                                        ? _formatValuta(totGruppo)
+                                        : '${totGruppo > 0 ? '+' : (totGruppo < 0 ? '-' : '')}${_formatValuta(totGruppo)}',
                                     style: TextStyle(
                                       color: isCategoriaGiroconto 
                                           ? const Color(0xFF3B82F6)
-                                          : (segnoGruppo == '+' ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                          : (totGruppo > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -1652,6 +1729,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   final bool isFattura = m['isFattura'] as bool;
                                   final bool isGiroconto = m['isGiroconto'] as bool? ?? false;
                                   final String id = m['id'] as String;
+                                  final String? gemelloId = m['gemelloId'] as String?;
                                   final String parentId = m['parentId'] as String;
                                   final String desc = m['desc'] as String;
                                   final String catSpecifica = m['cat'] as String;
@@ -1659,6 +1737,16 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   final bool isPrevisto = m['isPrevisto'] as bool? ?? false;
 
                                   final bool isFuturo = dt.isAfter(DateTime.now());
+
+                                  Color colorValore = isGiroconto
+                                      ? const Color(0xFF3B82F6)
+                                      : (isFuturo 
+                                          ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFF10B981).withOpacity(0.4))
+                                          : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)));
+
+                                  String testoValore = isGiroconto
+                                      ? _formatValuta(imp)
+                                      : '${isSpesa ? '-' : '+'}${_formatValuta(imp)}';
 
                                   final rowContent = Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -1682,9 +1770,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                                       ? '$desc ($catSpecifica)'
                                                       : (isPrevisto ? '$desc (Previsto il ${dt.day}/${dt.month})' : '$desc (${dt.day}/${dt.month})'),
                                                   style: TextStyle(
-                                                    color: isFuturo 
-                                                        ? Colors.white38 
-                                                        : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
+                                                    color: isGiroconto
+                                                        ? const Color(0xFF3B82F6)
+                                                        : (isFuturo 
+                                                            ? Colors.white38 
+                                                            : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
                                                     fontSize: 11, 
                                                     fontStyle: isFuturo ? FontStyle.italic : FontStyle.normal,
                                                     fontWeight: isFuturo ? FontWeight.normal : FontWeight.w600,
@@ -1697,15 +1787,9 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          isGiroconto 
-                                              ? _formatValuta(imp)
-                                              : '${isSpesa ? '-' : '+'}${_formatValuta(imp)}',
+                                          testoValore,
                                           style: TextStyle(
-                                            color: isGiroconto
-                                                ? const Color(0xFF3B82F6)
-                                                : (isFuturo 
-                                                  ? (isSpesa ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFF10B981).withOpacity(0.4))
-                                                  : (isSpesa ? const Color(0xFFEF4444) : const Color(0xFF10B981))),
+                                            color: colorValore,
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1717,7 +1801,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                   if (isFattura) return rowContent;
 
                                   return Dismissible(
-                                    key: Key('riepilogo_dismiss_${id}_$parentId'),
+                                    key: UniqueKey(),
                                     direction: DismissDirection.endToStart,
                                     background: Container(
                                       alignment: Alignment.centerRight,
@@ -1732,7 +1816,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                                       if (isPrevisto) {
                                         _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
                                       } else {
-                                        _confermaEliminazioneMovimento(context, id, desc, isRecurrent);
+                                        _confermaEliminazioneMovimento(context, id, desc, isRecurrent, gemelloId: gemelloId);
                                       }
                                       return false;
                                     },
@@ -2093,7 +2177,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                           onSelect: (val) {
                             setState(() {
                               _sottocategoriaSelezionata = val;
-                              // 🎯 Aggiorna automaticamente la Bussola in base alla Categoria scelta
                               if (_mappaSottocategoriaABussola.containsKey(val)) {
                                 _categoriaSelezionata = _mappaSottocategoriaABussola[val]!;
                               }
@@ -2469,7 +2552,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
                       style: TextStyle(
                         color: isDisabled ? Colors.white54 : Colors.white,
                         fontSize: 12,
-                        fontWeight: _isPreferitoSelezionato ? FontWeight.w600 : FontWeight.w600,
+                        fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

@@ -211,7 +211,6 @@ class WalletProvider with ChangeNotifier {
     cycleUserTier(); 
   }
 
-  // 🔍 SCALA TESTO GLOBALE (1.0 = 100%, 1.15 = 115%, 1.25 = 125%)
   double _textScaleFactor = 1.0;
   double get textScaleFactor => _textScaleFactor;
 
@@ -386,19 +385,15 @@ class WalletProvider with ChangeNotifier {
 
   double get nettoSpendibile => patrimonioNetto - fondoTasseDaVersare;
 
-  // 🎯 Calcolo dinamico in tempo reale per il grafico della Home
-  // 🎯 Helper universale: analizza titolo, sottotitolo e categoria per una classificazione perfetta
   String ottieniBussolaSemplificata(TransactionModel tx) {
     final testoCompleto = '${tx.category} ${tx.title} ${tx.subtitle}'.toLowerCase();
 
-    // 1. Risparmi (20%)
     if (testoCompleto.contains('20%') ||
         testoCompleto.contains('risparm') ||
         testoCompleto.contains('invest')) {
       return 'Risparmi';
     }
 
-    // 2. Svago / Spese Variabili (30%)
     if (testoCompleto.contains('30%') ||
         testoCompleto.contains('svag') ||
         testoCompleto.contains('variabil') ||
@@ -413,11 +408,9 @@ class WalletProvider with ChangeNotifier {
       return 'Svago';
     }
 
-    // 3. Default: Bisogni / Spese Fisse (50%)
     return 'Bisogni';
   }
 
-  // 🎯 Calcolo dinamico retroattivo in tempo reale per la Home
   double getSpesoBussola(String targetBussola) {
     final ora = DateTime.now();
     return _transactions.where((tx) {
@@ -441,7 +434,6 @@ class WalletProvider with ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
-  // 📌 LISTA SPESE PIANIFICATE
   List<Map<String, dynamic>> _vociPianificate = [
     {
       'id': '1',
@@ -554,7 +546,6 @@ class WalletProvider with ChangeNotifier {
   List<Map<String, dynamic>> get fattureIncassate => List.unmodifiable(_fattureIncassate);
   List<String> _skippedPredictions = [];
 
-  // 🔢 CALCOLA IL PROSSIMO NUMERO FATTURA INTELLIGENTE (con prefissi, suffissi e zeri)
   String get prossimoNumeroFattura {
     final annoCorrente = DateTime.now().year.toString();
     final tutteLeFatture = [..._fattureDaIncassare, ..._fattureIncassate];
@@ -571,7 +562,6 @@ class WalletProvider with ChangeNotifier {
 
     if (ultimoNumeroStr.isEmpty) return '1';
 
-    // Cerca prefisso, cifre e suffisso (es. "FATT-003/A" -> "FATT-", "003", "/A")
     final regExp = RegExp(r'^(.*?)(\d+)(.*)$');
     final match = regExp.firstMatch(ultimoNumeroStr);
 
@@ -583,7 +573,6 @@ class WalletProvider with ChangeNotifier {
       final numero = int.tryParse(cifreStr) ?? 0;
       final prossimoNumero = numero + 1;
 
-      // Preserva gli zeri iniziali se presenti (es. 003 -> 004)
       final cifreFormattate = prossimoNumero.toString().padLeft(cifreStr.length, '0');
 
       return '$prefisso$cifreFormattate$soffisso';
@@ -644,7 +633,6 @@ class WalletProvider with ChangeNotifier {
 
           bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
 
-          // 💡 Rimosso il blocco `isAfter(oggi)` per permettere la generazione nei mesi intermedi
           if (!isStessoMeseCreazione) {
             previsti.add(TransactionModel(
               id: 'prev_${tx.id}_${dataVirtuale.year}_${dataVirtuale.month}', 
@@ -866,7 +854,7 @@ class WalletProvider with ChangeNotifier {
       aliquotaInps = prefs.getDouble('aliquotaInps') ?? 0.2607;
       _aliquotaInps = aliquotaInps;
 
-      _textScaleFactor = prefs.getDouble('textScaleFactor') ?? 1.0; // 👈 LETTURA SCALA
+      _textScaleFactor = prefs.getDouble('textScaleFactor') ?? 1.0;
 
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 0.0;
       _accontiVersati = accontiVersatiAnnoPrecedente;
@@ -878,7 +866,6 @@ class WalletProvider with ChangeNotifier {
       _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2024;
       _meseAperturaPiva = prefs.getInt('meseAperturaPiva') ?? 1;
 
-      
       _fatturatoTotale = prefs.getDouble('fatturatoTotale') ?? 0.0;
 
       final accountsStr = prefs.getString('accounts');
@@ -935,7 +922,7 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('aliquotaInps', aliquotaInps);
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
       
-      await prefs.setDouble('textScaleFactor', _textScaleFactor); // 👈 SCRITTURA SCALA
+      await prefs.setDouble('textScaleFactor', _textScaleFactor);
 
       await prefs.setBool('onboarding_completed', true);
       await prefs.setString('codiceAteco', _codiceAteco);
@@ -949,7 +936,6 @@ class WalletProvider with ChangeNotifier {
         await prefs.setInt('meseAperturaPiva', _meseAperturaPiva!);
       }
 
-      
       await prefs.setDouble('fatturatoTotale', _fatturatoTotale);
 
       await prefs.setString('accounts', jsonEncode(_accounts.map((a) => a.toJson()).toList()));
@@ -1038,6 +1024,7 @@ class WalletProvider with ChangeNotifier {
     String? frequenza,        
     String? giornoRicorrenza, 
     DateTime? dataFineRicorrenza,
+    String? customId,
   }) {
     final DateTime dataUso = date ?? DateTime.now();
 
@@ -1047,7 +1034,7 @@ class WalletProvider with ChangeNotifier {
     );
 
     final newTx = TransactionModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: customId ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       subtitle: '${dataUso.day}/${dataUso.month} • $category',
       amount: amount,
@@ -1190,22 +1177,74 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 🎯 ELIMINAZIONE INFALLIBILE SUI GIROCONTI CON ID GEMELLO ESPLICITO
   void deleteTransaction(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
-    if (idx != -1) {
-      final tx = _transactions.removeAt(idx);
-      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? '1'), orElse: () => _accounts.first);
+    if (idx == -1) return;
 
-      if (tx.isIncome) {
-        targetAccount.amount -= tx.amount;
-      } else {
-        targetAccount.amount += tx.amount;
-        
+    final tx = _transactions[idx];
+
+    // Se è un giroconto legato a un id gemello (es. giro_123_da / giro_123_verso)
+    String? targetGemelloId;
+    if (id.endsWith('_da')) {
+      targetGemelloId = id.replaceAll('_da', '_verso');
+    } else if (id.endsWith('_verso')) {
+      targetGemelloId = id.replaceAll('_verso', '_da');
+    }
+
+    // 1. Storna il conto del movimento corrente
+    _stornaSaldoConto(tx);
+
+    // 2. Se c'è un gemello esplicito o cercato per corrispondenza
+    if (targetGemelloId != null) {
+      final gemelloIdx = _transactions.indexWhere((t) => t.id == targetGemelloId);
+      if (gemelloIdx != -1) {
+        _stornaSaldoConto(_transactions[gemelloIdx]);
+        _transactions.removeAt(gemelloIdx);
       }
+    } else {
+      // Ricerca fallback per vecchi giroconti di test
+      final bool isGiroconto = tx.category == 'Giroconto' ||
+          tx.category == 'Trasferimento' ||
+          tx.title.toLowerCase().contains('giroconto') ||
+          tx.title.toLowerCase().contains('salvadanaio') ||
+          tx.title.toLowerCase().contains('accantonamento');
 
-      _aggiornaTasseVirtuali();
-      _salvaDatiInLocalStorage();
-      notifyListeners();
+      if (isGiroconto) {
+        final gemelloIdx = _transactions.indexWhere((t) =>
+            t.id != tx.id &&
+            t.isIncome != tx.isIncome &&
+            (t.amount - tx.amount).abs() < 0.01 &&
+            t.date.difference(tx.date).inHours.abs() <= 24);
+
+        if (gemelloIdx != -1) {
+          _stornaSaldoConto(_transactions[gemelloIdx]);
+          _transactions.removeAt(gemelloIdx);
+        }
+      }
+    }
+
+    // Rimuove il movimento selezionato
+    _transactions.removeWhere((t) => t.id == id);
+
+    _aggiornaTasseVirtuali();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 🛡️ Helper universale per ripristinare il saldo esatto del conto
+  void _stornaSaldoConto(TransactionModel tx) {
+    if (tx.accountId == null || tx.accountId!.isEmpty) return;
+
+    final accIdx = _accounts.indexWhere((a) => a.id == tx.accountId);
+    if (accIdx != -1) {
+      if (tx.isIncome) {
+        // Detrae dal conto ricevente (-)
+        _accounts[accIdx].amount -= tx.amount;
+      } else {
+        // Riaccredita al conto emittente (+)
+        _accounts[accIdx].amount += tx.amount;
+      }
     }
   }
 
@@ -1231,7 +1270,6 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
-  // 🛡️ FERMA LA RICORRENZA DA UN MESE SPECIFICO SALVANDO IL PASSATO
   void stopRecurrenceFromDate(String id, DateTime meseRiferimento) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
@@ -1261,7 +1299,6 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
-
   void skipPrediction(String parentId, DateTime meseRiferimento) {
     final key = '${parentId}_${meseRiferimento.year}_${meseRiferimento.month}';
     if (!_skippedPredictions.contains(key)) {
@@ -1281,7 +1318,6 @@ class WalletProvider with ChangeNotifier {
         targetAccount.amount -= tx.amount;
       } else {
         targetAccount.amount += tx.amount;
-        
       }
 
       _transactions[idx] = TransactionModel(
@@ -1435,6 +1471,7 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 🎯 GIROCONTO CON ID CONDIVISO E NOMI DEI CONTI REALI
   void eseguiGiroconto({
     required String daAccountId,
     required String aAccountId,
@@ -1460,7 +1497,11 @@ class WalletProvider with ChangeNotifier {
       titoloA = 'Rientro Liquidità da Tasse ⚠️';
     }
 
+    final String baseId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Registra addebito sul conto emittente
     addTransaction(
+      customId: '${baseId}_da',
       title: titoloDa,
       amount: importo,
       isIncome: false,
@@ -1468,7 +1509,9 @@ class WalletProvider with ChangeNotifier {
       accountId: accDa.id,
     );
 
+    // Registra accredito sul conto ricevente
     addTransaction(
+      customId: '${baseId}_verso',
       title: titoloA,
       amount: importo,
       isIncome: true,
@@ -1477,7 +1520,6 @@ class WalletProvider with ChangeNotifier {
     );
 
     _aggiornaTasseVirtuali();
-
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
