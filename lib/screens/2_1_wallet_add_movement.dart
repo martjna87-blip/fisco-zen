@@ -489,6 +489,25 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   }
 
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent, {String? gemelloId}) {
+    final bool isFatturaPiva = desc.toLowerCase().startsWith('incasso:') || desc.toLowerCase().startsWith('fattura');
+
+    if (isFatturaPiva) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AppSecondaryPopup(
+          backgroundColor: const Color(0xFF18181B),
+          icon: Icons.shield_rounded,
+          iconColor: const Color(0xFF38BDF8),
+          titolo: 'Fattura P.IVA Protetta',
+          testoAnnulla: 'Chiudi',
+          child: const Text(
+            'Gli incassi delle fatture P.IVA regolano l\'accantonamento delle tasse e non possono essere eliminati dai movimenti comuni.\n\nPer gestire questa fattura utilizza la sezione P.IVA.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AppSecondaryPopup(

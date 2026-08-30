@@ -8,7 +8,7 @@ import '../data/notifications_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
 import '1_onboarding_wizard.dart';
-import 'main_dashboard_wrapper.dart';
+import '3_home_PI_screen.dart'; 
 import '2_wallet_screen.dart'; 
 import '2_1_wallet_add_movement.dart'; 
 import '4_notifications_screen.dart'; 
@@ -40,15 +40,10 @@ class _MainMenuState extends State<MainMenu> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> screens = [
-      MainDashboardWrapper(
-        hasPartitaIva: widget.hasPartitaIva,
-        codiceAtecoIniziale: widget.codiceAtecoIniziale,
-        coefficienteIniziale: widget.coefficienteIniziale,
-        aliquotaImpostaIniziale: widget.aliquotaImpostaIniziale,
-      ),                          // 1° ELEMENTO (Index 0): Dashboard / P.IVA
-      const WalletScreen(),        // 2° ELEMENTO (Index 1): Gestione Wallet & Conti
+      const HomeScreen(),          // 👈 NOME CLASSE ESATTO
+      const WalletScreen(),        // 2° ELEMENTO (Index 1): Wallet & Conti
       const NotificationsScreen(), // 3° ELEMENTO (Index 2): Centro Notifiche
-      const ProfileScreen(),       // 4° ELEMENTO (Index 3): Profilo Utente & GDPR
+      const ProfileScreen(),       // 4° ELEMENTO (Index 3): Profilo Utente
     ];
 
     return Scaffold(
@@ -64,13 +59,13 @@ class _MainMenuState extends State<MainMenu> {
 
   Widget _buildGlassBottomNav() {
     return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 14),
-      child: RepaintBoundary( // 🛡️ Isola il rendering della bottom bar dal resto della pagina
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 14),
+      child: RepaintBoundary(
         child: Container(
-          height: 58,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 62,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF141417).withOpacity(0.92),
+            color: const Color(0xFF141417).withOpacity(0.94),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
@@ -101,32 +96,47 @@ class _MainMenuState extends State<MainMenu> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: index == 2
-            ? Builder(
-                builder: (context) {
-                  final int nonLette = context.watch<NotificationsProvider>().nonLetteCount;
-                  return Badge(
-                    isLabelVisible: nonLette > 0,
-                    label: Text('$nonLette'),
-                    backgroundColor: const Color(0xFFEF4444),
-                    child: Icon(
-                      icon,
-                      color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
-                      size: 22,
-                    ),
-                  );
-                },
-              )
-            : Icon(
-                icon,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            index == 2
+                ? Builder(
+                    builder: (context) {
+                      final int nonLette = context.watch<NotificationsProvider>().nonLetteCount;
+                      return Badge(
+                        isLabelVisible: nonLette > 0,
+                        label: Text('$nonLette'),
+                        backgroundColor: const Color(0xFFEF4444),
+                        child: Icon(
+                          icon,
+                          color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
+                          size: 20,
+                        ),
+                      );
+                    },
+                  )
+                : Icon(
+                    icon,
+                    color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
+                    size: 20,
+                  ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
                 color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54,
-                size: 22,
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
+            ),
+          ],
+        ),
       ),
     );
   }

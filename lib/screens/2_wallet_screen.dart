@@ -8,7 +8,7 @@ import '2_5_wallet_annual_summary.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/serbatoio_tasse_widget.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
-import '../widgets_shared/app_bottom_sheet.dart'; // 👈 GUSCIO UNICO BOTTOM SHEET
+import '../widgets_shared/app_bottom_sheet.dart';
 import '2_4_wallet_budget_pilot_v2.dart';
 import '../widgets_shared/fiscon_logo.dart';
 
@@ -24,16 +24,13 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   String _filtroMeseMovimenti = 'ultimi_5';
 
-  // 🎨 COLORI ACCENTO PER IL VETRO
   final Color oceanCyan  = const Color(0xFF38BDF8); 
   final Color goldAccent = const Color(0xFFFBBF24); 
   final Color purpleZen  = const Color(0xFFC084FC); 
   final Color taxBlue    = const Color(0xFF60A5FA); 
 
-  // 👇 CONTATORE PER IL TEST DELLE FOTO
   int _testIndex = 0;
 
-  // 📸 GALLERIA SFONDI (Link stabili di test)
   final List<String> _sfondiSettimanali = [
     'https://images.unsplash.com/photo-1505413687799-90481dfc0203?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTl8fG1hcmV8ZW58MHx8MHx8fDA%3D',
     'https://images.unsplash.com/photo-1555412654-72a95a495858?w=1400&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YWNxdWF8ZW58MHx8MHx8fDA%3D',
@@ -44,7 +41,7 @@ class _WalletScreenState extends State<WalletScreen> {
   ];
 
   bool _isBussolaEspansa = false;
-  bool _isTargetEspanso = false; // 👈 Chiuso di default
+  bool _isTargetEspanso = false;
   DateTime _dataFiltroRipartizione = DateTime(2026, 8);
   bool _isVistaAnnuale = false;
 
@@ -80,15 +77,14 @@ class _WalletScreenState extends State<WalletScreen> {
       }
     });
   }
-// 🎯 WIDGET OBIETTIVO TARGET NETTO (LOGICA CUSCINETTO E MESI OFF COLLEGATA)
+
   Widget _buildTargetECuscinettoGlass({required WalletProvider walletProvider}) {
     final double target = walletProvider.nettoTargetMensile;
     if (target <= 0) return const SizedBox.shrink();
 
     final DateTime ora = DateTime.now();
-    final int meseCorrenteIndex = ora.month - 1; // 0 = Gen, 7 = Ago...
+    final int meseCorrenteIndex = ora.month - 1;
     
-    // 1. INCASSI REALI P.IVA NEL MESE CORRENTE
     final double incassatoPivaMese = walletProvider.transactions.where((tx) {
       return tx.isIncome &&
              tx.date.year == ora.year &&
@@ -96,7 +92,6 @@ class _WalletScreenState extends State<WalletScreen> {
              (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
     }).fold(0.0, (sum, tx) => sum + tx.amount);
 
-    // 2. STIPENDIO / PENSIONE REGISTRATI NEL MESE CORRENTE
     final double stipendioRegistratoMese = walletProvider.transactions.where((tx) {
       return tx.isIncome &&
              tx.date.year == ora.year &&
@@ -110,7 +105,6 @@ class _WalletScreenState extends State<WalletScreen> {
         ? stipendioRegistratoMese 
         : walletProvider.entrataExtraMensile;
 
-    // 3. VERIFICA SE IL MESE CORRENTE È DI LAVORO O PAUSA (DA PROVIDER)
     final bool isMeseLavorativo = walletProvider.mesiAttiviState.length > meseCorrenteIndex
         ? walletProvider.mesiAttiviState[meseCorrenteIndex]
         : true;
@@ -121,12 +115,10 @@ class _WalletScreenState extends State<WalletScreen> {
       final double fattoreMesiAttivi = (walletProvider.mesiAttivi / 12).clamp(0.0, 1.0);
       nettoPivaIncassato = incassatoPivaMese * (1 - walletProvider.aliquotaFiscaleReale) * fattoreMesiAttivi;
     } else {
-      // MESE OFF: Sblocca la quota mensile dal cuscinetto
       final double quotaCuscinettoMensile = (target - nettoExtraMese).clamp(0.0, double.infinity);
       nettoPivaIncassato = quotaCuscinettoMensile;
     }
 
-    // 4. NETTO TOTALE REALE REALIZZATO NEL MESE
     final double nettoRealizzatoMese = (walletProvider.isPartitaIVA ? nettoPivaIncassato : 0.0) + nettoExtraMese;
 
     final double gap = target - nettoRealizzatoMese;
@@ -269,7 +261,7 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
-  // 🛑 ALERT DI SICUREZZA PER ELIMINAZIONE TOTALE STORICO
+
   void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc) {
     showDialog(
       context: context,
@@ -314,8 +306,39 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  // 🔄 GESTIONE REGOLE RICORRENZA ED ELIMINAZIONE SINGOLA
   void _gestisciEliminazioneMovimento(BuildContext context, dynamic tx) {
+    final String catLower = (tx.category ?? '').toString().toLowerCase();
+    final String titleLower = (tx.title ?? '').toString().toLowerCase();
+    final bool isFatturaPiva = catLower == 'p.iva' || titleLower.startsWith('incasso:') || titleLower.startsWith('fattura');
+
+    if (isFatturaPiva) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.shield_rounded, color: Color(0xFF38BDF8), size: 22),
+              SizedBox(width: 8),
+              Text('Fattura P.IVA Protetta', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Gli incassi delle fatture P.IVA regolano l\'accantonamento delle tasse e non possono essere eliminati dai movimenti comuni.\n\nPer annullare o gestire questa fattura, utilizza la sezione Gestione P.IVA.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Chiudi', style: TextStyle(color: Colors.white54)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final bool isRecurrent = tx.isRecurrent ?? false;
     final String desc = tx.title ?? 'Movimento';
     final String id = tx.id as String;
@@ -435,13 +458,12 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
-// 💳 MOSTRA MODALE MOVIMENTI FILTRATI PER SINGOLO CONTO (CON SWIPE-TO-DELETE E LIVE UPDATE)
+
   void _mostraMovimentiConto(BuildContext context, dynamic acc) {
     AppBottomSheet.mostra(
       context: context,
       child: Consumer<WalletProvider>(
         builder: (context, walletProvider, child) {
-          // 💡 Calcola i movimenti in tempo reale. Se uno viene eliminato, la lista si aggiorna subito!
           final txsConto = walletProvider.transactions
               .where((tx) => tx.accountId == acc.id)
               .toList();
@@ -464,7 +486,6 @@ class _WalletScreenState extends State<WalletScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ➖ BARRETTA DI TRASCINAMENTO (INDICATORE SWIPE-DOWN)
                   Center(
                     child: Container(
                       width: 38,
@@ -526,10 +547,10 @@ class _WalletScreenState extends State<WalletScreen> {
                       final String dateStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}/${tx.date.year}';
 
                       return Dismissible(
-                        key: Key('modal_dismiss_${tx.id}_$index'), // 🛡️ Chiave ora univoca con indice
+                        key: Key('modal_dismiss_${tx.id}_$index'),
                         direction: DismissDirection.endToStart,
                         background: Container(
-                          margin: const EdgeInsets.only(bottom: 8), // Allinea lo sfondo al bordo
+                          margin: const EdgeInsets.only(bottom: 8),
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 20),
                           decoration: BoxDecoration(
@@ -539,7 +560,6 @@ class _WalletScreenState extends State<WalletScreen> {
                           child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
                         ),
                         confirmDismiss: (direction) async {
-                          // Chiama la stessa funzione sicura del Wallet principale
                           _gestisciEliminazioneMovimento(context, tx);
                           return false; 
                         },
@@ -571,21 +591,21 @@ class _WalletScreenState extends State<WalletScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      tx.title,
-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            tx.title,
+                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (tx.isRecurrent ?? false) ...[
+                                          const SizedBox(width: 6),
+                                          Icon(Icons.sync_rounded, color: oceanCyan.withOpacity(0.8), size: 13),
+                                        ],
+                                      ],
                                     ),
-                                  ),
-                                  if (tx.isRecurrent ?? false) ...[
-                                    const SizedBox(width: 6),
-                                    Icon(Icons.sync_rounded, color: oceanCyan.withOpacity(0.8), size: 13),
-                                  ],
-                                ],
-                              ),
                                     const SizedBox(height: 2),
                                     Text(
                                       '$dateStr • ${tx.category}',
@@ -612,6 +632,7 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final String currentBackgroundUrl = _sfondiSettimanali[_testIndex % _sfondiSettimanali.length];
@@ -632,7 +653,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final double residuoTasseDaCoprire = tasseDaAccantonare;
 
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
-    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
     final double sommaContiLiquidi = walletProvider.accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
@@ -769,7 +789,6 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: const FiscOnLogo(fontSize: 22, sottotitolo: 'Portafoglio Personale'),
                       ),
                       
-                      // 🚀 RIEPILOGO ANNUALE CON APP BOTTOM SHEET
                       _buildGlassContainer(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         borderRadius: BorderRadius.circular(20),
@@ -843,8 +862,8 @@ class _WalletScreenState extends State<WalletScreen> {
                           icon: Icons.payments_rounded,
                           color: oceanCyan,
                           value: _formattaInt(nettoRealeSpendibile),
-                          onTap: () {}, // 👈 Il tap semplice non fa nulla (o inserisci un'azione)
-                          onLongPress: () { // 👈 La spiegazione si apre SOLO tenendo premuto
+                          onTap: () {},
+                          onLongPress: () {
                             AppPopupWrapper.mostraInfo(
                               context: context,
                               icon: Icons.payments_rounded,
@@ -887,7 +906,6 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 🚀 1. STORICO MOVIMENTI CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.add_circle_outline_rounded,
@@ -899,7 +917,6 @@ class _WalletScreenState extends State<WalletScreen> {
                             ),
                             const SizedBox(width: 12),
 
-                            // 🚀 2. GESTIONE CONTI CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.account_balance_wallet_outlined,
@@ -911,7 +928,6 @@ class _WalletScreenState extends State<WalletScreen> {
                             ),
                             const SizedBox(width: 12),
 
-                            // 🚀 3. PIANO SPESA CON APP BOTTOM SHEET
                             Expanded(
                               child: _buildGlassMiniCard(
                                 icon: Icons.pie_chart_outline_rounded,
@@ -927,7 +943,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
                       const SizedBox(height: 24),
 
-                      // 💡 VERSION 1.1: WIDGET ACCREDITO STIPENDIO / PENSIONE (POSIZIONATO IN CIMA)
                       _buildTipAccreditoStipendio(walletProvider),
 
                       _buildRipartizioneSpeseGlass(
@@ -943,7 +958,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
                       const SizedBox(height: 24),
 
-                      // 🎯 NUOVO ELEMENTO: OBIETTIVO TARGET & CUSCINETTO
                       _buildTargetECuscinettoGlass(walletProvider: walletProvider),
 
                       const SizedBox(height: 24),
@@ -1123,11 +1137,11 @@ class _WalletScreenState extends State<WalletScreen> {
     BorderRadius? borderRadius,
   }) {
     final radius = borderRadius ?? BorderRadius.circular(24);
-    return RepaintBoundary( // 🛡️ Evita il re-paint in cascata
+    return RepaintBoundary(
       child: Container(
         padding: padding ?? const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF18181C).withOpacity(0.75), // 🎨 Effetto vetro scuro a costo zero GPU
+          color: const Color(0xFF18181C).withOpacity(0.75),
           borderRadius: radius,
           border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
         ),
@@ -1395,7 +1409,6 @@ class _WalletScreenState extends State<WalletScreen> {
     Color color = tx.isIncome ? oceanCyan : const Color(0xFFF43F5E);
     String amountStr = (tx.isIncome ? '+' : '-') + _formattaValuta(tx.amount).replaceAll('+', '').replaceAll('-', '');
     
-    // 💳 Inserisce il nome del conto associato al movimento
     String nomeConto = getNome(fromAccountId ?? tx.accountId);
     String detail = nomeConto.isNotEmpty ? '$nomeConto • ${tx.subtitle}' : tx.subtitle;
 
@@ -1439,6 +1452,7 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
+
   Widget _buildTipAccreditoStipendio(WalletProvider walletProvider) {
     if (!walletProvider.mostraTipAccreditoStipendio) return const SizedBox.shrink();
 

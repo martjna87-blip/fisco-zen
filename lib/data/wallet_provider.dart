@@ -284,7 +284,7 @@ class WalletProvider with ChangeNotifier {
 
   bool _hasPensione = false;
   bool get hasPensione => _hasPensione;
-  // 💡 VERSION 1.1: CONTROLLO ACCREDITO STIPENDIO / PENSIONE
+  // 💡 VERSION 1.1: CONTROLLO ISOLATO ACCREDITO STIPENDIO / PENSIONE
   bool get haInseritoStipendioMeseCorrente {
     final ora = DateTime.now();
     return _transactions.any((tx) {
@@ -294,12 +294,17 @@ class WalletProvider with ChangeNotifier {
       final catLower = tx.category.toLowerCase();
       final titleLower = tx.title.toLowerCase();
 
-      // Riconosce transazioni di stipendio/pensione o entrate fisse non P.IVA
+      // 🛡️ Escludiamo fatture P.IVA, incassi generici e giroconti
+      final bool isPivaOIncasso = tx.category == 'P.IVA' || 
+                                  titleLower.startsWith('incasso') || 
+                                  titleLower.startsWith('fattura');
+      if (isPivaOIncasso || tx.category == 'Giroconto') return false;
+
+      // 🎯 Il banner scompare SOLO se è stato registrato espressamente lo Stipendio o la Pensione
       return catLower.contains('stipendio') ||
           catLower.contains('pensione') ||
           titleLower.contains('stipendio') ||
-          titleLower.contains('pensione') ||
-          (tx.category != 'P.IVA' && tx.category != 'Giroconto' && !titleLower.contains('incasso'));
+          titleLower.contains('pensione');
     });
   }
 
@@ -1748,10 +1753,12 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 🎯 AGGIORNAMENTO PREFERENZE PROFILO FISCALE (NO RETROATTIVITÀ SULLO STORICO)
   void aggiornaProfiloFiscale({
     required String nuovoAteco,
     required double nuovoCoeff,
     required double nuovaImposta,
+    bool ricalcolaFattureAnnoCorrente = false, // Ignorato: il passato non si tocca
   }) {
     salvaProfiloFiscale(
       codiceAteco: nuovoAteco,

@@ -113,7 +113,6 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
           'mese': nomiMesiBrevi[mIdx],
           'incassato': incassatoMese,
           'speso': spesoMese,
-          // Se non ci sono spese previste, usiamo uno standard basato sullo speso
           'budget': budgetObiettivoMese > 0 ? budgetObiettivoMese : (spesoMese > 0 ? spesoMese * 1.05 : 2000.0),
           'isPassato': isPassato,
         };
@@ -251,9 +250,8 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
-    final bool isUserPro = walletProvider.isPro; // 🔒 VERIFICA SE L'UTENTE È PRO
+    final bool isUserPro = walletProvider.isPro;
 
-    // ⚡ SE L'UTENTE È PRO USA I DATI REALI AL 100%, ALTRIMENTI MOSTRA LA DEMO
     final List<Map<String, dynamic>> anniInUso = isUserPro 
         ? _calcolaDatiReali(walletProvider) 
         : _anniDemoData;
@@ -261,26 +259,38 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     final currentAnno = anniInUso[_selectedYearIndex.clamp(0, anniInUso.length - 1)];
     final List<Map<String, dynamic>> storicoMesiInUso = List<Map<String, dynamic>>.from(currentAnno['storicoMesi']);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0C),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0A0A0C),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Panoramica Annuale',
-          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0A0C),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      body: SingleChildScrollView(
+      child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ➖ BARRETTA TRASCINAMENTO
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            
+            // TITOLO
+            const Center(
+              child: Text(
+                'Panoramica Annuale',
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // 🌟 BANNER SOLO PER UTENTI NON PRO
             if (!isUserPro) ...[
               Padding(

@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
+import '../widgets_shared/f24_facsimile_sheet.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 
 class TaxProfileScreen extends StatefulWidget {
   const TaxProfileScreen({super.key});
@@ -131,9 +134,19 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                         const Divider(color: Colors.white10, height: 20),
                         _buildInfoRiga(Icons.pie_chart_outline_rounded, 'Coeff. Redditività', '${(walletProvider.coeffRedditivita * 100).toInt()}% (Automatico)'),
                         const Divider(color: Colors.white10, height: 20),
-                        _buildInfoRiga(Icons.badge_outlined, 'Lavoro Dipendente', _formattaDipendente(walletProvider.tipoLavoroDipendente)),
+                        _buildInfoRiga(
+                          Icons.badge_outlined, 
+                          'Lavoro Dipendente', 
+                          walletProvider.hasDipendente 
+                              ? 'Sì (Entrata Extra ${TaxProfileScreen.formattaEuro(walletProvider.entrataExtraMensile)}/mese)' 
+                              : (walletProvider.hasPensione ? 'Pensione Attiva' : 'No (Solo P.IVA)')
+                        ),
                         const Divider(color: Colors.white10, height: 20),
-                        _buildInfoRiga(Icons.account_balance_rounded, 'Cassa / Previdenza', walletProvider.tipoLavoroDipendente == 'full' ? 'Esenzione INPS (Full-time)' : '26,07% Gestione Separata'),
+                        _buildInfoRiga(
+                          Icons.account_balance_rounded, 
+                          'Cassa / Previdenza', 
+                          walletProvider.hasDipendente ? '24,00% INPS (Aliquota Ridotta Dipendenti)' : '26,07% Gestione Separata INPS'
+                        ),
                       ],
                     ),
                   ),
@@ -300,7 +313,12 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                         const SizedBox(height: 12),
 
                         InkWell(
-                          onTap: () => setState(() => _mostraCalcoloF24 = !_mostraCalcoloF24),
+                          onTap: () {
+                            AppBottomSheet.mostra(
+                              context: context,
+                              child: const F24FacsimileSheet(),
+                            );
+                          },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -535,6 +553,11 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     final TextEditingController accontiCtrl = TextEditingController(text: provider.accontiVersati.toStringAsFixed(0));
     final TextEditingController fatturatoCtrl = TextEditingController(text: provider.fatturatoStimato.toStringAsFixed(0));
     final TextEditingController annoCtrl = TextEditingController(text: (provider.annoAperturaPiva ?? DateTime.now().year).toString());
+    
+    // 💡 VERSION 1.2: Controller per Obiettivi e Lavoro Dipendente
+    final TextEditingController targetNettoCtrl = TextEditingController(text: provider.nettoTargetMensile.toStringAsFixed(0));
+    final TextEditingController mesiAttiviCtrl = TextEditingController(text: provider.mesiAttivi.toString());
+    final TextEditingController entrataExtraCtrl = TextEditingController(text: provider.entrataExtraMensile.toStringAsFixed(0));
 
     double tempImposta = provider.aliquotaImposta;
     int tempMeseApertura = provider.meseAperturaPiva ?? 1;
@@ -800,6 +823,89 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                     _buildModalTextField(fatturatoCtrl, '35.000', isNumber: true),
 
                     const SizedBox(height: 24),
+                    const Divider(color: Colors.white10, height: 1),
+                    const SizedBox(height: 16),
+                    const Text('OBIETTIVI & LAVORO DIPENDENTE', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildInputLabel('TARGET NETTO MENSILE (€)'),
+                              _buildModalTextField(targetNettoCtrl, '2.500', isNumber: true),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildInputLabel('MESI LAVORATIVI P.IVA (SU 12)'),
+                              _buildModalTextField(mesiAttiviCtrl, '10', isNumber: true),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+                    if (provider.hasDipendente || provider.hasPensione) ...[
+                      _buildInputLabel(provider.hasDipendente ? 'NETTO MENSILE STIPENDIO DIPENDENTE (€)' : 'NETTO MENSILE PENSIONE (€)'),
+                      _buildModalTextField(entrataExtraCtrl, '1.500', isNumber: true),
+                    ],
+
+                    // 💡 AVVISO SOGLIE 85K / 100K SULLA STIMA FATTURATO
+                    if ((double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > provider.sogliaForfettarioReale) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                              ? const Color(0xFFEF4444).withOpacity(0.15)
+                              : const Color(0xFFF59E0B).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                                ? const Color(0xFFEF4444).withOpacity(0.4)
+                                : const Color(0xFFF59E0B).withOpacity(0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.info_outline_rounded,
+                              color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFFF59E0B),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                                    ? '🚨 Oltre 100.000 €: Uscita immediata dal Forfettario in corso d\'anno.'
+                                    : '⚠️ Oltre ${TaxProfileScreen.formattaEuro(provider.sogliaForfettarioReale)}: Dal 1° Gennaio dell\'anno prossimo passerai al Regime Ordinario.',
+                                style: TextStyle(
+                                  color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFFF59E0B),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -809,22 +915,26 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                           final double acconti = double.tryParse(accontiCtrl.text.replaceAll('.', '')) ?? 0.0;
                           final double fatturato = double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 35000.0;
                           final int anno = int.tryParse(annoCtrl.text) ?? DateTime.now().year;
+                          final String codiceCompleto = '${atecoSelezionato['codice']} - ${atecoSelezionato['descrizione']}';
 
-                          provider.salvaProfiloFiscale(
-                            codiceAteco: '${atecoSelezionato['codice']} - ${atecoSelezionato['descrizione']}',
-                            coeffRedditivitaVal: coeff,
-                            aliquotaImpostaVal: tempImposta,
-                            accontiVersati: acconti,
-                            fatturatoStimato: fatturato,
-                            annoAperturaPiva: anno,
-                            meseAperturaPiva: tempMeseApertura,
-                          );
+                          // 💡 VERSION 1.2: Lettura valori Obiettivi
+                          final double target = double.tryParse(targetNettoCtrl.text.replaceAll('.', '')) ?? 2500.0;
+                          final int mesi = int.tryParse(mesiAttiviCtrl.text) ?? 10;
+                          final double extra = double.tryParse(entrataExtraCtrl.text.replaceAll('.', '')) ?? provider.entrataExtraMensile;
 
-                          Navigator.pop(context);
-                          AppNotifications.mostraInAlto(
-                            context,
-                            'Dati e parametri fiscali aggiornati! ✅',
-                            type: NotificationType.success,
+                          _gestisciSalvataggioProfiloV12(
+                            context: context,
+                            provider: provider,
+                            nuovoAteco: codiceCompleto,
+                            nuovoCoeff: coeff,
+                            nuovaAliquota: tempImposta,
+                            acconti: acconti,
+                            fatturato: fatturato,
+                            annoApertura: anno,
+                            meseApertura: tempMeseApertura,
+                            targetNetto: target,
+                            mesiAttivi: mesi,
+                            entrataExtra: extra,
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -870,5 +980,43 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
       ),
     );
   }
+
+  // 🎯 SALVATAGGIO PREFERENZE PROFILO (PRESET PER LE PROSSIME FATTURE)
+  void _gestisciSalvataggioProfiloV12({
+    required BuildContext context,
+    required WalletProvider provider,
+    required String nuovoAteco,
+    required double nuovoCoeff,
+    required double nuovaAliquota,
+    required double acconti,
+    required double fatturato,
+    required int annoApertura,
+    required int meseApertura,
+    required double targetNetto,
+    required int mesiAttivi,
+    required double entrataExtra,
+  }) {
+    // 1. Salva Parametri P.IVA (Live)
+    provider.salvaProfiloFiscale(
+      codiceAteco: nuovoAteco,
+      coeffRedditivitaVal: nuovoCoeff,
+      aliquotaImpostaVal: nuovaAliquota,
+      accontiVersati: acconti,
+      fatturatoStimato: fatturato,
+      annoAperturaPiva: annoApertura,
+      meseAperturaPiva: meseApertura,
+      nettoTarget: targetNetto,
+      mesiAttivi: mesiAttivi,
+    );
+
+    // 2. Aggiorna eventuale Entrata Extra
+    provider.salvaEntrateExtra(
+      importoMensile: entrataExtra,
+      dipendente: provider.hasDipendente,
+      pensione: provider.hasPensione,
+    );
+
+    Navigator.pop(context);
+    AppNotifications.mostraInAlto(context, 'Preferenze e Obiettivi aggiornati! ✨');
+  }
 }
-// 📍 FINE CODICE COMPLETO: lib/screens/0_2_tax_profile.dart
