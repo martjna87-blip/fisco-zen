@@ -927,6 +927,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
                       const SizedBox(height: 24),
 
+                      // 💡 VERSION 1.1: WIDGET ACCREDITO STIPENDIO / PENSIONE (POSIZIONATO IN CIMA)
+                      _buildTipAccreditoStipendio(walletProvider),
+
                       _buildRipartizioneSpeseGlass(
                         spesoBisogni: spesoRealeBisogni,
                         spesoSvago: spesoRealeSvago,
@@ -1432,6 +1435,89 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ),
           Text(amountStr, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+  Widget _buildTipAccreditoStipendio(WalletProvider walletProvider) {
+    if (!walletProvider.mostraTipAccreditoStipendio) return const SizedBox.shrink();
+
+    final String etichetta = walletProvider.hasDipendente ? 'lo Stipendio' : 'la Pensione';
+    final String nomeTitolo = walletProvider.hasDipendente ? 'Stipendio Dipendente' : 'Assegno Pensione';
+    final double importo = walletProvider.entrataExtraMensile;
+    final String tipKey = 'tip_stipendio_${DateTime.now().year}_${DateTime.now().month}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF38BDF8).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF38BDF8), size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Accredito In Attesa',
+                    style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => walletProvider.dismissAdvisorTip(tipKey),
+                child: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Risulta impostata un\'entrata mensile fissa. Hai già ricevuto $etichetta di ${_formattaInt(importo)} per questo mese?',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, height: 1.3),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF38BDF8),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.edit_note_rounded, size: 18),
+              label: Text(
+                'Registra ${_formattaInt(importo)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              onPressed: () {
+                AppBottomSheet.mostra(
+                  context: context,
+                  child: AddMovementSheet(
+                    initialTab: 'entrata',
+                    initialTitle: nomeTitolo,
+                    initialAmount: importo,
+                    initialCategory: 'Stipendio',
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

@@ -284,6 +284,50 @@ class WalletProvider with ChangeNotifier {
 
   bool _hasPensione = false;
   bool get hasPensione => _hasPensione;
+  // 💡 VERSION 1.1: CONTROLLO ACCREDITO STIPENDIO / PENSIONE
+  bool get haInseritoStipendioMeseCorrente {
+    final ora = DateTime.now();
+    return _transactions.any((tx) {
+      if (!tx.isIncome) return false;
+      if (tx.date.year != ora.year || tx.date.month != ora.month) return false;
+
+      final catLower = tx.category.toLowerCase();
+      final titleLower = tx.title.toLowerCase();
+
+      // Riconosce transazioni di stipendio/pensione o entrate fisse non P.IVA
+      return catLower.contains('stipendio') ||
+          catLower.contains('pensione') ||
+          titleLower.contains('stipendio') ||
+          titleLower.contains('pensione') ||
+          (tx.category != 'P.IVA' && tx.category != 'Giroconto' && !titleLower.contains('incasso'));
+    });
+  }
+
+  bool get mostraTipAccreditoStipendio =>
+      (hasDipendente || hasPensione) &&
+      _entrataExtraMensile > 0 &&
+      !haInseritoStipendioMeseCorrente &&
+      !dismissedTipKeys.contains('tip_stipendio_${DateTime.now().year}_${DateTime.now().month}');
+
+  // 💡 VERSION 1.1: METODO DI ACCREDITO RAPIDO STIPENDIO / PENSIONE
+  void accreditaStipendioRapido() {
+    if (_entrataExtraMensile <= 0) return;
+
+    final String etichetta = _hasDipendente ? 'Stipendio Dipendente' : 'Assegno Pensione';
+    final contoPrincipale = _accounts.firstWhere(
+      (a) => a.role == AccountRole.principal || a.id == 'main_account' || a.id == '1',
+      orElse: () => _accounts.first,
+    );
+
+    addTransaction(
+      title: 'Accredito: $etichetta',
+      amount: _entrataExtraMensile,
+      isIncome: true,
+      category: 'Stipendio',
+      accountId: contoPrincipale.id,
+      date: DateTime.now(),
+    );
+  }
 
   double get sogliaForfettarioReale {
     final int annoCorrente = DateTime.now().year;
@@ -314,6 +358,29 @@ class WalletProvider with ChangeNotifier {
   // 🎯 METODI DEDICATI PER IL SALVATAGGIO DALL'ONBOARDING WIZARD
   void salvaContiIniziali(List<AccountModel> nuoviConti) {
     _accounts = List.from(nuoviConti);
+
+    // 🛡️ Rimuove eventuali saldi iniziali precedenti per evitare duplicati se l'utente rifà l'onboarding
+    _transactions.removeWhere((t) => t.id.contains('_init_'));
+
+    // 🎯 Crea un movimento "Saldo Iniziale" per giustificare i fondi inseriti nell'Onboarding
+    for (var acc in _accounts) {
+      if (acc.amount > 0) {
+        _transactions.insert(
+          0,
+          TransactionModel(
+            id: '${acc.id}_init_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Saldo Iniziale: ${acc.title}',
+            subtitle: 'Impostazione Onboarding',
+            amount: acc.amount,
+            isIncome: true,
+            category: 'Risparmi',
+            date: DateTime.now(),
+            accountId: acc.id,
+          ),
+        );
+      }
+    }
+
     _aggiornaTasseVirtuali();
     _salvaDatiInLocalStorage();
     notifyListeners();

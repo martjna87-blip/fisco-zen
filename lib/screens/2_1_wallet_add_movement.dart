@@ -15,10 +15,16 @@ import 'package:flutter/services.dart';
 
 class AddMovementSheet extends StatefulWidget {
   final String initialTab;
+  final String? initialTitle;
+  final double? initialAmount;
+  final String? initialCategory;
 
   const AddMovementSheet({
     super.key,
     this.initialTab = 'riepilogo',
+    this.initialTitle,
+    this.initialAmount,
+    this.initialCategory,
   });
 
   @override
@@ -173,6 +179,17 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     super.initState();
     _tipoMovimento = widget.initialTab;
     
+    if (widget.initialTitle != null) {
+      _noteController.text = widget.initialTitle!;
+    }
+    if (widget.initialAmount != null) {
+      _amountController.text = widget.initialAmount!.toStringAsFixed(0);
+    }
+    if (widget.initialCategory != null) {
+      _sottocategoriaEntrataSelezionata = widget.initialCategory!;
+      _sottocategoriaSelezionata = widget.initialCategory!;
+    }
+
     int initialPage = 0;
     if (_tipoMovimento == 'uscita' || _tipoMovimento == 'spesa') initialPage = 1;
     if (_tipoMovimento == 'entrata') initialPage = 2;

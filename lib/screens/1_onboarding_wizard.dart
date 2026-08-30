@@ -87,6 +87,8 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
   String aliquotaTasse = '5%';
   String tipoLavoroDipendente = 'nessuno';
   final TextEditingController _accontiController = TextEditingController(text: '0');
+  final TextEditingController _fatturatoAnnoPrecedenteController = TextEditingController(text: '0');
+  bool fatturatoPrecedenteSuperava85k = false;
 
   // 🗂️ CONTI BANCARI
   final List<ContoItem> _contiList = [];
@@ -213,6 +215,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     _fatturatoController.dispose();
     _searchController.dispose();
     _accontiController.dispose();
+    _fatturatoAnnoPrecedenteController.dispose();
     for (var conto in _contiList) {
       conto.dispose();
     }
@@ -260,39 +263,64 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     final wallet = context.read<WalletProvider>();
     wallet.setPartitaIVA(hasPiva);
     
-    // 1. PREPARIAMO I CONTI BANCARI DA SALVARE
-    List<Map<String, dynamic>> contiDaSalvare = _contiList.map((conto) => {
-      'id': conto.id,
-      'ruolo': conto.ruoloDefault,
-      'nome': conto.nomeController.text.trim().isEmpty ? 'Conto' : conto.nomeController.text.trim(),
-      'saldo': double.tryParse(conto.saldoController.text.replaceAll('.', '')) ?? 0.0,
+    // 1. PREPARIAMO I CONTI BANCARI DA SALVARE TRADUCENDOLI NEL MODELLO REALE
+    List<AccountModel> contiDaSalvare = _contiList.map((conto) {
+      final String nome = conto.nomeController.text.trim().isEmpty ? 'Conto' : conto.nomeController.text.trim();
+      final double saldo = double.tryParse(conto.saldoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+      
+      AccountRole ruolo = AccountRole.standard;
+      Color colore = const Color(0xFFF59E0B); // Default Risparmio (Ambra)
+      String sottotitolo = 'Riserva Liquidità';
+
+      // 🛡️ Conserviamo rigorosamente gli ID per i calcoli centrali del Wallet
+      if (conto.id == 'main_account') {
+        ruolo = AccountRole.principal;
+        colore = const Color(0xFF2DD4BF); // Teal
+        sottotitolo = 'Conto Operativo';
+      } else if (conto.id == 'tax_account') {
+        ruolo = AccountRole.taxReserve;
+        colore = const Color(0xFF3B82F6); // Blue
+        sottotitolo = 'Obiettivo Riserva';
+      } else if (conto.ruoloDefault == 'extra') {
+        colore = const Color(0xFFA855F7); // Purple
+        sottotitolo = 'Conto Aggiuntivo';
+      }
+
+      return AccountModel(
+        id: conto.id, // 👈 ID FONDAMENTALE INVIOLATO
+        title: nome,
+        subtitle: sottotitolo,
+        amount: saldo,
+        color: colore,
+        role: ruolo,
+      );
     }).toList();
 
     // 2. PREPARIAMO LE ENTRATE EXTRA (DIPENDENTE/PENSIONE)
     double entrataExtraMensile = 0.0;
     if (hasDipendente || hasPensione) {
-      entrataExtraMensile = double.tryParse(_dipendenteImportoController.text.replaceAll('.', '')) ?? 0.0;
+      entrataExtraMensile = double.tryParse(_dipendenteImportoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
     }
 
     if (hasPiva) {
       final String codicePulito = (codiceAtecoSelezionato ?? '74.10.21').split(' ').first.trim();
       
-      // 3. SALVIAMO TUTTO NEL PROVIDER
+      // 3. SALVIAMO PROFILO FISCALE NEL PROVIDER
       wallet.salvaProfiloFiscale(
-  codiceAteco: codicePulito,
-  coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
-  aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
-  accontiVersati: double.tryParse(_accontiController.text.replaceAll('.', '')) ?? 0.0,
-  nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0,
-  fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '')) ?? 35000.0,
-  mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
-  annoAperturaPiva: annoAperturaPiva,
-  meseAperturaPiva: meseAperturaPiva,
-);
+        codiceAteco: codicePulito,
+        coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
+        aliquotaImpostaVal: aliquotaTasse == '15%' || aliquotaTasse == 'Ordinario' ? 0.15 : 0.05,
+        accontiVersati: double.tryParse(_accontiController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
+        nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 2000.0,
+        fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 35000.0,
+        mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
+        annoAperturaPiva: annoAperturaPiva,
+        meseAperturaPiva: meseAperturaPiva,
+      );
 
-      // Metodi ipotetici da aggiungere al WalletProvider per completare il salvataggio
-      // wallet.salvaContiIniziali(contiDaSalvare);
-      // wallet.salvaEntrateExtra(entrataExtraMensile, hasDipendente, hasPensione);
+      // 4. SALVIAMO I CONTI E LE ENTRATE EXTRA (SCOMMENTATI)
+      wallet.salvaContiIniziali(contiDaSalvare);
+      wallet.salvaEntrateExtra(importoMensile: entrataExtraMensile, dipendente: hasDipendente, pensione: hasPensione);
 
       Navigator.pushReplacement(
         context, 
@@ -300,13 +328,13 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
           hasPartitaIva: true, 
           codiceAtecoIniziale: codicePulito, 
           coefficienteIniziale: coefficienteRedditivita ?? 0.78, 
-          aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15
+          aliquotaImpostaIniziale: aliquotaTasse == '15%' || aliquotaTasse == 'Ordinario' ? 0.15 : 0.05
         ))
       );
     } else {
       // SALVATAGGIO ANCHE SE HA SOLO LAVORO DIPENDENTE O PENSIONE
-      // wallet.salvaContiIniziali(contiDaSalvare);
-      // wallet.salvaEntrateExtra(entrataExtraMensile, hasDipendente, hasPensione);
+      wallet.salvaContiIniziali(contiDaSalvare);
+      wallet.salvaEntrateExtra(importoMensile: entrataExtraMensile, dipendente: hasDipendente, pensione: hasPensione);
 
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainMenu(hasPartitaIva: false)));
     }
@@ -882,53 +910,190 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
 
   // --- STEP INQUADRAMENTO FISCALE ---
   Widget _buildStepInquadramentoFiscaleSleek() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Parametri Fiscali', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-          const SizedBox(height: 6),
-          Text('Imposta l\'aliquota e gli eventuali acconti versati:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
-          const SizedBox(height: 32),
+    final int currentYear = DateTime.now().year;
+    final double fatturatoAttuale = double.tryParse(_fatturatoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+    
+    final bool supera100k = fatturatoAttuale >= 100000.0; // 👈 Corretto con >= e pulizia virgole
+    final bool supera85k = fatturatoAttuale > 85000.0 && !supera100k;
+    final bool eSecondoAnnoOSucc = annoAperturaPiva != null && annoAperturaPiva! < currentYear;
 
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(24), border: Border.all(color: borderDark)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('ALIQUOTA SOSTITUTIVA', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                const SizedBox(height: 16),
-                _buildSegmentedControl(
-                  options: ['5%', '15%'],
-                  labels: const ['5% (Primi 5 anni)', '15% (Standard)'],
-                  selectedValue: aliquotaTasse,
-                  onChanged: (val) => setState(() => aliquotaTasse = val),
+    // Blocca il Forfettario se supera 100k o se ha superato 85k anche l'anno scorso
+    final bool forfettarioInibito = supera100k || (supera85k && eSecondoAnnoOSucc && fatturatoPrecedenteSuperava85k);
+
+    if (forfettarioInibito && aliquotaTasse != 'Ordinario') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => aliquotaTasse = 'Ordinario');
+      });
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Parametri Fiscali', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+            const SizedBox(height: 6),
+            Text('Verifica la fattibilità del Regime Forfettario e imposta le aliquote:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+            const SizedBox(height: 24),
+
+            // CASO 1: SUPERAMENTO > 100K (INIBIZIONE DIRETTA)
+            if (supera100k)
+              Container(
+                padding: const EdgeInsets.all(18),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF451A03),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFEF4444)),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 28),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('SUPERATI 100.000 €', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Il superamento di 100.000 € comporta l\'uscita immediata dal Forfettario nell\'anno in corso. Assegnato Regime Ordinario (IRPEF).',
+                            style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-          _buildHeroCard(
-            title: 'ACCONTI F24 GIÀ VERSATI',
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _accontiController,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
-                    style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
-                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+            // CASO 2: TRA 85K E 100K E SECONDO ANNO O SUCC. (DOMANDA EXTRA)
+            if (supera85k && eSecondoAnnoOSucc) ...[
+              Container(
+                padding: const EdgeInsets.all(18),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: cardDark,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFF97316)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.help_outline_rounded, color: Color(0xFFF97316), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'VERIFICA ANNO PRECEDENTE (${annoAperturaPiva!})',
+                            style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Stai stimando di fatturare ${formatEuro(fatturatoAttuale)} €. Avevi superato la soglia di 85.000 € anche l\'anno precedente?',
+                      style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => fatturatoPrecedenteSuperava85k = false),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: !fatturatoPrecedenteSuperava85k ? brandTeal.withOpacity(0.2) : bgDark,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: !fatturatoPrecedenteSuperava85k ? brandTeal : borderDark),
+                              ),
+                              child: Text('NO (<= 85k)', style: TextStyle(color: !fatturatoPrecedenteSuperava85k ? brandTeal : textMuted, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => fatturatoPrecedenteSuperava85k = true),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: fatturatoPrecedenteSuperava85k ? const Color(0xFFEF4444).withOpacity(0.2) : bgDark,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: fatturatoPrecedenteSuperava85k ? const Color(0xFFEF4444) : borderDark),
+                              ),
+                              child: Text('SÌ (> 85k)', style: TextStyle(color: fatturatoPrecedenteSuperava85k ? const Color(0xFFEF4444) : textMuted, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // SELEZIONE REGIME FISCALE
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(24), border: Border.all(color: borderDark)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('REGIME E ALIQUOTA FISCALE', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 16),
+                  if (forfettarioInibito)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(color: bgDark, borderRadius: BorderRadius.circular(14), border: Border.all(color: borderDark)),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.gavel_rounded, color: Color(0xFFF97316), size: 18),
+                          SizedBox(width: 10),
+                          Text('Regime Ordinario / IRPEF Semplificato', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                    )
+                  else
+                    _buildSegmentedControl(
+                      options: ['5%', '15%'],
+                      labels: const ['5% (Primi 5 anni)', '15% (Standard)'],
+                      selectedValue: aliquotaTasse,
+                      onChanged: (val) => setState(() => aliquotaTasse = val),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildHeroCard(
+              title: 'ACCONTI F24 GIÀ VERSATI',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _accontiController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
+                      decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                    ),
                   ),
-                ),
-                Text('€ crediti', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
+                  Text('€ crediti', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -1218,12 +1383,15 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: [
-                        Icon(Icons.lightbulb_rounded, color: statusColor, size: 20),
-                        const SizedBox(width: 8),
-                        Text('SCEGLI UNA DI QUESTE ALTERNATIVE:', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
-                      ],
-                    ),
+  children: [
+    Icon(Icons.lightbulb_rounded, color: statusColor, size: 20),
+    const SizedBox(width: 8),
+    Text(
+      (hasPiva && hasDipendente) ? 'SCEGLI UNA DI QUESTE ALTERNATIVE:' : 'SOLUZIONE CONSIGLIATA:',
+      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8),
+    ),
+  ],
+),
                     const SizedBox(height: 12),
                     
                     // Opzione Partita IVA (se attiva)

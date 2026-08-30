@@ -146,9 +146,14 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
     final screenHeight = MediaQuery.of(context).size.height;
     final walletProvider = Provider.of<WalletProvider>(context);
     final fattureAttuali = walletProvider.fattureDaIncassare;
-    final contiDisponibili = widget.contiWallet ?? walletProvider.accounts.map((a) => a.title).toList();
 
-    if (_contoSelezionato == null && contiDisponibili.isNotEmpty) {
+    // 🎯 FILTRAGGIO DINAMICO CONTI: Legge i conti reali dal Provider ed esclude il Salvadanaio Tasse
+    final contiDisponibili = walletProvider.accounts
+        .where((a) => a.role != AccountRole.taxReserve && !a.title.toLowerCase().contains('salvadanaio tasse'))
+        .map((a) => a.title)
+        .toList();
+
+    if ((_contoSelezionato == null || !contiDisponibili.contains(_contoSelezionato)) && contiDisponibili.isNotEmpty) {
       _contoSelezionato = contiDisponibili.first;
     }
 
