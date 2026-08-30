@@ -260,19 +260,54 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     final wallet = context.read<WalletProvider>();
     wallet.setPartitaIVA(hasPiva);
     
+    // 1. PREPARIAMO I CONTI BANCARI DA SALVARE
+    List<Map<String, dynamic>> contiDaSalvare = _contiList.map((conto) => {
+      'id': conto.id,
+      'ruolo': conto.ruoloDefault,
+      'nome': conto.nomeController.text.trim().isEmpty ? 'Conto' : conto.nomeController.text.trim(),
+      'saldo': double.tryParse(conto.saldoController.text.replaceAll('.', '')) ?? 0.0,
+    }).toList();
+
+    // 2. PREPARIAMO LE ENTRATE EXTRA (DIPENDENTE/PENSIONE)
+    double entrataExtraMensile = 0.0;
+    if (hasDipendente || hasPensione) {
+      entrataExtraMensile = double.tryParse(_dipendenteImportoController.text.replaceAll('.', '')) ?? 0.0;
+    }
+
     if (hasPiva) {
       final String codicePulito = (codiceAtecoSelezionato ?? '74.10.21').split(' ').first.trim();
+      
+      // 3. SALVIAMO TUTTO NEL PROVIDER
       wallet.salvaProfiloFiscale(
-        codiceAteco: codicePulito,
-        coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
-        aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
-        accontiVersati: double.tryParse(_accontiController.text.replaceAll('.', '')) ?? 0.0,
-        nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0,
-        fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '')) ?? 35000.0,
-        mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
+  codiceAteco: codicePulito,
+  coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
+  aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
+  accontiVersati: double.tryParse(_accontiController.text.replaceAll('.', '')) ?? 0.0,
+  nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0,
+  fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '')) ?? 35000.0,
+  mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
+  annoAperturaPiva: annoAperturaPiva,
+  meseAperturaPiva: meseAperturaPiva,
+);
+
+      // Metodi ipotetici da aggiungere al WalletProvider per completare il salvataggio
+      // wallet.salvaContiIniziali(contiDaSalvare);
+      // wallet.salvaEntrateExtra(entrataExtraMensile, hasDipendente, hasPensione);
+
+      Navigator.pushReplacement(
+        context, 
+        MaterialPageRoute(builder: (context) => MainMenu(
+          hasPartitaIva: true, 
+          codiceAtecoIniziale: codicePulito, 
+          coefficienteIniziale: coefficienteRedditivita ?? 0.78, 
+          aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15
+        ))
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => MainMenu(hasPartitaIva: true, codiceAtecoIniziale: codicePulito, coefficienteIniziale: coefficienteRedditivita ?? 0.78, aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15)));
     } else {
+      // SALVATAGGIO ANCHE SE HA SOLO LAVORO DIPENDENTE O PENSIONE
+      // wallet.salvaContiIniziali(contiDaSalvare);
+      // wallet.salvaEntrateExtra(entrataExtraMensile, hasDipendente, hasPensione);
+
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainMenu(hasPartitaIva: false)));
     }
   }
@@ -1283,7 +1318,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                     const SizedBox(height: 10),
                     if (cuscinettoCoperto)
                       Text(
-                        'Cuscinetto ampiamente gestibile! Nei tuoi $_mesiAttiviConteggio mesi di lavoro incasserai circa ${formatEuro(sost["nettoMeseNeiMesiAttivi"])} €/mese netti. Accantonando +${formatEuro(quotaCuscinettoMese)} €/mese coprirai i $mesiOff mesi di pausa garantendoti il tuo target mensile.',
+                        'Cuscinetto ampiamente gestibile! Nei tuoi $_mesiAttiviConteggio mesi di lavoro incasserai ${formatEuro(sost["nettoMeseNeiMesiAttivi"])} €/mese netti. Accantonando +${formatEuro(quotaCuscinettoMese)} €/mese coprirai i $mesiOff mesi di pausa garantendoti il tuo target mensile.',
                         style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
                       )
                     else

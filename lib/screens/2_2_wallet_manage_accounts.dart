@@ -795,9 +795,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
         .fold(0.0, (sum, a) => sum + a.amount);
 
     final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
-    final double cuscinettoFerie = postTasse * percentualeFondoFerie;
-    final double nettoRealeSpendibile = postTasse - cuscinettoFerie;
+    // ✅ CODICE CORRETTO:
+final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
+final double cuscinettoFerie = walletProvider.cuscinettoResiduo; // 👈 Legge il residuo futuro dal Provider
+final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, double.infinity);
 
     return AppBottomSheet(
       title: 'Gestione Conti',
@@ -890,7 +891,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                 const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'CUSCINETTO MESI NO-LAVORO ($mesiLavorati MESI):',
+                                  'CUSCINETTO MESI OFF (${12 - mesiLavorati} MESI PAUSA):',
                                   style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(width: 4),
@@ -903,7 +904,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                       titolo: 'Cuscinetto Mesi No-Lavoro',
                                       testoAnnulla: 'Ho capito',
                                       child: Text(
-                                        'È la riserva strategica accantonata in base ai mesi effettivi di lavoro ($mesiLavorati su 12).\n\nServirà a proteggere il tuo stile di vita coprendo spese fisse e ferie anche nei mesi di inattività!',
+                                        'È la riserva strategica accantonata per garantirti il tuo Target Netto nei ${12 - mesiLavorati} mesi in cui hai previsto di non fatturare.\n\nI fondi vengono sbloccati automaticamente durante i mesi di pausa per proteggere il tuo stile di vita.',
                                         style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
                                       ),
                                     );

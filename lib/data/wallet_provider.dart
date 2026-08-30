@@ -53,9 +53,9 @@ class AccountModel {
       );
     }
 
-    if (id == '1' || title.contains('principale')) {
+    if (id == '1' || id == 'main_account' || title.contains('principale')) {
       roleAssegnato = AccountRole.principal;
-    } else if (id == '3' || title.contains('salvadanaio tasse') || title.contains('acconto tasse')) {
+    } else if (id == '3' || id == 'tax_account' || title.contains('salvadanaio tasse') || title.contains('acconto tasse')) {
       roleAssegnato = AccountRole.taxReserve;
     }
 
@@ -153,9 +153,9 @@ class WalletProvider with ChangeNotifier {
   };
 
   List<AccountModel> _accounts = [
-    AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-    AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
-    AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+    AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+    AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+    AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
@@ -220,7 +220,7 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  String _codiceAteco = '62.02.00';
+  String _codiceAteco = '74.10.21';
   String get codiceAteco => _codiceAteco;
 
   double _coefficienteRedditivita = 0.78;
@@ -248,7 +248,7 @@ class WalletProvider with ChangeNotifier {
 
   double _contributiInpsPagatiAnnoCorrente = 0.0;
 
-  double _nettoTargetMensile = 2000.0;
+  double _nettoTargetMensile = 2500.0;
   double _speseFisseMensili = 800.0;
 
   double _fatturatoStimatoAnnuo = 35000.0;
@@ -258,11 +258,32 @@ class WalletProvider with ChangeNotifier {
   int get mesiAttivi => _mesiAttiviIncasso;
   double get nettoTargetMensile => _nettoTargetMensile;
 
-  int? _annoAperturaPiva = 2024;
+  // 🏖️ STATO MESI ATTIVI (12 MESI: true = Lavoro, false = Pausa)
+  List<bool> _mesiAttiviState = List.generate(12, (index) => index < 10);
+  List<bool> get mesiAttiviState => List.unmodifiable(_mesiAttiviState);
+
+  // 🛡️ STATO CUSCINETTO MESI OFF
+  double _cuscinettoAccumulato = 0.0;
+  double _cuscinettoUtilizzato = 0.0;
+  double get cuscinettoAccumulato => _cuscinettoAccumulato;
+  double get cuscinettoUtilizzato => _cuscinettoUtilizzato;
+  double get cuscinettoResiduo => (_cuscinettoAccumulato - _cuscinettoUtilizzato).clamp(0.0, double.infinity);
+
+  int? _annoAperturaPiva = 2026;
   int? get annoAperturaPiva => _annoAperturaPiva;
 
   int? _meseAperturaPiva = 1;
   int? get meseAperturaPiva => _meseAperturaPiva;
+
+  // 🎯 ENTRATE EXTRA DA ONBOARDING (DIPENDENTE / PENSIONE)
+  double _entrataExtraMensile = 0.0;
+  double get entrataExtraMensile => _entrataExtraMensile;
+
+  bool _hasDipendente = false;
+  bool get hasDipendente => _hasDipendente;
+
+  bool _hasPensione = false;
+  bool get hasPensione => _hasPensione;
 
   double get sogliaForfettarioReale {
     final int annoCorrente = DateTime.now().year;
@@ -286,6 +307,78 @@ class WalletProvider with ChangeNotifier {
 
   void setPartitaIVA(bool value) {
     isPartitaIVA = value;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 🎯 METODI DEDICATI PER IL SALVATAGGIO DALL'ONBOARDING WIZARD
+  void salvaContiIniziali(List<AccountModel> nuoviConti) {
+    _accounts = List.from(nuoviConti);
+    _aggiornaTasseVirtuali();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  void salvaEntrateExtra({
+    required double importoMensile,
+    required bool dipendente,
+    required bool pensione,
+  }) {
+    _entrataExtraMensile = importoMensile;
+    _hasDipendente = dipendente;
+    _hasPensione = pensione;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 🎯 CALCOLA DINAMICAMENTE L'ACCUMULO E L'UTILIZZO DEL CUSCINETTO MESI OFF
+  void _calcolaStatoCuscinetto() {
+    if (!isPartitaIVA || _mesiAttiviIncasso == 12) {
+      _cuscinettoAccumulato = 0.0;
+      _cuscinettoUtilizzato = 0.0;
+      return;
+    }
+
+    // 🛡️ AUTO-CORREZIONE: Se la matrice dei mesi non coincide con _mesiAttiviIncasso, la riallinea
+    if (_mesiAttiviState.where((m) => m).length != _mesiAttiviIncasso) {
+      _mesiAttiviState = List.generate(12, (index) => index < _mesiAttiviIncasso);
+    }
+
+    final int annoCorrente = DateTime.now().year;
+    final int meseCorrenteIndex = DateTime.now().month - 1; // 0 = Gen, 7 = Ago...
+
+    double totaleAccumulato = 0.0;
+    double totaleUtilizzato = 0.0;
+
+    // 1. ACCUMULO REALE: Quota trattenuta dagli incassi P.IVA fino al mese corrente
+    for (var tx in _transactions) {
+      if (tx.isIncome && tx.date.year == annoCorrente && tx.date.month <= DateTime.now().month) {
+        if (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso')) {
+          final double nettoPiva = tx.amount * (1 - aliquotaFiscaleReale);
+          final double percentualeAccantonamento = (12 - _mesiAttiviIncasso) / 12;
+          totaleAccumulato += (nettoPiva * percentualeAccantonamento);
+        }
+      }
+    }
+
+    // 2. UTILIZZO REALE: Quota erogata nei mesi OFF passati e in quello attuale
+    for (int i = 0; i <= meseCorrenteIndex; i++) {
+      final bool isMeseLavorativo = _mesiAttiviState[i];
+      if (!isMeseLavorativo) {
+        final double quotaErogata = (_nettoTargetMensile - _entrataExtraMensile).clamp(0.0, double.infinity);
+        totaleUtilizzato += quotaErogata;
+      }
+    }
+
+    _cuscinettoAccumulato = totaleAccumulato;
+    _cuscinettoUtilizzato = totaleUtilizzato;
+  }
+
+  // 🔄 AGGIORNA LA MATRICE DEI MESI ATTIVI (DA ONBOARDING O IMPOSTAZIONI)
+  void setMesiAttiviState(List<bool> newState) {
+    _mesiAttiviState = List.from(newState);
+    _mesiAttiviIncasso = newState.where((m) => m).length;
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -325,7 +418,7 @@ class WalletProvider with ChangeNotifier {
     final stimaImpostaAnnuo = imponibileNettoTasse * aliquotaImpostaVal;
     final totaleTasseAnnuo = stimaInpsAnnuo + stimaImpostaAnnuo;
     final nettoRealeAnnuo = fatturato - totaleTasseAnnuo;
-    final stipendioMensile12Mesi = nettoRealeAnnuo / 12;
+    final stipendioMensile12Mesi = (nettoRealeAnnuo / 12) + _entrataExtraMensile;
     final mesiPausa = 12 - mesiAttivi;
     final quotaMesiZeroMensile = (mesiPausa > 0) 
         ? (stipendioMensile12Mesi * mesiPausa) / mesiAttivi 
@@ -697,6 +790,8 @@ class WalletProvider with ChangeNotifier {
 
     final bool isProtetto = target.role == AccountRole.principal || 
                             target.role == AccountRole.taxReserve ||
+                            target.id == 'main_account' ||
+                            target.id == 'tax_account' ||
                             target.id == '1' || 
                             target.id == '3';
 
@@ -724,6 +819,8 @@ class WalletProvider with ChangeNotifier {
 
     if (target.role == AccountRole.principal ||
         target.role == AccountRole.taxReserve ||
+        target.id == 'main_account' ||
+        target.id == 'tax_account' ||
         target.id == '1' ||
         target.id == '3') {
       throw Exception('"${target.title}" è un conto di sistema protetto e non può essere eliminato.');
@@ -821,6 +918,7 @@ class WalletProvider with ChangeNotifier {
     _accounts.removeAt(targetIndex);
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -859,12 +957,23 @@ class WalletProvider with ChangeNotifier {
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 0.0;
       _accontiVersati = accontiVersatiAnnoPrecedente;
 
-      _codiceAteco = prefs.getString('codiceAteco') ?? '62.02.00';
-      _nettoTargetMensile = prefs.getDouble('nettoTargetMensile') ?? 2000.0;
+      _codiceAteco = prefs.getString('codiceAteco') ?? '74.10.21';
+      _nettoTargetMensile = prefs.getDouble('nettoTargetMensile') ?? 2500.0;
       _fatturatoStimatoAnnuo = prefs.getDouble('fatturatoStimatoAnnuo') ?? 35000.0;
       _mesiAttiviIncasso = prefs.getInt('mesiAttiviIncasso') ?? 10;
-      _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2024;
+      final mesiStateStr = prefs.getString('mesiAttiviState');
+      if (mesiStateStr != null) {
+        final List decoded = jsonDecode(mesiStateStr);
+        _mesiAttiviState = decoded.map((e) => e as bool).toList();
+      } else {
+        _mesiAttiviState = List.generate(12, (index) => index < _mesiAttiviIncasso);
+      }
+      _annoAperturaPiva = prefs.getInt('annoAperturaPiva') ?? 2026;
       _meseAperturaPiva = prefs.getInt('meseAperturaPiva') ?? 1;
+
+      _entrataExtraMensile = prefs.getDouble('entrataExtraMensile') ?? 0.0;
+      _hasDipendente = prefs.getBool('hasDipendente') ?? false;
+      _hasPensione = prefs.getBool('hasPensione') ?? false;
 
       _fatturatoTotale = prefs.getDouble('fatturatoTotale') ?? 0.0;
 
@@ -905,6 +1014,7 @@ class WalletProvider with ChangeNotifier {
       }
 
       _aggiornaTasseVirtuali();
+      _calcolaStatoCuscinetto();
       notifyListeners();
     } catch (e) {
       debugPrint('Errore durante la lettura: $e');
@@ -929,12 +1039,17 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('nettoTargetMensile', _nettoTargetMensile);
       await prefs.setDouble('fatturatoStimatoAnnuo', _fatturatoStimatoAnnuo);
       await prefs.setInt('mesiAttiviIncasso', _mesiAttiviIncasso);
+      await prefs.setString('mesiAttiviState', jsonEncode(_mesiAttiviState));
       if (_annoAperturaPiva != null) {
         await prefs.setInt('annoAperturaPiva', _annoAperturaPiva!);
       }
       if (_meseAperturaPiva != null) {
         await prefs.setInt('meseAperturaPiva', _meseAperturaPiva!);
       }
+
+      await prefs.setDouble('entrataExtraMensile', _entrataExtraMensile);
+      await prefs.setBool('hasDipendente', _hasDipendente);
+      await prefs.setBool('hasPensione', _hasPensione);
 
       await prefs.setDouble('fatturatoTotale', _fatturatoTotale);
 
@@ -967,6 +1082,9 @@ class WalletProvider with ChangeNotifier {
         'mesiAttiviIncasso': _mesiAttiviIncasso,
         'annoAperturaPiva': _annoAperturaPiva,
         'meseAperturaPiva': _meseAperturaPiva,        
+        'entrataExtraMensile': _entrataExtraMensile,
+        'hasDipendente': _hasDipendente,
+        'hasPensione': _hasPensione,
         'fatturatoTotale': _fatturatoTotale,
         'accounts': _accounts.map((a) => a.toJson()).toList(),
         'transactions': _transactions.map((t) => t.toJson()).toList(),
@@ -989,7 +1107,7 @@ class WalletProvider with ChangeNotifier {
 
   double get saldoSalvadanaioTasse {
     final salvadanaio = _accounts.firstWhere(
-      (a) => a.role == AccountRole.taxReserve || a.id == '3',
+      (a) => a.role == AccountRole.taxReserve || a.id == 'tax_account' || a.id == '3',
       orElse: () => _accounts.last,
     );
     return salvadanaio.amount;
@@ -1006,7 +1124,7 @@ class WalletProvider with ChangeNotifier {
     }
 
     final contoPrincipale = _accounts.firstWhere(
-      (a) => a.role == AccountRole.principal || a.id == '1',
+      (a) => a.role == AccountRole.principal || a.id == 'main_account' || a.id == '1',
       orElse: () => _accounts.first,
     );
 
@@ -1029,7 +1147,7 @@ class WalletProvider with ChangeNotifier {
     final DateTime dataUso = date ?? DateTime.now();
 
     final targetAccount = _accounts.firstWhere(
-      (acc) => acc.id == (accountId ?? '1'),
+      (acc) => acc.id == (accountId ?? 'main_account'),
       orElse: () => _accounts.first,
     );
 
@@ -1057,6 +1175,7 @@ class WalletProvider with ChangeNotifier {
     }
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1137,6 +1256,7 @@ class WalletProvider with ChangeNotifier {
     );
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1153,7 +1273,7 @@ class WalletProvider with ChangeNotifier {
       _fatturatoTotale = (_fatturatoTotale - importoLordo).clamp(0.0, double.infinity);
 
       final contoPrincipale = _accounts.firstWhere(
-        (a) => a.role == AccountRole.principal || a.id == '1',
+        (a) => a.role == AccountRole.principal || a.id == 'main_account' || a.id == '1',
         orElse: () => _accounts.first,
       );
 
@@ -1169,6 +1289,7 @@ class WalletProvider with ChangeNotifier {
       _transactions.removeWhere((t) => t.title.contains(cliente));
 
       _aggiornaTasseVirtuali();
+      _calcolaStatoCuscinetto();
     } else {
       _fattureDaIncassare.removeWhere((f) => f['id'] == idFattura);
     }
@@ -1177,14 +1298,12 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🎯 ELIMINAZIONE INFALLIBILE SUI GIROCONTI CON ID GEMELLO ESPLICITO
   void deleteTransaction(String id) {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx == -1) return;
 
     final tx = _transactions[idx];
 
-    // Se è un giroconto legato a un id gemello (es. giro_123_da / giro_123_verso)
     String? targetGemelloId;
     if (id.endsWith('_da')) {
       targetGemelloId = id.replaceAll('_da', '_verso');
@@ -1192,10 +1311,8 @@ class WalletProvider with ChangeNotifier {
       targetGemelloId = id.replaceAll('_verso', '_da');
     }
 
-    // 1. Storna il conto del movimento corrente
     _stornaSaldoConto(tx);
 
-    // 2. Se c'è un gemello esplicito o cercato per corrispondenza
     if (targetGemelloId != null) {
       final gemelloIdx = _transactions.indexWhere((t) => t.id == targetGemelloId);
       if (gemelloIdx != -1) {
@@ -1203,7 +1320,6 @@ class WalletProvider with ChangeNotifier {
         _transactions.removeAt(gemelloIdx);
       }
     } else {
-      // Ricerca fallback per vecchi giroconti di test
       final bool isGiroconto = tx.category == 'Giroconto' ||
           tx.category == 'Trasferimento' ||
           tx.title.toLowerCase().contains('giroconto') ||
@@ -1224,25 +1340,22 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    // Rimuove il movimento selezionato
     _transactions.removeWhere((t) => t.id == id);
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
-  // 🛡️ Helper universale per ripristinare il saldo esatto del conto
   void _stornaSaldoConto(TransactionModel tx) {
     if (tx.accountId == null || tx.accountId!.isEmpty) return;
 
     final accIdx = _accounts.indexWhere((a) => a.id == tx.accountId);
     if (accIdx != -1) {
       if (tx.isIncome) {
-        // Detrae dal conto ricevente (-)
         _accounts[accIdx].amount -= tx.amount;
       } else {
-        // Riaccredita al conto emittente (+)
         _accounts[accIdx].amount += tx.amount;
       }
     }
@@ -1312,7 +1425,7 @@ class WalletProvider with ChangeNotifier {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
       final tx = _transactions[idx];
-      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? '1'), orElse: () => _accounts.first);
+      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? 'main_account'), orElse: () => _accounts.first);
 
       if (tx.isIncome) {
         targetAccount.amount -= tx.amount;
@@ -1335,6 +1448,7 @@ class WalletProvider with ChangeNotifier {
       );
 
       _aggiornaTasseVirtuali();
+      _calcolaStatoCuscinetto();
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
@@ -1383,9 +1497,9 @@ class WalletProvider with ChangeNotifier {
     await prefs.clear();
 
     _accounts = [
-      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
-      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+      AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+      AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+      AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
     ];
 
     isPartitaIVA = true; 
@@ -1396,6 +1510,7 @@ class WalletProvider with ChangeNotifier {
     _vociPianificate.clear();
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     notifyListeners();
   }
 
@@ -1471,13 +1586,12 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🎯 GIROCONTO CON ID CONDIVISO E NOMI DEI CONTI REALI
   void eseguiGiroconto({
     required String daAccountId,
     required String aAccountId,
     required double importo,
     required bool isAccantonamentoTasse,
-    DateTime? date, // 👈 NUOVO PARAMETRO DATA
+    DateTime? date,
   }) {
     final accDa = _accounts.firstWhere((a) => a.id == daAccountId);
     final accA = _accounts.firstWhere((a) => a.id == aAccountId);
@@ -1508,7 +1622,7 @@ class WalletProvider with ChangeNotifier {
       isIncome: false,
       category: 'Giroconto',
       accountId: accDa.id,
-      date: dataFinale, // 👈 PASSAGGIO DATA PERSONALIZZATA
+      date: dataFinale,
     );
 
     addTransaction(
@@ -1518,7 +1632,7 @@ class WalletProvider with ChangeNotifier {
       isIncome: true,
       category: 'Giroconto',
       accountId: accA.id,
-      date: dataFinale, // 👈 PASSAGGIO DATA PERSONALIZZATA
+      date: dataFinale,
     );
 
     _aggiornaTasseVirtuali();
@@ -1552,6 +1666,9 @@ class WalletProvider with ChangeNotifier {
     _fatturatoStimatoAnnuo = fatturatoStimato;
     _mesiAttiviIncasso = mesiAttivi;
 
+    // 🎯 RIGENERA AUTOMATICAMENTE LA LISTA DEI MESI ATTIVI
+    _mesiAttiviState = List.generate(12, (index) => index < mesiAttivi);
+
     if (annoAperturaPiva != null) {
       _annoAperturaPiva = annoAperturaPiva;
     }
@@ -1559,6 +1676,7 @@ class WalletProvider with ChangeNotifier {
       _meseAperturaPiva = meseAperturaPiva;
     }
 
+    _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1583,9 +1701,9 @@ class WalletProvider with ChangeNotifier {
 
   Future<void> resetSoloMovimentieFatture() async {
     _accounts = [
-      AccountModel(id: '1', title: 'Conto Principale (IBAN)', subtitle: 'Banca Fineco •• 4092', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-      AccountModel(id: '2', title: 'Carta Spese & Svago', subtitle: 'Revolut Digital •• 1102', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
-      AccountModel(id: '3', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+      AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
+      AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
+      AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
     ];
 
     _fatturatoTotale = 0.00;
@@ -1594,6 +1712,7 @@ class WalletProvider with ChangeNotifier {
     _fattureIncassate.clear();
 
     _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
     await _salvaDatiInLocalStorage();
     notifyListeners();
   }

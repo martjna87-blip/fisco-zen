@@ -176,7 +176,7 @@ class SerbatoioTasseWidget extends StatefulWidget {
 
           final double calcoloPercentualeGreggio = tasseTotaliCalcolate > 0.01 
               ? (nuovaRiservaTotale / tasseTotaliCalcolate * 100) 
-              : (nuovaRiservaTotale > 0 ? 100.0 : 0.0);
+              : 100.0; // 👈 100% se non ci sono tasse dovute
               
           final int percentualeInt = (calcoloPercentualeGreggio - 100).abs() < 0.1 
               ? 100 
@@ -577,11 +577,11 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
 
     final double percentualeRatio = tasseTotaliCalcolate > 0.01
         ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
-        : (riservaAccantonata > 0 ? 1.0 : 0.0);
+        : 1.0; // 👈 Riempimento completo visivo se non ci sono tasse dovute
 
     final double calcoloPercentualeGreggio = tasseTotaliCalcolate > 0.01 
         ? (riservaAccantonata / tasseTotaliCalcolate * 100) 
-        : (riservaAccantonata > 0 ? 100.0 : 0.0);
+        : 100.0; // 👈 100% di copertura se non ci sono tasse dovute
 
     final int percentualeTextInt = (calcoloPercentualeGreggio - 100).abs() < 0.1 
         ? 100 

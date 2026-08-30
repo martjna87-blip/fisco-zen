@@ -44,6 +44,7 @@ class _WalletScreenState extends State<WalletScreen> {
   ];
 
   bool _isBussolaEspansa = false;
+  bool _isTargetEspanso = false; // 👈 Chiuso di default
   DateTime _dataFiltroRipartizione = DateTime(2026, 8);
   bool _isVistaAnnuale = false;
 
@@ -79,7 +80,195 @@ class _WalletScreenState extends State<WalletScreen> {
       }
     });
   }
+// 🎯 WIDGET OBIETTIVO TARGET NETTO (LOGICA CUSCINETTO E MESI OFF COLLEGATA)
+  Widget _buildTargetECuscinettoGlass({required WalletProvider walletProvider}) {
+    final double target = walletProvider.nettoTargetMensile;
+    if (target <= 0) return const SizedBox.shrink();
 
+    final DateTime ora = DateTime.now();
+    final int meseCorrenteIndex = ora.month - 1; // 0 = Gen, 7 = Ago...
+    
+    // 1. INCASSI REALI P.IVA NEL MESE CORRENTE
+    final double incassatoPivaMese = walletProvider.transactions.where((tx) {
+      return tx.isIncome &&
+             tx.date.year == ora.year &&
+             tx.date.month == ora.month &&
+             (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+    }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+    // 2. STIPENDIO / PENSIONE REGISTRATI NEL MESE CORRENTE
+    final double stipendioRegistratoMese = walletProvider.transactions.where((tx) {
+      return tx.isIncome &&
+             tx.date.year == ora.year &&
+             tx.date.month == ora.month &&
+             tx.category != 'P.IVA' &&
+             !tx.title.toLowerCase().contains('incasso') &&
+             !tx.category.toLowerCase().contains('giroconto');
+    }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+    final double nettoExtraMese = stipendioRegistratoMese > 0 
+        ? stipendioRegistratoMese 
+        : walletProvider.entrataExtraMensile;
+
+    // 3. VERIFICA SE IL MESE CORRENTE È DI LAVORO O PAUSA (DA PROVIDER)
+    final bool isMeseLavorativo = walletProvider.mesiAttiviState.length > meseCorrenteIndex
+        ? walletProvider.mesiAttiviState[meseCorrenteIndex]
+        : true;
+
+    double nettoPivaIncassato = 0.0;
+
+    if (isMeseLavorativo) {
+      final double fattoreMesiAttivi = (walletProvider.mesiAttivi / 12).clamp(0.0, 1.0);
+      nettoPivaIncassato = incassatoPivaMese * (1 - walletProvider.aliquotaFiscaleReale) * fattoreMesiAttivi;
+    } else {
+      // MESE OFF: Sblocca la quota mensile dal cuscinetto
+      final double quotaCuscinettoMensile = (target - nettoExtraMese).clamp(0.0, double.infinity);
+      nettoPivaIncassato = quotaCuscinettoMensile;
+    }
+
+    // 4. NETTO TOTALE REALE REALIZZATO NEL MESE
+    final double nettoRealizzatoMese = (walletProvider.isPartitaIVA ? nettoPivaIncassato : 0.0) + nettoExtraMese;
+
+    final double gap = target - nettoRealizzatoMese;
+    final bool isCoperto = gap <= 0;
+    final double percentuale = (nettoRealizzatoMese / target).clamp(0.0, 1.0);
+    final int mesiOff = 12 - walletProvider.mesiAttivi;
+
+    final Color statusColor = isCoperto ? oceanCyan : const Color(0xFFF97316);
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      alignment: Alignment.topCenter,
+      child: _buildGlassContainer(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _isTargetEspanso = !_isTargetEspanso),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          isCoperto ? Icons.flag_rounded : Icons.track_changes_rounded,
+                          color: statusColor,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Obiettivo Target Netto',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isTargetEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isCoperto ? '100% OK' : 'Mancano ${_formattaInt(gap)}',
+                      style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (_isTargetEspanso) ...[
+              const SizedBox(height: 20),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  height: 8,
+                  color: Colors.white.withOpacity(0.1),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: percentuale,
+                    child: Container(color: statusColor),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'NETTO REALIZZATO (MESE)',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formattaInt(nettoRealizzatoMese),
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'TARGET DESIDERATO',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formattaInt(target),
+                        style: TextStyle(color: statusColor, fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              if (mesiOff > 0) ...[
+                const SizedBox(height: 14),
+                Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.beach_access_rounded, color: oceanCyan, size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isMeseLavorativo
+                            ? 'Cuscinetto Mesi OFF: $mesiOff mesi di pausa previsti (in accantonamento)'
+                            : 'Cuscinetto Mesi OFF: Mese di pausa in corso (quota erogata)',
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
   // 🛑 ALERT DI SICUREZZA PER ELIMINAZIONE TOTALE STORICO
   void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc) {
     showDialog(
@@ -450,8 +639,8 @@ class _WalletScreenState extends State<WalletScreen> {
         .fold(0.0, (sum, a) => sum + a.amount);
 
     final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
-    final double cuscinettoFerie = postTasse * percentualeFondoFerie;
-    final double nettoRealeSpendibile = postTasse - cuscinettoFerie;
+    final double cuscinettoFerie = walletProvider.cuscinettoResiduo;
+    final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, double.infinity);
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
@@ -751,6 +940,11 @@ class _WalletScreenState extends State<WalletScreen> {
 
                       const SizedBox(height: 24),
 
+                      // 🎯 NUOVO ELEMENTO: OBIETTIVO TARGET & CUSCINETTO
+                      _buildTargetECuscinettoGlass(walletProvider: walletProvider),
+
+                      const SizedBox(height: 24),
+
                       if (mostraPiva) ...[
                         _buildGlassContainer(
                           padding: EdgeInsets.zero,
@@ -758,7 +952,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           child: const SerbatoioTasseWidget(
                             cardColor: Colors.transparent,
                             isCollapsible: true,
-                            initiallyExpanded: true,
+                            initiallyExpanded: false,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -1043,8 +1237,14 @@ class _WalletScreenState extends State<WalletScreen> {
                         decoration: BoxDecoration(color: purpleZen.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
                         child: Icon(Icons.explore_rounded, color: purpleZen, size: 16),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       const Text('Bussola Spese (50/30/20)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
                     ],
                   ),
                   Container(
