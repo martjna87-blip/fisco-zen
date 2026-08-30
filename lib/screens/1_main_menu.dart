@@ -36,6 +36,13 @@ class MainMenu extends StatefulWidget {
 
 class _MainMenuState extends State<MainMenu> {
   int _currentIndex = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +55,13 @@ class _MainMenuState extends State<MainMenu> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
         children: screens,
       ),
       extendBody: true,
@@ -92,6 +104,11 @@ class _MainMenuState extends State<MainMenu> {
         setState(() {
           _currentIndex = index;
         });
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
