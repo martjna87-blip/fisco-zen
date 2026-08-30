@@ -851,69 +851,73 @@ final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, dou
                     const SizedBox(height: 12),
                     const Divider(color: Colors.white12, height: 1),
                     const SizedBox(height: 12),
-                    Table(
-                      columnWidths: const {
-                        0: IntrinsicColumnWidth(),
-                        1: FixedColumnWidth(12),
-                        2: FlexColumnWidth(),
-                      },
-                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                    Column(
                       children: [
-                        TableRow(
+                        // 🟢 RIGA 1: LIQUIDITÀ SPENDIBILE
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
                                 SizedBox(width: 6),
-                                Text('LIQUIDITÀ SPENDIBILE:', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text(
+                                  'LIQUIDITÀ SPENDIBILE:',
+                                  style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
                               ],
                             ),
-                            const SizedBox.shrink(),
+                            const SizedBox(width: 8),
                             Text(
                               _formattaValuta(nettoRealeSpendibile),
                               style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
-                        const TableRow(
+
+                        const SizedBox(height: 8),
+
+                        // 🟣 RIGA 2: CUSCINETTO MESI OFF
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            SizedBox(height: 6),
-                            SizedBox.shrink(),
-                            SizedBox(height: 6),
-                          ],
-                        ),
-                        TableRow(
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'CUSCINETTO MESI OFF (${12 - mesiLavorati} MESI PAUSA):',
-                                  style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(width: 4),
-                                GestureDetector(
-                                  onTap: () {
-                                    AppSecondaryPopup.mostra(
-                                      context: context,
-                                      icon: Icons.info_outline_rounded,
-                                      iconColor: const Color(0xFF8B5CF6),
-                                      titolo: 'Cuscinetto Mesi No-Lavoro',
-                                      testoAnnulla: 'Ho capito',
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
                                       child: Text(
-                                        'È la riserva strategica accantonata per garantirti il tuo Target Netto nei ${12 - mesiLavorati} mesi in cui hai previsto di non fatturare.\n\nI fondi vengono sbloccati automaticamente durante i mesi di pausa per proteggere il tuo stile di vita.',
-                                        style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                                        'CUSCINETTO (${12 - mesiLavorati} MESI PAUSA):',
+                                        style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
                                       ),
-                                    );
-                                  },
-                                  child: const Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 13),
-                                ),
-                              ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () {
+                                      AppSecondaryPopup.mostra(
+                                        context: context,
+                                        icon: Icons.info_outline_rounded,
+                                        iconColor: const Color(0xFF8B5CF6),
+                                        titolo: 'Cuscinetto Mesi No-Lavoro',
+                                        testoAnnulla: 'Ho capito',
+                                        child: Text(
+                                          'È la riserva strategica accantonata per garantirti il tuo Target Netto nei ${12 - mesiLavorati} mesi in cui hai previsto di non fatturare.\n\nI fondi vengono sbloccati automaticamente durante i mesi di pausa per proteggere il tuo stile di vita.',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                                        ),
+                                      );
+                                    },
+                                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 13),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox.shrink(),
+                            const SizedBox(width: 8),
                             Text(
                               _formattaValuta(cuscinettoFerie),
                               style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
