@@ -4,7 +4,37 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '1_main_menu.dart';
 import '../widgets_shared/fiscon_logo.dart';
-import '../data/ateco_database.dart'; // 👈 IMPORT DEL DATABASE CENTRALIZZATO!
+import '../data/ateco_database.dart';
+
+// Helper per la formattazione dei numeri con il punto per le migliaia (es. 8.000, 35.000)
+String formatEuro(num value) {
+  final int val = value.round().abs();
+  final String str = val.toString();
+  final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+  final String formatted = str.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  return value < 0 ? '-$formatted' : formatted;
+}
+
+// Modello con ID immutabile per la gestione dei conti
+class ContoItem {
+  final String id;
+  final String ruoloDefault; 
+  final TextEditingController nomeController;
+  final TextEditingController saldoController;
+
+  ContoItem({
+    required this.id,
+    required this.ruoloDefault,
+    required String nomeIniziale,
+    required String saldoIniziale,
+  })  : nomeController = TextEditingController(text: nomeIniziale),
+        saldoController = TextEditingController(text: saldoIniziale);
+
+  void dispose() {
+    nomeController.dispose();
+    saldoController.dispose();
+  }
+}
 
 class OnboardingWizard extends StatefulWidget {
   const OnboardingWizard({super.key});
@@ -16,38 +46,52 @@ class OnboardingWizard extends StatefulWidget {
 class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _totalPages = 4;
 
   late AnimationController _waveController;
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _pivaScrollController = ScrollController();
 
-  // 🗂️ STEP 1: PROFILO & ATECO
-  String? tipoProfilo; // 'piva' o 'dipendente'
-  String? aliquotaTasse; // '5%' o '15%'
+  // Palette Colori Coerente
+  final Color bgDark = const Color(0xFF080B0C);
+  final Color cardDark = const Color(0xFF101618);
+  final Color borderDark = const Color(0xFF1F2937);
+  final Color brandTeal = const Color(0xFF2DD4BF);
+  final Color textMuted = const Color(0xFF6B7280);
+  final Color textWhite = Colors.white;
+
+  // 🎯 STEP 1: OBIETTIVO ENTRATA NETTA
+  final TextEditingController _nettoTargetController = TextEditingController(text: '2500');
+
+  // 🗂️ STEP 2: FONTI DI ENTRATA
+  bool hasPiva = true;
+  bool hasDipendente = false;
+  bool hasPensione = false;
+
+  // Dettagli Dipendente / Pensione
+  final TextEditingController _dipendenteImportoController = TextEditingController(text: '1500');
+  int mensilitaDipendente = 13;
+
+  // Dettagli Partita IVA (ANNO E MESE NON PRESELEZIONATI)
   int? annoAperturaPiva; 
-  double? coefficienteRedditivita;
-  String? codiceAtecoSelezionato;
+  int? meseAperturaPiva; 
+  final TextEditingController _fatturatoController = TextEditingController(text: '35000');
+  final List<String> _nomiMesiEstesi = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+  final List<bool> _mesiAttiviState = List.generate(12, (_) => true);
+  
+  // Dettagli ATECO
+  double? coefficienteRedditivita = 0.78;
+  String? codiceAtecoSelezionato = '74.10.21 - Design & Digital';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // 🗂️ STEP 2: CONTRIBUTI & ACCONTI
-  String? tipoLavoroDipendente; // 'nessuno', 'full', 'part_over50', 'part_under50'
-  final TextEditingController _accontiController = TextEditingController();
+  // 🗂️ FISCO
+  String aliquotaTasse = '5%';
+  String tipoLavoroDipendente = 'nessuno';
+  final TextEditingController _accontiController = TextEditingController(text: '0');
 
-  // 🗂️ STEP 3: OBIETTIVO NETTO
-  final TextEditingController _nettoTargetController = TextEditingController(text: '2000');
-
-  // 🗂️ STEP 4: PROIEZIONE, MESI & VERDETTO
-  final TextEditingController _fatturatoController = TextEditingController(text: '35000');
-  
-  // Lista dei 12 mesi (tutti attivi di default)
-  final List<String> _nomiMesi = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-  final List<bool> _mesiAttiviState = List.generate(12, (_) => true);
+  // 🗂️ CONTI BANCARI
+  final List<ContoItem> _contiList = [];
 
   int get _mesiAttiviConteggio => _mesiAttiviState.where((m) => m).length;
-
-  // 👇 RIMOSSA LA VECCHIA LISTA _databaseAteco
-  // Ora useremo AtecoDatabase.lista
 
   @override
   void initState() {
@@ -56,242 +100,323 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
       vsync: this,
       duration: const Duration(seconds: 18),
     )..repeat();
+
+    _contiList.add(ContoItem(id: 'main_account', ruoloDefault: 'principale', nomeIniziale: 'Conto Principale', saldoIniziale: '0'));
+    _contiList.add(ContoItem(id: 'tax_account', ruoloDefault: 'tasse', nomeIniziale: 'Salvadanaio Tasse', saldoIniziale: '0'));
+    _contiList.add(ContoItem(id: 'savings_account', ruoloDefault: 'risparmio', nomeIniziale: 'Fondo Risparmio', saldoIniziale: '0'));
+  }
+
+  void _aggiungiNuovoConto() {
+    setState(() {
+      final int idx = _contiList.length + 1;
+      _contiList.add(ContoItem(id: 'extra_$idx', ruoloDefault: 'extra', nomeIniziale: 'Nuovo Conto', saldoIniziale: '0'));
+    });
+  }
+
+  void _rimuoviConto(int index) {
+    final item = _contiList[index];
+    if (item.id != 'main_account' && item.id != 'tax_account') {
+      setState(() {
+        item.dispose();
+        _contiList.removeAt(index);
+      });
+    }
+  }
+
+  void _scrollToPivaBottom() {
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (_pivaScrollController.hasClients) {
+        _pivaScrollController.animateTo(
+          _pivaScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  // 🔍 VALIDAZIONE RIGIDA PER OGNI STEP
+  bool _canProceed() {
+    int idx = 0;
+    final int currentYear = DateTime.now().year;
+
+    // Step 1: Obiettivo Mensile
+    if (_currentPage == idx) {
+      final val = double.tryParse(_nettoTargetController.text.replaceAll('.', ''));
+      return val != null && val > 0;
+    }
+    idx++;
+
+    // Step 2: Selezione Fonti
+    if (_currentPage == idx) {
+      return hasPiva || hasDipendente || hasPensione;
+    }
+    idx++;
+
+    // Step opzionale: Dipendente / Pensione
+    if (hasDipendente || hasPensione) {
+      if (_currentPage == idx) {
+        final val = double.tryParse(_dipendenteImportoController.text.replaceAll('.', ''));
+        return val != null && val > 0;
+      }
+      idx++;
+    }
+
+    // Step opzionali: Partita IVA
+    if (hasPiva) {
+      // Step: P.IVA Dettagli
+      if (_currentPage == idx) {
+        final fatt = double.tryParse(_fatturatoController.text.replaceAll('.', ''));
+        if (fatt == null || fatt <= 0) return false;
+        if (annoAperturaPiva == null) return false;
+        if (annoAperturaPiva == currentYear && meseAperturaPiva == null) return false;
+        if (_mesiAttiviConteggio == 0) return false;
+        return true;
+      }
+      idx++;
+
+      // Step: P.IVA Ateco
+      if (_currentPage == idx) {
+        return codiceAtecoSelezionato != null && codiceAtecoSelezionato!.isNotEmpty;
+      }
+      idx++;
+
+      // Step: Inquadramento Fiscale
+      if (_currentPage == idx) {
+        final acc = double.tryParse(_accontiController.text.replaceAll('.', ''));
+        return acc != null && acc >= 0;
+      }
+      idx++;
+    }
+
+    // Step: Conti Bancari
+    if (_currentPage == idx) {
+      for (var conto in _contiList) {
+        if (conto.nomeController.text.trim().isEmpty) return false;
+        if (double.tryParse(conto.saldoController.text.replaceAll('.', '')) == null) return false;
+      }
+      return true;
+    }
+    idx++;
+
+    // Step Finale: Esito Analisi
+    return true;
   }
 
   @override
   void dispose() {
     _waveController.dispose();
     _pageController.dispose();
-    _scrollController.dispose();
+    _pivaScrollController.dispose();
+    _nettoTargetController.dispose();
+    _dipendenteImportoController.dispose();
+    _fatturatoController.dispose();
     _searchController.dispose();
     _accontiController.dispose();
-    _nettoTargetController.dispose();
-    _fatturatoController.dispose();
+    for (var conto in _contiList) {
+      conto.dispose();
+    }
     super.dispose();
   }
 
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+  List<Widget> _getDynamicPages() {
+    List<Widget> pages = [
+      _buildStep1ObiettivoSleek(),
+      _buildStep2SelezioneFontiSleek(),
+    ];
+
+    if (hasDipendente || hasPensione) pages.add(_buildStepDipendenteDettagliSleek());
+    if (hasPiva) {
+      pages.add(_buildStepPivaDettagliSleek());
+      pages.add(_buildStepPivaAtecoSleek());
+      pages.add(_buildStepInquadramentoFiscaleSleek());
+    }
+
+    pages.add(_buildStepContiBancariSleek());
+    pages.add(_buildStepSostenibilitaSleek());
+
+    return pages;
   }
 
   void _nextPage() {
+    if (!_canProceed()) return;
     FocusScope.of(context).unfocus();
-    if (tipoProfilo == 'dipendente' || _currentPage == _totalPages - 1) {
+    final pages = _getDynamicPages();
+    if (_currentPage >= pages.length - 1) {
       _concludiOnboarding();
     } else {
-      _pageController.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      _pageController.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
     }
   }
 
   void _prevPage() {
     FocusScope.of(context).unfocus();
     if (_currentPage > 0) {
-      _pageController.previousPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      _pageController.previousPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
     }
   }
 
   void _concludiOnboarding() {
     final wallet = context.read<WalletProvider>();
+    wallet.setPartitaIVA(hasPiva);
     
-    if (tipoProfilo == 'dipendente') {
-      wallet.setPartitaIVA(false);
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainMenu(hasPartitaIva: false)));
-    } else {
-      wallet.setPartitaIVA(true);
-      
-      // 📌 ESTRAIAMO SOLO IL CODICE NUMERICO PULITO (es. "74.10.21")
+    if (hasPiva) {
       final String codicePulito = (codiceAtecoSelezionato ?? '74.10.21').split(' ').first.trim();
-
       wallet.salvaProfiloFiscale(
         codiceAteco: codicePulito,
         coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
         aliquotaImpostaVal: aliquotaTasse == '5%' ? 0.05 : 0.15,
-        accontiVersati: double.tryParse(_accontiController.text) ?? 0.0,
-        nettoTarget: double.tryParse(_nettoTargetController.text) ?? 2000.0,
-        fatturatoStimato: double.tryParse(_fatturatoController.text) ?? 35000.0,
+        accontiVersati: double.tryParse(_accontiController.text.replaceAll('.', '')) ?? 0.0,
+        nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0,
+        fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '')) ?? 35000.0,
         mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
       );
-      
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MainMenu(
-            hasPartitaIva: true,
-            codiceAtecoIniziale: codicePulito,
-            coefficienteIniziale: coefficienteRedditivita ?? 0.78,
-            aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15,
-          ),
-        ),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => MainMenu(hasPartitaIva: true, codiceAtecoIniziale: codicePulito, coefficienteIniziale: coefficienteRedditivita ?? 0.78, aliquotaImpostaIniziale: aliquotaTasse == '5%' ? 0.05 : 0.15)));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainMenu(hasPartitaIva: false)));
     }
   }
 
-  // 🧮 CALCOLO VERDETTO & SUGGERIMENTI
-  Map<String, double> _calcolaVerdetto() {
-    final double fatturato = double.tryParse(_fatturatoController.text) ?? 0.0;
-    final double nettoTargetMese = double.tryParse(_nettoTargetController.text) ?? 0.0;
-    final double coeff = coefficienteRedditivita ?? 0.78;
-    final double aliquota = (aliquotaTasse == '5%') ? 0.05 : 0.15;
+  Map<String, dynamic> _calcolaSostenibilita() {
+    final double nettoTargetMese = double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0;
     
-    // Esenzione o riduzione INPS se dipendente Full-Time o Part-Time > 50%
-    final double aliquotaInps = (tipoLavoroDipendente == 'full' || tipoLavoroDipendente == 'part_over50') ? 0.0 : 0.2607;
+    double nettoMeseDipendente = 0.0;
+    if (hasDipendente || hasPensione) {
+      final double importo = double.tryParse(_dipendenteImportoController.text.replaceAll('.', '')) ?? 0.0;
+      nettoMeseDipendente = (importo * mensilitaDipendente) / 12;
+    }
 
-    final double imponibile = fatturato * coeff;
-    final double tasseAnno = imponibile * aliquota;
-    final double inpsAnno = imponibile * aliquotaInps;
-    final double nettoAnno = fatturato - tasseAnno - inpsAnno;
-    final double nettoMeseReale = nettoAnno / 12;
+    double nettoMesePiva = 0.0;
+    double coeff = coefficienteRedditivita ?? 0.78;
+    double aliquota = (aliquotaTasse == '5%') ? 0.05 : 0.15;
+    double aliquotaInps = (hasDipendente && tipoLavoroDipendente == 'full') || hasPensione ? 0.0 : 0.2607;
+    final double fatturato = double.tryParse(_fatturatoController.text.replaceAll('.', '')) ?? 0.0;
 
-    final double gapMese = nettoTargetMese - nettoMeseReale;
+    if (hasPiva) {
+      final double imponibile = fatturato * coeff;
+      nettoMesePiva = (fatturato - (imponibile * aliquota) - (imponibile * aliquotaInps)) / 12;
+    }
+
+    final double nettoTotaleMese = nettoMeseDipendente + nettoMesePiva;
+    final double gapMese = nettoTargetMese - nettoTotaleMese;
+    final int mesiOff = 12 - _mesiAttiviConteggio;
     
-    double extraFatturatoAnno = 0.0;
-    if (gapMese > 0) {
+    double quotaCuscinettoMese = 0.0;
+    double nettoMeseNeiMesiAttivi = 0.0;
+    final double entrateTotaliAnno = nettoTotaleMese * 12;
+    final double fabbisognoTotaleAnno = nettoTargetMese * 12;
+
+    if (_mesiAttiviConteggio > 0) {
+      nettoMeseNeiMesiAttivi = entrateTotaliAnno / _mesiAttiviConteggio;
+      quotaCuscinettoMese = nettoMeseNeiMesiAttivi - nettoTargetMese;
+      if (quotaCuscinettoMese < 0) quotaCuscinettoMese = 0;
+    }
+
+    final bool cuscinettoCoperto = (entrateTotaliAnno >= fabbisognoTotaleAnno) && (_mesiAttiviConteggio > 0);
+
+    double extraFatturatoAnnoPiva = 0.0;
+    if (gapMese > 0 && hasPiva) {
       final double fattoreNetto = 1 - (coeff * (aliquota + aliquotaInps));
-      extraFatturatoAnno = (gapMese * 12) / (fattoreNetto > 0 ? fattoreNetto : 1.0);
+      extraFatturatoAnnoPiva = (gapMese * 12) / (fattoreNetto > 0 ? fattoreNetto : 1.0);
     }
 
     return {
-      'nettoMese': nettoMeseReale,
+      'nettoTotaleMese': nettoTotaleMese,
       'gapMese': gapMese,
-      'extraFatturatoAnno': extraFatturatoAnno,
-      'extraFatturatoMese': _mesiAttiviConteggio > 0 ? extraFatturatoAnno / _mesiAttiviConteggio : 0.0,
+      'mesiOff': mesiOff,
+      'nettoMeseNeiMesiAttivi': nettoMeseNeiMesiAttivi,
+      'quotaCuscinettoMese': quotaCuscinettoMese,
+      'cuscinettoCoperto': cuscinettoCoperto,
+      'extraFatturatoAnnoPiva': extraFatturatoAnnoPiva,
+      'extraFatturatoMesePiva': _mesiAttiviConteggio > 0 ? extraFatturatoAnnoPiva / _mesiAttiviConteggio : 0.0,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final dynamicPages = _getDynamicPages();
+    final totalPages = dynamicPages.length;
+    if (_currentPage >= totalPages) _currentPage = totalPages - 1;
+
+    final bool canProceed = _canProceed();
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: const Color(0xFF080B0C),
+        backgroundColor: bgDark,
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: _waveController,
-                builder: (context, child) {
-                  return CustomPaint(painter: FluidWavePainter(animationValue: _waveController.value));
-                },
+                builder: (context, child) => CustomPaint(painter: FluidWavePainter(animationValue: _waveController.value)),
               ),
             ),
-            
             SafeArea(
               child: Column(
                 children: [
-                  // HEADER & PROGRESS BAR
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(color: const Color(0xFF0D9488), borderRadius: BorderRadius.circular(8)),
-                              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 16),
-                            ),
-                            const SizedBox(width: 8),
-                            const FiscOnLogo(fontSize: 26),
-                          ],
+                        const FiscOnLogo(fontSize: 22),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: bgDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderDark)),
+                          child: Text('Passo ${_currentPage + 1} di $totalPages', style: TextStyle(color: brandTeal, fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
-                        if (tipoProfilo == 'piva')
-                          Text('Step ${_currentPage + 1} di $_totalPages', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
-                  
-                  if (tipoProfilo == 'piva')
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: (_currentPage + 1) / _totalPages,
-                          backgroundColor: Colors.white.withOpacity(0.1),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
-                          minHeight: 4,
-                        ),
-                      ),
-                    ),
 
-                  // SCHERMATE PAGEVIEW
                   Expanded(
                     child: PageView(
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       onPageChanged: (int page) => setState(() => _currentPage = page),
-                      children: [
-                        _buildStep1(),
-                        _buildStep2(),
-                        _buildStep3(),
-                        _buildStep4(),
-                      ],
+                      children: dynamicPages,
                     ),
                   ),
 
-                  // BOTTOM BAR CON TASTI
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [const Color(0xFF080B0C), const Color(0xFF080B0C).withOpacity(0.0)],
-                      ),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                     child: Row(
                       children: [
-                        if (_currentPage > 0 && tipoProfilo == 'piva')
+                        if (_currentPage > 0)
                           Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
+                            padding: const EdgeInsets.only(right: 10.0),
                             child: InkWell(
                               onTap: _prevPage,
                               borderRadius: BorderRadius.circular(16),
                               child: Container(
-                                height: 54,
-                                width: 54,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: const Color(0xFF1F2937)),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                                height: 54, width: 54,
+                                decoration: BoxDecoration(color: cardDark, border: Border.all(color: borderDark), borderRadius: BorderRadius.circular(16)),
+                                child: Icon(Icons.arrow_back_rounded, color: textWhite, size: 20),
                               ),
                             ),
                           ),
-                        
                         Expanded(
-                          child: SizedBox(
+                          child: Container(
                             height: 54,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: canProceed ? [BoxShadow(color: brandTeal.withOpacity(0.15), blurRadius: 16, spreadRadius: 0)] : [],
+                            ),
                             child: ElevatedButton(
-                              onPressed: (tipoProfilo == null || (tipoProfilo == 'piva' && coefficienteRedditivita == null && _currentPage == 0)) ? null : _nextPage,
+                              onPressed: canProceed ? _nextPage : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2DD4BF),
-                                foregroundColor: Colors.black,
-                                disabledBackgroundColor: const Color(0xFF1F2937),
+                                backgroundColor: brandTeal,
+                                foregroundColor: bgDark,
+                                disabledBackgroundColor: borderDark,
+                                disabledForegroundColor: textMuted,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    tipoProfilo == 'dipendente' ? 'Home Dipendente' 
-                                    : (_currentPage == _totalPages - 1 ? 'Scopri il tuo Verdetto' : 'Avanti'),
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Icon(tipoProfilo == 'dipendente' || _currentPage == _totalPages - 1 ? Icons.check_circle : Icons.arrow_forward_rounded, size: 18),
-                                ],
+                              child: Text(
+                                _currentPage == totalPages - 1 ? 'Salva e Inizia' : 'Avanti',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -308,99 +433,830 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     );
   }
 
-  // STEP 1: PROFILO & ATECO
-  Widget _buildStep1() {
+  // --- STEP 1: OBIETTIVO ENTRATA NETTA ---
+  Widget _buildStep1ObiettivoSleek() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Obiettivo Mensile', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          Text('Qual è l\'entrata netta mensile di cui hai bisogno per vivere sereno?', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 32),
+
+          _buildHeroCard(
+            title: 'NETTO TARGET DESIDERATO',
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nettoTargetController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
+                        decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                      ),
+                    ),
+                    Text('€ / mese', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSegmentedControl(
+                  options: ['1.500', '2.000', '2.500', '3.500'],
+                  selectedValue: _nettoTargetController.text,
+                  onChanged: (val) => setState(() => _nettoTargetController.text = val.replaceAll('.', '')),
+                  suffix: '€',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP 2: FONTI DI ENTRATA ---
+  Widget _buildStep2SelezioneFontiSleek() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Le tue Fonti', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          Text('Seleziona le voci da cui percepirai reddito quest\'anno:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 32),
+
+          _buildSelectableSleekCard(
+            title: 'Partita IVA', subtitle: 'Attività autonoma o libera professione',
+            icon: Icons.badge_rounded, isSelected: hasPiva, onTap: () => setState(() => hasPiva = !hasPiva),
+          ),
+          const SizedBox(height: 12),
+          _buildSelectableSleekCard(
+            title: 'Lavoro Dipendente', subtitle: 'Stipendio da contratto privato o pubblico',
+            icon: Icons.work_rounded, isSelected: hasDipendente, onTap: () => setState(() => hasDipendente = !hasDipendente),
+          ),
+          const SizedBox(height: 12),
+          _buildSelectableSleekCard(
+            title: 'Pensione', subtitle: 'Assegno pensionistico INPS o Ente',
+            icon: Icons.account_balance_rounded, isSelected: hasPensione, onTap: () => setState(() => hasPensione = !hasPensione),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP 3: DIPENDENTE / PENSIONE ---
+  Widget _buildStepDipendenteDettagliSleek() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            hasDipendente && hasPensione ? 'Dipendente & Pensione' : (hasDipendente ? 'Stipendio Dipendente' : 'Assegno Pensione'),
+            style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasDipendente 
+                ? 'Inserisci lo stipendio netto mensile percepito:' 
+                : 'Inserisci l\'importo netto mensile della tua pensione:',
+            style: TextStyle(color: textMuted, fontSize: 14, height: 1.4),
+          ),
+          const SizedBox(height: 32),
+
+          _buildHeroCard(
+            title: 'IMPORTO NETTO MENSILE',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _dipendenteImportoController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
+                        decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                      ),
+                    ),
+                    Text('€ / mese', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Mensilità erogate:', style: TextStyle(color: textWhite, fontSize: 13)),
+                    Row(
+                      children: [12, 13, 14].map((m) {
+                        final isSelected = mensilitaDipendente == m;
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6.0),
+                          child: InkWell(
+                            onTap: () => setState(() => mensilitaDipendente = m),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? brandTeal : bgDark,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: isSelected ? brandTeal : borderDark),
+                              ),
+                              child: Text('$m', style: TextStyle(color: isSelected ? bgDark : textWhite, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP 4: PARTITA IVA ---
+  Widget _buildStepPivaDettagliSleek() {
+    final int currentYear = DateTime.now().year;
+
+    final bool canShowMesiAttivi = annoAperturaPiva != null &&
+        (annoAperturaPiva != currentYear || (annoAperturaPiva == currentYear && meseAperturaPiva != null));
+
+    return SingleChildScrollView(
+      controller: _pivaScrollController,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Partita IVA: Fatturato e Periodo', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+            const SizedBox(height: 6),
+            Text('Stima il tuo fatturato lordo e imposta il periodo di apertura e attività:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+            const SizedBox(height: 28),
+
+            // CARD 1: FATTURATO LORDO PREVISTO
+            _buildHeroCard(
+              title: 'FATTURATO LORDO PREVISTO P.IVA',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _fatturatoController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
+                      decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                    ),
+                  ),
+                  Text('€ / anno', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // CARD 2: ANNO DI APERTURA
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(24), border: Border.all(color: borderDark)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ANNO DI APERTURA PARTITA IVA', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 16),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ...List.generate(3, (index) => currentYear - index).map((anno) {
+                          return _buildPill(
+                            label: anno == currentYear ? '$anno (Ora)' : '$anno',
+                            isSelected: annoAperturaPiva == anno,
+                            onTap: () {
+                              setState(() { 
+                                annoAperturaPiva = anno; 
+                                aliquotaTasse = '5%';
+                                if (anno != currentYear) {
+                                  meseAperturaPiva = null;
+                                }
+                              });
+                              _scrollToPivaBottom();
+                            },
+                          );
+                        }),
+                        _buildPill(
+                          label: '> 5 anni',
+                          isSelected: annoAperturaPiva != null && annoAperturaPiva! <= (currentYear - 3),
+                          onTap: () {
+                            setState(() { 
+                              annoAperturaPiva = currentYear - 5; 
+                              aliquotaTasse = '15%';
+                              meseAperturaPiva = null;
+                            });
+                            _scrollToPivaBottom();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // SELEZIONE MESE APERTURA (Solo se selezionato 2026)
+                  if (annoAperturaPiva == currentYear) ...[
+                    const SizedBox(height: 20),
+                    const Divider(height: 1, color: Color(0xFF1F2937)),
+                    const SizedBox(height: 16),
+                    Text('SELEZIONA IL MESE DI APERTURA ($currentYear)', style: TextStyle(color: brandTeal, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: List.generate(12, (index) {
+                          final isSelected = meseAperturaPiva == (index + 1);
+                          return _buildPill(
+                            label: _nomiMesiEstesi[index],
+                            isSelected: isSelected,
+                            onTap: () {
+                              setState(() => meseAperturaPiva = index + 1);
+                              _scrollToPivaBottom();
+                            },
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // CARD 3: MESI ATTIVI (GRIGLIA COMPATTA 4 COLONNE x 3 RIGHE)
+            if (canShowMesiAttivi) ...[
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(24), border: Border.all(color: brandTeal.withOpacity(0.5), width: 1.5)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('MESI DI ATTIVITÀ', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        Text('$_mesiAttiviConteggio/12', style: TextStyle(color: brandTeal, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: List.generate(12, (index) {
+                        final isSelected = _mesiAttiviState[index];
+                        final double itemWidth = (MediaQuery.of(context).size.width - 40 - 40 - 24) / 4;
+                        return InkWell(
+                          onTap: () => setState(() => _mesiAttiviState[index] = !isSelected),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: itemWidth,
+                            height: 42,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isSelected ? brandTeal.withOpacity(0.12) : bgDark,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isSelected ? brandTeal : borderDark, width: isSelected ? 1.5 : 1),
+                            ),
+                            child: Text(_nomiMesiEstesi[index], style: TextStyle(color: isSelected ? brandTeal : textMuted, fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- STEP ATECO ---
+  Widget _buildStepPivaAtecoSleek() {
     final atecoFiltrati = AtecoDatabase.lista.where((item) {
       final query = _searchQuery.toLowerCase().replaceAll('.', '').trim();
       return item['codice'].toString().toLowerCase().replaceAll('.', '').contains(query) || 
              item['descrizione'].toString().toLowerCase().contains(query);
     }).toList();
 
-    // Generiamo gli anni selezionabili (ultimi 5 anni + opzione "> 5 anni fa")
-    final int annoCorrente = DateTime.now().year;
-    final List<int> anniApertura = List.generate(5, (index) => annoCorrente - index);
-
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Qual è il tuo profilo lavorativo?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _buildProfileCard(id: 'piva', icon: Icons.badge_rounded, title: 'Partita IVA', subtitle: 'Forfettario', activeColor: const Color(0xFF0D9488))),
-              const SizedBox(width: 12),
-              Expanded(child: _buildProfileCard(id: 'dipendente', icon: Icons.work_rounded, title: 'Dipendente', subtitle: 'Privato', activeColor: const Color(0xFF3B82F6))),
-            ],
-          ),
-          
-          if (tipoProfilo == 'piva') ...[
-            const SizedBox(height: 28),
-            const Text('IN CHE ANNO HAI APERTO LA PARTITA IVA?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-            const SizedBox(height: 12),
-            
-            // CHIP SELEZIONE ANNO DI APERTURA
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ...anniApertura.map((anno) {
-                  final isSelected = annoAperturaPiva == anno;
-                  return ChoiceChip(
-                    label: Text(
-                      anno == annoCorrente ? '$anno (Quest\'anno)' : '$anno',
-                      style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 13),
-                    ),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF2DD4BF),
-                    backgroundColor: const Color(0xFF101618),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937)),
-                    ),
-                    onSelected: (selected) {
-                      setState(() {
-                        annoAperturaPiva = anno;
-                        aliquotaTasse = '5%'; // Entro i 5 anni -> default 5%
-                      });
-                      _scrollToBottom();
-                    },
-                  );
-                }),
-                ChoiceChip(
-                label: Text(
-                  '${annoCorrente - 5} o prima (> 5 anni)',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                ),
-                selected: annoAperturaPiva != null && annoAperturaPiva! <= (annoCorrente - 5),
-                selectedColor: const Color(0xFF3B82F6),
-                backgroundColor: const Color(0xFF101618),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: (annoAperturaPiva != null && annoAperturaPiva! <= (annoCorrente - 5)) ? const Color(0xFF3B82F6) : const Color(0xFF1F2937)),
-                ),
-                onSelected: (selected) {
-                  setState(() {
-                    annoAperturaPiva = annoCorrente - 5;
-                    aliquotaTasse = '15%';
-                  });
-                  _scrollToBottom();
-                },
+          Text('Codice ATECO', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          Text('Individua il tuo settore per definire la redditività fiscale:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 24),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderDark)),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: textWhite, fontSize: 15),
+              onChanged: (v) => setState(() => _searchQuery = v),
+              decoration: InputDecoration(
+                icon: Icon(Icons.search_rounded, color: brandTeal, size: 20),
+                hintText: 'Cerca codice o professione (es. 85.52.09)...',
+                hintStyle: TextStyle(color: textMuted, fontSize: 14),
+                border: InputBorder.none,
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Expanded(
+            child: _searchQuery.isEmpty
+                ? Column(
+                    children: [
+                      _buildSelectableSleekCard(
+                        title: 'Consulenza & Digital (78%)', subtitle: '74.10.21 - Design, IT, Marketing',
+                        icon: Icons.laptop_mac_rounded, isSelected: codiceAtecoSelezionato?.startsWith('74.10.21') ?? false,
+                        onTap: () => setState(() { coefficienteRedditivita = 0.78; codiceAtecoSelezionato = '74.10.21 - Digital'; }),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSelectableSleekCard(
+                        title: 'Formazione Culturale & Coaching (78%)', subtitle: '85.52.09 - Altra formazione culturale, corsi',
+                        icon: Icons.school_rounded, isSelected: codiceAtecoSelezionato?.startsWith('85.52.09') ?? false,
+                        onTap: () => setState(() { coefficienteRedditivita = 0.78; codiceAtecoSelezionato = '85.52.09 - Formazione Culturale'; }),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSelectableSleekCard(
+                        title: 'Commercio & E-commerce (40%)', subtitle: '47.91.10 - Vendita Online',
+                        icon: Icons.storefront_rounded, isSelected: codiceAtecoSelezionato?.startsWith('47.91.10') ?? false,
+                        onTap: () => setState(() { coefficienteRedditivita = 0.40; codiceAtecoSelezionato = '47.91.10 - E-commerce'; }),
+                      ),
+                    ],
+                  )
+                : Container(
+                    decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderDark)),
+                    child: ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: atecoFiltrati.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: borderDark),
+                      itemBuilder: (context, index) {
+                        final item = atecoFiltrati[index];
+                        final double coef = (item['coef'] as num).toDouble();
+                        final int percentuale = (coef * 100).round();
+                        final isSelected = codiceAtecoSelezionato != null && codiceAtecoSelezionato!.startsWith(item['codice'].toString());
+                        
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                          onTap: () => setState(() { coefficienteRedditivita = coef; codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}'; }),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(item['codice'], style: TextStyle(color: isSelected ? brandTeal : textWhite, fontWeight: FontWeight.bold, fontSize: 14)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: brandTeal.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                                child: Text('$percentuale%', style: TextStyle(color: brandTeal, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ),
+                            ],
+                          ),
+                          subtitle: Text(item['descrizione'], style: TextStyle(color: textMuted, fontSize: 12)),
+                          trailing: isSelected ? Icon(Icons.check_circle_rounded, color: brandTeal, size: 20) : null,
+                        );
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP INQUADRAMENTO FISCALE ---
+  Widget _buildStepInquadramentoFiscaleSleek() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Parametri Fiscali', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          Text('Imposta l\'aliquota e gli eventuali acconti versati:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 32),
+
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(24), border: Border.all(color: borderDark)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('ALIQUOTA SOSTITUTIVA', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                const SizedBox(height: 16),
+                _buildSegmentedControl(
+                  options: ['5%', '15%'],
+                  labels: const ['5% (Primi 5 anni)', '15% (Standard)'],
+                  selectedValue: aliquotaTasse,
+                  onChanged: (val) => setState(() => aliquotaTasse = val),
+                ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
 
-            // BOX INFO ALIQUOTA AUTOMATICA
-            if (annoAperturaPiva != null) ...[
-              const SizedBox(height: 24),
+          _buildHeroCard(
+            title: 'ACCONTI F24 GIÀ VERSATI',
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _accontiController,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    style: TextStyle(color: textWhite, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.0),
+                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                  ),
+                ),
+                Text('€ crediti', style: TextStyle(color: brandTeal, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP CONTI BANCARI ---
+  Widget _buildStepContiBancariSleek() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('I tuoi Conti', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+              InkWell(
+                onTap: _aggiungiNuovoConto,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: brandTeal.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_rounded, color: brandTeal, size: 16),
+                      const SizedBox(width: 4),
+                      Text('Aggiungi', style: TextStyle(color: brandTeal, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Rinomina i conti e inserisci il saldo attuale:', style: TextStyle(color: textMuted, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 24),
+
+          Expanded(
+            child: ListView.separated(
+              itemCount: _contiList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = _contiList[index];
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderDark)),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: bgDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderDark)),
+                        child: Icon(item.ruoloDefault == 'tasse' ? Icons.lock_rounded : Icons.account_balance_wallet_rounded, color: textWhite, size: 18),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: item.nomeController,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(color: textWhite, fontSize: 15, fontWeight: FontWeight.bold),
+                              decoration: InputDecoration(border: InputBorder.none, isDense: true, hintText: 'Nome', hintStyle: TextStyle(color: textMuted), contentPadding: EdgeInsets.zero),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text('Saldo: ', style: TextStyle(color: textMuted, fontSize: 12)),
+                                Expanded(
+                                  child: TextField(
+                                    controller: item.saldoController,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                    style: TextStyle(color: brandTeal, fontSize: 14, fontWeight: FontWeight.bold),
+                                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                                  ),
+                                ),
+                                Text('€', style: TextStyle(color: brandTeal, fontSize: 14, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (item.id != 'main_account' && item.id != 'tax_account')
+                        IconButton(
+                          icon: Icon(Icons.remove_circle_outline_rounded, color: textMuted, size: 20),
+                          onPressed: () => _rimuoviConto(index),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP FINALE ESITO ANALISI ---
+  Widget _buildStepSostenibilitaSleek() {
+    final sost = _calcolaSostenibilita();
+    final double nettoTotaleMese = sost['nettoTotaleMese']!;
+    final double gapMese = sost['gapMese']!;
+    final int mesiOff = sost['mesiOff']!;
+    final double quotaCuscinettoMese = sost['quotaCuscinettoMese']!;
+    final bool cuscinettoCoperto = sost['cuscinettoCoperto']!;
+    final double extraFatturatoAnnoPiva = sost['extraFatturatoAnnoPiva']!;
+    final double extraFatturatoMesePiva = sost['extraFatturatoMesePiva']!;
+    final double nettoTargetMese = double.tryParse(_nettoTargetController.text.replaceAll('.', '')) ?? 2000.0;
+    
+    final bool isSostenibile = gapMese <= 0;
+    final Color statusColor = isSostenibile ? brandTeal : const Color(0xFFF97316);
+    final Color statusBgHeader = isSostenibile ? const Color(0xFF064E3B) : const Color(0xFF451A03);
+    final double percentage = nettoTargetMese > 0 
+        ? (nettoTotaleMese / nettoTargetMese).clamp(0.0, 1.0) 
+        : 0.0;
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isSostenibile ? 'Obiettivo Coperto!' : 'Attenzione al Target',
+              style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isSostenibile 
+                  ? 'Il tuo piano finanziario copre interamente il tuo fabbisogno.' 
+                  : 'Le entrate attuali non coprono del tutto il target desiderato.',
+              style: TextStyle(color: textMuted, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 24),
+
+            // HERO CARD A IMPATTO VISIVO CON PROGRESS BAR
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [statusBgHeader.withOpacity(0.6), cardDark],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: statusColor, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withOpacity(0.2),
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                  )
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: statusColor.withOpacity(0.4)),
+                          boxShadow: [
+                            BoxShadow(color: statusColor.withOpacity(0.3), blurRadius: 12)
+                          ],
+                        ),
+                        child: Icon(
+                          isSostenibile ? Icons.rocket_launch_rounded : Icons.warning_amber_rounded,
+                          color: statusColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isSostenibile ? 'PIANO OTTIMALE' : 'TARGET GAP',
+                                style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isSostenibile 
+                                  ? 'Target Netto Raggiunto' 
+                                  : 'Mancano ${formatEuro(gapMese)} € / mese',
+                              style: TextStyle(color: textWhite, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // BARRA DI PROGRESSO GRAFICA (VISUAL GAUGE)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Copertura Target', style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('${(percentage * 100).toStringAsFixed(0)}%', style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          children: [
+                            Container(height: 10, color: bgDark),
+                            FractionallySizedBox(
+                              widthFactor: percentage,
+                              child: Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [BoxShadow(color: statusColor.withOpacity(0.5), blurRadius: 8)],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+                  Container(height: 1, color: borderDark),
+                  const SizedBox(height: 18),
+
+                  // NUMERI A CONFRONTO CON IL PUNTO PER LE MIGLIAIA
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('NETTO STIMATO', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                          const SizedBox(height: 4),
+                          Text('${formatEuro(nettoTotaleMese)} €', style: TextStyle(color: textWhite, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                          Text('al mese', style: TextStyle(color: textMuted, fontSize: 11)),
+                        ],
+                      ),
+                      Container(height: 40, width: 1, color: borderDark),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('TARGET', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                          const SizedBox(height: 4),
+                          Text('${formatEuro(nettoTargetMese)} €', style: TextStyle(color: statusColor, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                          Text('desiderato', style: TextStyle(color: textMuted, fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // CHIARIFICATO: LE OPZIONI SONO ALTERNATIVE
+            if (!isSostenibile)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF101618),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF1F2937)),
+                  color: statusColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.lightbulb_rounded, color: statusColor, size: 20),
+                        const SizedBox(width: 8),
+                        Text('SCEGLI UNA DI QUESTE ALTERNATIVE:', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Opzione Partita IVA (se attiva)
+                    if (hasPiva) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.add_chart_rounded, color: Colors.white70, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Opzione A: Aumenta il Fatturato P.IVA di +${formatEuro(extraFatturatoAnnoPiva)} €/anno (+${formatEuro(extraFatturatoMesePiva)} €/mese nei tuoi $_mesiAttiviConteggio mesi attivi)',
+                              style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (hasDipendente) const SizedBox(height: 8),
+                    ],
+
+                    // Opzione Lavoro Dipendente (se attivo)
+                    if (hasDipendente) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.work_outline_rounded, color: Colors.white70, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${hasPiva ? "Opzione B: Oppure adegua" : "Opzione A: Adegua"} lo Stipendio Dipendente di +${formatEuro(gapMese)} € netti/mese',
+                              style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    // Nota per la Pensione (non modificabile)
+                    if (hasPensione) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: Colors.white70, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Nota: la Pensione non è modificabile. Per coprire il gap di ${formatEuro(gapMese)} €/mese valuta l\'apertura o l\'incremento di un\'attività autonoma P.IVA.',
+                              style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // ANALISI DEDICATA DEL CUSCINETTO MESI OFF
+            if (mesiOff > 0)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardDark,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: cuscinettoCoperto ? brandTeal.withOpacity(0.5) : const Color(0xFFF97316).withOpacity(0.5)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,475 +1264,140 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
                     Row(
                       children: [
                         Icon(
-                          aliquotaTasse == '5%' ? Icons.eco_rounded : Icons.work_outline_rounded,
-                          color: aliquotaTasse == '5%' ? const Color(0xFF2DD4BF) : const Color(0xFF3B82F6),
+                          Icons.beach_access_rounded, 
+                          color: cuscinettoCoperto ? brandTeal : const Color(0xFFF97316), 
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          aliquotaTasse == '5%' ? 'Aliquota Agevolata Startup (5%)' : 'Aliquota Standard (15%)',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          'CUSCINETTO $mesiOff MESI OFF:', 
+                          style: TextStyle(
+                            color: cuscinettoCoperto ? brandTeal : const Color(0xFFF97316), 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 12, 
+                            letterSpacing: 1.0,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      annoAperturaPiva == 2021
-                          ? 'Avendo aperto da oltre 5 anni, la tua imposta sostitutiva è passata alla misura standard del 15%.'
-                          : 'Sei nei primi 5 anni di attività: hai diritto al 5% (a meno che tu non abbia aperto senza requisiti startup; in tal caso seleziona 15% qui sotto).',
-                      style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-                    ),
-                    if (annoAperturaPiva != 2021) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => setState(() => aliquotaTasse = (aliquotaTasse == '5%' ? '15%' : '5%')),
-                            child: Text(
-                              aliquotaTasse == '5%' ? 'Non ho requisiti startup -> Passa al 15%' : 'Torna al 5% Startup',
-                              style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, decoration: TextDecoration.underline),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-            
-            if (aliquotaTasse != null) ...[
-              const SizedBox(height: 32),
-              const Text('CERCA O SELEZIONA CODICE ATECO PRINCIPALE', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-              const SizedBox(height: 12),
-              _buildCustomTextField(
-                controller: _searchController,
-                hintText: 'es. 855209 o professione...',
-                icon: Icons.search_rounded,
-                onChanged: (val) => setState(() => _searchQuery = val),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF101618).withOpacity(0.88), 
-                  borderRadius: BorderRadius.circular(24), 
-                  border: Border.all(color: const Color(0xFF1F2937))
-                ),
-                // 🧠 LOGICA SMART: Se la barra è vuota mostra i Top 3, altrimenti cerca su Firebase!
-                child: _searchQuery.isEmpty
-                    ? Column(
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 16, bottom: 8),
-                            child: Text('🔥 I PIÙ SCELTI IN ITALIA', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                          ),
-                          _buildRevolutListTile(
-                            icon: Icons.laptop_mac_rounded, 
-                            title: 'Consulenza & Digital (78%)', 
-                            subtitle: 'Es. 74.10.21 - IT, Marketing, Design', 
-                            isSelected: codiceAtecoSelezionato?.startsWith('74.10.21') ?? false, 
-                            onTap: () => _selectAtecoPreset(0.78, '74.10.21 - Consulenza & Digital')
-                          ),
-                          const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
-                          _buildRevolutListTile(
-                            icon: Icons.storefront_rounded, 
-                            title: 'Commercio & E-commerce (40%)', 
-                            subtitle: 'Es. 47.91.10 - Vendita online, Dropshipping', 
-                            isSelected: codiceAtecoSelezionato?.startsWith('47.91.10') ?? false, 
-                            onTap: () => _selectAtecoPreset(0.40, '47.91.10 - Commercio & E-commerce')
-                          ),
-                          const Divider(height: 1, color: Color(0xFF1F2937), indent: 64),
-                          _buildRevolutListTile(
-                            icon: Icons.build_rounded, 
-                            title: 'Artigiani & Ristorazione (40%)', 
-                            subtitle: 'Es. 56.10.11 - Produzione, Bar, Parrucchieri', 
-                            isSelected: codiceAtecoSelezionato?.startsWith('56.10.11') ?? false, 
-                            onTap: () => _selectAtecoPreset(0.40, '56.10.11 - Artigiani & Ristorazione')
-                          ),
-                        ],
+                    const SizedBox(height: 10),
+                    if (cuscinettoCoperto)
+                      Text(
+                        'Cuscinetto ampiamente gestibile! Nei tuoi $_mesiAttiviConteggio mesi di lavoro incasserai circa ${formatEuro(sost["nettoMeseNeiMesiAttivi"])} €/mese netti. Accantonando +${formatEuro(quotaCuscinettoMese)} €/mese coprirai i $mesiOff mesi di pausa garantendoti il tuo target mensile.',
+                        style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
                       )
-                    : (atecoFiltrati.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.all(20), 
-                            child: Center(child: Text('Nessun codice ATECO trovato', style: TextStyle(color: Colors.white54, fontSize: 12)))
-                          )
-                        : ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: atecoFiltrati.length,
-                            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFF1F2937), indent: 16),
-                            itemBuilder: (context, index) {
-                              final item = atecoFiltrati[index];
-                              final isSelected = codiceAtecoSelezionato != null && codiceAtecoSelezionato!.startsWith(item['codice'].toString());
-                              final double coef = (item['coef'] as num).toDouble();
-
-                              return Container(
-                                color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
-                                child: ListTile(
-                                  onTap: () {
-                                    FocusScope.of(context).unfocus();
-                                    setState(() {
-                                      coefficienteRedditivita = coef;
-                                      codiceAtecoSelezionato = '${item['codice']} - ${item['descrizione']}';
-                                    });
-                                    _scrollToBottom();
-                                  },
-                                  title: Row(
-                                    children: [
-                                      Text(item['codice'], style: TextStyle(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
-                                        decoration: BoxDecoration(color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF1F2937), borderRadius: BorderRadius.circular(6)), 
-                                        child: Text('${(coef * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ),
-                                  subtitle: Text(item['descrizione'], style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12)),
-                                  trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 22) : const Icon(Icons.circle_outlined, color: Colors.white24, size: 20),
-                                ),
-                              );
-                            }
-                          )
+                    else
+                      Text(
+                        'Attenzione al cuscinetto: con il reddito stimato attuale, non riesci ad accantonare abbastanza nei mesi lavorativi per coprire i tuoi $mesiOff mesi di pausa mantenendo il target desiderato.',
+                        style: TextStyle(color: textWhite.withOpacity(0.9), fontSize: 12, height: 1.3),
                       ),
-                  ),
-                ],
-              ],
-            ],
-          ),
-        );
-      }
-
-  void _selectAtecoPreset(double coef, String str) {
-    setState(() {
-      coefficienteRedditivita = coef;
-      codiceAtecoSelezionato = str;
-    });
-    _scrollToBottom();
-  }
-
-  // STEP 2: CONTRIBUTI & ACCONTI F24
-  Widget _buildStep2() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Situazione Contributiva', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Oltre alla P.IVA, hai un contratto da dipendente?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-          const SizedBox(height: 20),
-          
-          _buildRevolutListTile(icon: Icons.close_rounded, title: 'No, solo Partita IVA', subtitle: 'Lavoro in proprio al 100%', isSelected: tipoLavoroDipendente == 'nessuno', onTap: () => setState(() => tipoLavoroDipendente = 'nessuno')),
-          const SizedBox(height: 8),
-          _buildRevolutListTile(icon: Icons.work, title: 'Sì, Full-Time', subtitle: 'Esenzione contributi INPS P.IVA', isSelected: tipoLavoroDipendente == 'full', onTap: () => setState(() => tipoLavoroDipendente = 'full')),
-          const SizedBox(height: 8),
-          _buildRevolutListTile(icon: Icons.timelapse_rounded, title: 'Sì, Part-Time', subtitle: 'Riduzione contributi INPS', isSelected: tipoLavoroDipendente == 'part_over50' || tipoLavoroDipendente == 'part_under50', onTap: () => setState(() => tipoLavoroDipendente = 'part_over50')),
-          
-          if (tipoLavoroDipendente == 'part_over50' || tipoLavoroDipendente == 'part_under50') ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF0D9488).withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.3))),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Dettaglio Part-Time', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildProfileCard(id: 'part_over50', icon: Icons.keyboard_double_arrow_up_rounded, title: 'Più del 50%', subtitle: 'Es. > 20h', activeColor: const Color(0xFF0D9488), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildProfileCard(id: 'part_under50', icon: Icons.keyboard_double_arrow_down_rounded, title: 'Fino al 50%', subtitle: 'Es. <= 20h', activeColor: const Color(0xFF3B82F6), groupValue: tipoLavoroDipendente, onChanged: (v) => setState(() => tipoLavoroDipendente = v))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-          const Text('IL TUO GRUZZOLETTO (F24 ANNO SCORSO)', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-          const SizedBox(height: 12),
-          _buildCustomTextField(
-            controller: _accontiController,
-            hintText: 'Es. 1500 (Lascia 0 se è il 1° anno)',
-            icon: Icons.savings_rounded,
-            keyboardType: TextInputType.number,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // STEP 3: OBIETTIVO NETTO
-  Widget _buildStep3() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Obiettivo di Vita', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Qual è lo stipendio netto mensile di cui hai bisogno per vivere sereno?', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-          const SizedBox(height: 32),
-          
-          Center(
-            child: Container(
-              width: 200,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF101618), border: Border.all(color: const Color(0xFF2DD4BF), width: 2), boxShadow: [BoxShadow(color: const Color(0xFF2DD4BF).withOpacity(0.2), blurRadius: 20, spreadRadius: 5)]),
-              child: Column(
-                children: [
-                  const Text('NETTO TARGET', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      IntrinsicWidth(
-                        child: TextField(
-                          controller: _nettoTargetController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
-                          decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
-                        ),
-                      ),
-                      const Padding(padding: EdgeInsets.only(bottom: 6.0, left: 4.0), child: Text('€', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 24, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          const Center(child: Text('L\'app utilizzerà questo valore per calcolare\nla sostenibilità delle tue entrate.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF6B7280), fontSize: 13))),
-        ],
-      ),
-    );
-  }
-
-  // STEP 4: PROIEZIONE, MESI ATTIVI & VERDETTO INTELLIGENTE
-  Widget _buildStep4() {
-    final verdetto = _calcolaVerdetto();
-    final double nettoMese = verdetto['nettoMese']!;
-    final double gapMese = verdetto['gapMese']!;
-    final double extraFatturatoAnno = verdetto['extraFatturatoAnno']!;
-    final double extraFatturatoMese = verdetto['extraFatturatoMese']!;
-    final double nettoTargetMese = double.tryParse(_nettoTargetController.text) ?? 2000.0;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Proiezione & Verdetto', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Stima gli incassi lordi da P.IVA e seleziona i mesi di lavoro.', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-          const SizedBox(height: 24),
-          
-          const Text('FATTURATO LORDO P.IVA STIMATO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-          const SizedBox(height: 4),
-          const Text('Inserisci solo il lordo P.IVA (escludi lo stipendio da dipendente)', style: TextStyle(color: Color(0xFF6B7280), fontSize: 11)),
-          const SizedBox(height: 8),
-          _buildCustomTextField(
-            controller: _fatturatoController,
-            hintText: 'Es. 35000',
-            icon: Icons.trending_up_rounded,
-            keyboardType: TextInputType.number,
-            onChanged: (v) => setState(() {}),
-          ),
-          
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('MESI DI ATTIVITÀ / INCASSO', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-              Text('$_mesiAttiviConteggio / 12 Mesi', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: List.generate(12, (index) {
-              final isSelected = _mesiAttiviState[index];
-              return ChoiceChip(
-                label: Text(_nomiMesi[index], style: TextStyle(color: isSelected ? Colors.black : Colors.white70, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                selected: isSelected,
-                selectedColor: const Color(0xFF2DD4BF),
-                backgroundColor: const Color(0xFF101618),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(
-                    color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937),
-                  ),
-                ),                onSelected: (bool selected) {
-                  setState(() {
-                    _mesiAttiviState[index] = selected;
-                  });
-                },
-              );
-            }),
-          ),
-
-          const SizedBox(height: 32),
-          
-          // CARD VERDETTO FINALE
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF101618),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B), width: 1.5),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      gapMese <= 0 ? '🎉 Sostenibile!' : '⚠️ Attenzione al Target',
-                      style: TextStyle(color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Icon(gapMese <= 0 ? Icons.check_circle_rounded : Icons.warning_amber_rounded, color: gapMese <= 0 ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B)),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Netto Mensile Stimato:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                    Text('${nettoMese.toStringAsFixed(0)} € / mese', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const Divider(height: 20, color: Color(0xFF1F2937)),
-                
-                if (gapMese <= 0)
-                  Text(
-                    'Il tuo fatturato stimato ti permette di superare il tuo obiettivo netto mensile di ${nettoTargetMese.toStringAsFixed(0)} €!',
-                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-                  )
-                else ...[
-                  Text(
-                    'Ti mancano circa ${gapMese.toStringAsFixed(0)} € netti al mese per raggiungere il tuo obiettivo di ${nettoTargetMese.toStringAsFixed(0)} €.',
-                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('SUGGERIMENTI DI INTEGRATIVI:', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.add_chart_rounded, color: Color(0xFF2DD4BF), size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Incrementa il Fatturato P.IVA di +${extraFatturatoAnno.toStringAsFixed(0)} €/anno (+${extraFatturatoMese.toStringAsFixed(0)} € nei ${_mesiAttiviConteggio} mesi attivi)',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.work_outline_rounded, color: Color(0xFF3B82F6), size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Oppure integra +${gapMese.toStringAsFixed(0)} € netti/mese da un lavoro Dipendente',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
+              ),
 
-  // COMPONENTI GRAFICI RIUTILIZZABILI
-  Widget _buildCustomTextField({required TextEditingController controller, required String hintText, required IconData icon, Function(String)? onChanged, TextInputType? keyboardType}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(color: const Color(0xFF101618).withOpacity(0.85), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1F2937))),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: const TextStyle(color: Colors.white, fontSize: 15),
-        onChanged: onChanged,
-        decoration: InputDecoration(icon: Icon(icon, color: const Color(0xFF9CA3AF)), hintText: hintText, hintStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14), border: InputBorder.none),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard({required String id, required IconData icon, required String title, required String subtitle, required Color activeColor, String? groupValue, Function(String)? onChanged}) {
-    final bool isSelected = (groupValue ?? tipoProfilo) == id;
-    return GestureDetector(
-      onTap: () => (onChanged != null) ? onChanged(id) : setState(() => tipoProfilo = id),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: isSelected ? activeColor.withOpacity(0.15) : const Color(0xFF101618), borderRadius: BorderRadius.circular(20), border: Border.all(color: isSelected ? activeColor : const Color(0xFF1F2937), width: isSelected ? 2 : 1)),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? activeColor : Colors.grey, size: 32),
-            const SizedBox(height: 10),
-            Text(title, style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF9CA3AF), fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11), textAlign: TextAlign.center),
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderQuickAction({required IconData icon, required String label, required String subtitle, required bool isSelected, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
+  // --- WIDGET HELPER ---
+
+  Widget _buildHeroCard({required String title, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cardDark,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: brandTeal.withOpacity(0.5), width: 1),
+        boxShadow: [BoxShadow(color: brandTeal.withOpacity(0.05), blurRadius: 20, spreadRadius: 0)],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AnimatedContainer(duration: const Duration(milliseconds: 150), width: 60, height: 60, decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : const Color(0xFF101618), border: Border.all(color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937), width: 2)), child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 26)),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF9CA3AF), fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-          Text(subtitle, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10)),
+          Text(title, style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const SizedBox(height: 16),
+          child,
         ],
       ),
     );
   }
 
-  Widget _buildRevolutListTile({required IconData icon, required String title, required String subtitle, required bool isSelected, required VoidCallback onTap}) {
+  Widget _buildSelectableSleekCard({required String title, required String subtitle, required IconData icon, required bool isSelected, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected ? brandTeal.withOpacity(0.05) : cardDark,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: isSelected ? brandTeal : borderDark, width: isSelected ? 1.5 : 1),
+          boxShadow: isSelected ? [BoxShadow(color: brandTeal.withOpacity(0.1), blurRadius: 16)] : [],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: isSelected ? brandTeal : bgDark, borderRadius: BorderRadius.circular(16)),
+              child: Icon(icon, color: isSelected ? bgDark : textWhite, size: 22),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: textWhite, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(color: textMuted, fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(isSelected ? Icons.check_circle_rounded : Icons.circle_outlined, color: isSelected ? brandTeal : borderDark, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentedControl({required List<String> options, List<String>? labels, required String selectedValue, required Function(String) onChanged, String? suffix}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.1) : const Color(0xFF101618), borderRadius: BorderRadius.circular(16), border: Border.all(color: isSelected ? const Color(0xFF2DD4BF) : const Color(0xFF1F2937))),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(color: bgDark, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderDark)),
+      child: Row(
+        children: List.generate(options.length, (index) {
+          final isSelected = selectedValue.replaceAll('.', '') == options[index].replaceAll('.', '');
+          return Expanded(
+            child: InkWell(
+              onTap: () => onChanged(options[index]),
+              borderRadius: BorderRadius.circular(12),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: isSelected ? cardDark : Colors.transparent, borderRadius: BorderRadius.circular(12), border: Border.all(color: isSelected ? borderDark : Colors.transparent)),
+                child: Text(labels != null ? labels[index] : '${options[index]}${suffix ?? ''}', style: TextStyle(color: isSelected ? brandTeal : textMuted, fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildPill({required String label, required bool isSelected, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(width: 38, height: 38, decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF1F2937)), child: Icon(icon, color: Colors.white, size: 18)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: TextStyle(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text(subtitle, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11)),
-                  ],
-                ),
-              ),
-              if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF2DD4BF), size: 18),
-            ],
-          ),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(color: isSelected ? brandTeal.withOpacity(0.12) : bgDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: isSelected ? brandTeal : borderDark, width: isSelected ? 1.5 : 1)),
+          child: Text(label, style: TextStyle(color: isSelected ? brandTeal : textMuted, fontWeight: FontWeight.bold, fontSize: 13)),
         ),
       ),
     );
