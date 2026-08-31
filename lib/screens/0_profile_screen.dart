@@ -1,4 +1,5 @@
-// 📍 INIZIO CODICE COMPLETO: lib/screens/0_profile_screen.dart
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,8 +14,22 @@ import '../widgets_shared/app_image_picker.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  
+  ImageProvider? _getAvatarImage(String? pathOrUrl) {
+    if (pathOrUrl == null || pathOrUrl.isEmpty) return null;
+    if (kIsWeb || pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('blob:')) {
+      return NetworkImage(pathOrUrl);
+    }
+    return FileImage(File(pathOrUrl));
+  }
 
   Future<void> _apriLink(BuildContext context, String urlString) async {
     final Uri url = Uri.parse(urlString);
@@ -43,9 +58,12 @@ class ProfileScreen extends StatelessWidget {
         if (user != null) {
           await user.updatePhotoURL(immagine.path);
           await user.reload();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Foto profilo aggiornata con successo!')),
+          if (mounted) {
+            setState(() {});
+            AppNotifications.mostraInAlto(
+              context,
+              'Foto profilo aggiornata con successo! 🎉',
+              type: NotificationType.success,
             );
           }
         }
@@ -130,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        automaticallyImplyLeading: false, // 🚫 FRECCIA ELIMINATA COMPLETAMENTE
+        automaticallyImplyLeading: false,
         title: const Text(
           'Profilo & Impostazioni',
           style: TextStyle(
@@ -156,7 +174,6 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-          
           Container(
             height: headerHeight,
             decoration: BoxDecoration(
@@ -171,7 +188,6 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -215,19 +231,24 @@ class ProfileScreen extends StatelessWidget {
                                     width: 2,
                                   ),
                                 ),
-                                child: CircleAvatar(
-                                  radius: 26,
-                                  backgroundColor: (walletProvider.isProUser ? coloreOro : coloreOttanio).withOpacity(0.15),
-                                  backgroundImage: FirebaseAuth.instance.currentUser?.photoURL != null
-                                      ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
-                                      : null,
-                                  child: FirebaseAuth.instance.currentUser?.photoURL == null
-                                      ? Icon(
-                                          Icons.person_rounded,
-                                          color: walletProvider.isProUser ? coloreOro : coloreOttanio,
-                                          size: 30,
-                                        )
-                                      : null,
+                                child: Builder(
+                                  builder: (context) {
+                                    final photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+                                    final imageProvider = _getAvatarImage(photoUrl);
+
+                                    return CircleAvatar(
+                                      radius: 26,
+                                      backgroundColor: (walletProvider.isProUser ? coloreOro : coloreOttanio).withOpacity(0.15),
+                                      backgroundImage: imageProvider,
+                                      child: imageProvider == null
+                                          ? Icon(
+                                              Icons.person_rounded,
+                                              color: walletProvider.isProUser ? coloreOro : coloreOttanio,
+                                              size: 30,
+                                            )
+                                          : null,
+                                    );
+                                  },
                                 ),
                               ),
                               Positioned(
@@ -408,10 +429,10 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     Divider(color: Colors.white.withOpacity(0.06), height: 1, indent: 60),
                     _buildListTile(
-                      icon: Icons.description_outlined,
+                      icon: Icons.cookie_outlined,
                       iconColor: coloreOttanio,
-                      title: 'Termini e Condizioni',
-                      subtitle: 'Condizioni generali di servizio',
+                      title: 'Cookie Policy',
+                      subtitle: 'Informativa sull\'uso dei cookie e tracciamento',
                       isExternal: true,
                       onTap: () => _apriLink(context, 'https://www.iubenda.com/privacy-policy/94892300/cookie-policy'),
                     ),
@@ -706,7 +727,6 @@ class _ProfiloSandboxScreenState extends State<ProfiloSandboxScreen> with Single
                           type: NotificationType.warning,
                         );
 
-                        // 👈 AGGIUNGI QUESTE RIGHE PER FAR RIPARTIRE L'ONBOARDING:
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (context) => const SplashScreen()),

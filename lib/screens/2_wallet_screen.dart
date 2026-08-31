@@ -24,10 +24,10 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   String _filtroMeseMovimenti = 'ultimi_5';
 
-  final Color oceanCyan  = const Color(0xFF38BDF8); 
-  final Color goldAccent = const Color(0xFFFBBF24); 
-  final Color purpleZen  = const Color(0xFFC084FC); 
-  final Color taxBlue    = const Color(0xFF60A5FA); 
+  final Color oceanCyan   = const Color(0xFF38BDF8); 
+  final Color goldAccent  = const Color(0xFFFBBF24); 
+  final Color purpleZen   = const Color(0xFFC084FC); 
+  final Color taxBlue     = const Color(0xFF60A5FA); 
 
   int _testIndex = 0;
 
@@ -652,8 +652,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
     final double residuoTasseDaCoprire = tasseDaAccantonare;
 
-    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
-
     final double sommaContiLiquidi = walletProvider.accounts
         .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
         .fold(0.0, (sum, a) => sum + a.amount);
@@ -695,7 +693,13 @@ class _WalletScreenState extends State<WalletScreen> {
 
     final double entratePeriodo = movimenti.where((tx) {
       if (!tx.isIncome) return false;
-      if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
+      final titleLower = tx.title.toLowerCase();
+      final catLower = tx.category.toLowerCase();
+
+      if (catLower == 'giroconto' ||
+          titleLower.contains('giroconto') ||
+          titleLower.contains('saldo iniziale') ||
+          catLower == 'risparmi') return false;
 
       if (_isVistaAnnuale) {
         return tx.date.year == _dataFiltroRipartizione.year;
@@ -705,11 +709,15 @@ class _WalletScreenState extends State<WalletScreen> {
       }
     }).fold(0.0, (sum, tx) => sum + tx.amount);
 
-    final double entrateRiferimento = entratePeriodo > 0 ? entratePeriodo : walletProvider.fatturatoTotale;
+    final double targetBase = _isVistaAnnuale ? (walletProvider.nettoTargetMensile * 12) : walletProvider.nettoTargetMensile;
+    // Nel passato/presente le entrate di riferimento devono essere esattamente quelle reali (anche se sono 0)
+    final double entrateRiferimento = entratePeriodo; 
 
-    final double targetBisogni = entrateRiferimento * 0.50;
-    final double targetSvago = entrateRiferimento * 0.30;
-    final double targetRisparmio = entrateRiferimento * 0.20;
+    // I target di spesa si basano sull'obiettivo dell'Onboarding o su quanto hai realmente incassato se sei sopra al target
+    final double basePerTarget = entratePeriodo > targetBase ? entratePeriodo : (targetBase > 0 ? targetBase : 2500.0);
+    final double targetBisogni = basePerTarget * 0.50;
+    final double targetSvago = basePerTarget * 0.30;
+    final double targetRisparmio = basePerTarget * 0.20;
 
     final List<dynamic> movimentiFiltrati = (() {
       final lista = List.from(movimenti);
@@ -871,10 +879,10 @@ class _WalletScreenState extends State<WalletScreen> {
                               titolo: 'Netto Reale Spendibile',
                               descrizione:
                                   'È la liquidità che puoi spendere in totale serenità. '
-                                  'Calcolata sottraendo al tuo saldo le tasse stimate e la quota accantonata per i tuoi mesi di pausa/ferie (${walletProvider.mesiAttivi} mesi lavorativi su 12).',
+                                  'Calcolata sottraendo al tuo patrimonio totale le tasse stimate e la quota accantonata per i tuoi mesi di pausa/ferie (${walletProvider.mesiAttivi} mesi lavorativi su 12).',
                               formula:
-                                  '💰 Saldi Conti: ${_formattaInt(sommaContiLiquidi)}\n'
-                                  '🛡️ Riserva Tasse: -${_formattaInt(residuoTasseDaCoprire)}\n'
+                                  '💰 Patrimonio Totale: ${_formattaInt(patrimonioNetto)}\n'
+                                  '🛡️ Riserva Tasse Totale: -${_formattaInt(tasseTotaliCalcolate)}\n'
                                   '🏖️ Fondo Mesi Off: -${_formattaInt(cuscinettoFerie)}\n'
                                   '──────────────────────\n'
                                   '✨ Netto Spendibile: ${_formattaInt(nettoRealeSpendibile)}',
@@ -944,6 +952,8 @@ class _WalletScreenState extends State<WalletScreen> {
                       const SizedBox(height: 24),
 
                       _buildTipAccreditoStipendio(walletProvider),
+
+                      _buildBannerRicalibrazioneSmart(walletProvider),
 
                       _buildRipartizioneSpeseGlass(
                         spesoBisogni: spesoRealeBisogni,
@@ -1222,15 +1232,361 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  Widget _buildBannerRicalibrazioneSmart(WalletProvider walletProvider) {
+    if (walletProvider.haRispostoRicalibrazione) return const SizedBox.shrink();
+
+    final String ritmo = walletProvider.statoRitmoFatturato;
+    if (ritmo == 'in_linea') return const SizedBox.shrink();
+
+    final bool isOver = ritmo == 'over';
+    final Color coloreBanner = isOver ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B);
+    final String targetFormattato = _formattaInt(walletProvider.fatturatoStimato);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: coloreBanner.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: coloreBanner.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isOver ? Icons.trending_up_rounded : Icons.warning_amber_rounded,
+                    color: coloreBanner,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isOver ? '🚀 Ritmo Fatturato Superiore' : '⚠️ Forte Scostamento Ritmo',
+                    style: TextStyle(color: coloreBanner, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => walletProvider.impostaRispostaRicalibrazione(true),
+                child: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isOver
+                ? 'Stai fatturando più del previsto rispetto al target di $targetFormattato. Vuoi ricalibrare l\'obiettivo annuo?'
+                : 'Ad oggi hai fatturato ${_formattaInt(walletProvider.fatturatoTotale)} su $targetFormattato. Per raggiungere il target dovresti fatturare a ritmi molto elevati nei mesi ON rimasti.',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, height: 1.3),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: coloreBanner,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () => _mostraModalRicalibrazioneTarget(context, walletProvider, isOver),
+                  child: const Text(
+                    'Modifica Target 🎯',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () {
+                  walletProvider.impostaRispostaRicalibrazione(true);
+                  AppNotifications.mostraInAlto(context, 'Target annuo di $targetFormattato confermato.');
+                },
+                child: Text('Mantieni $targetFormattato', style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostraModalRicalibrazioneTarget(BuildContext context, WalletProvider walletProvider, bool isOver) {
+    const bool simulaStoricoAnnoScorso = true; 
+    const double fatturatoAnnoScorsoFinoAdOggi = 22000.0;
+    const double fatturatoAnnoScorsoRestante = 38000.0;
+
+    final double fatturatoMancanteYTG = (walletProvider.fatturatoStimato - walletProvider.fatturatoTotale).clamp(0.0, double.infinity);
+
+    final int meseCorrente = DateTime.now().month;
+    int mesiRimanentiOn = 0;
+    for (int i = meseCorrente - 1; i < 12; i++) {
+      if (walletProvider.mesiAttiviState.length > i && walletProvider.mesiAttiviState[i]) {
+        mesiRimanentiOn++;
+      }
+    }
+    final double quotaMensileLordaNecessaria = mesiRimanentiOn > 0 ? (fatturatoMancanteYTG / mesiRimanentiOn) : 0.0;
+
+    final TextEditingController targetCtrl = TextEditingController(
+      text: walletProvider.fatturatoStimato.toStringAsFixed(0),
+    );
+
+    AppPopupWrapper.mostra(
+      context: context,
+      child: Material(
+        color: const Color(0xFF1F2428),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isOver ? Icons.auto_graph_rounded : Icons.tune_rounded,
+                          color: isOver ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Ricalibrazione Target',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Column(
+                            children: [
+                              const Text('TARGET ANNUO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text(_formattaInt(walletProvider.fatturatoStimato), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Container(height: 24, width: 1, color: Colors.white24),
+                          Column(
+                            children: [
+                              const Text('REALIZZATO AD OGGI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text(_formattaInt(walletProvider.fatturatoTotale), style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Fatturato da realizzare (YTG):', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                          Text(_formattaInt(fatturatoMancanteYTG), style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Ritmo sui $mesiRimanentiOn mesi attivi rimasti:', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                          Text('${_formattaInt(quotaMensileLordaNecessaria)} / mese lordi', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (simulaStoricoAnnoScorso) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.25)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.history_rounded, color: Color(0xFF38BDF8), size: 14),
+                            SizedBox(width: 6),
+                            Text('STORICO ANNO SCORSO (2025)', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Fatturato Gen - Ago 2025:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                            Text(_formattaInt(fatturatoAnnoScorsoFinoAdOggi), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Fatturato Set - Dic 2025:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                            Text(_formattaInt(fatturatoAnnoScorsoRestante), style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                const Text('NUOVO TARGET FATTURATO ANNUO (€)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: targetCtrl,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.4),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    suffixText: '€ / Anno',
+                    suffixStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isOver ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      final double nuovoTarget = double.tryParse(targetCtrl.text.replaceAll('.', '')) ?? walletProvider.fatturatoStimato;
+                      
+                      walletProvider.salvaProfiloFiscale(
+                        codiceAteco: walletProvider.codiceAteco,
+                        coeffRedditivitaVal: walletProvider.coeffRedditivita,
+                        aliquotaImpostaVal: walletProvider.aliquotaImposta,
+                        accontiVersati: walletProvider.accontiVersati,
+                        nettoTarget: walletProvider.nettoTargetMensile,
+                        fatturatoStimato: nuovoTarget,
+                        mesiAttivi: walletProvider.mesiAttivi,
+                        annoAperturaPiva: walletProvider.annoAperturaPiva,
+                        meseAperturaPiva: walletProvider.meseAperturaPiva,
+                      );
+
+                      walletProvider.impostaRispostaRicalibrazione(true);
+                      Navigator.pop(context);
+
+                      AppNotifications.mostraInAlto(
+                        context,
+                        'Target Annuo aggiornato a ${_formattaInt(nuovoTarget)}! 🎯',
+                      );
+                    },
+                    child: const Text('Salva Nuovo Target', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRipartizioneSpeseGlass({
-    required double spesoBisogni, required double spesoSvago, required double spesoRisparmio,
-    required double totaleSpeseReali, required double targetBisogni, required double targetSvago,
-    required double targetRisparmio, required double entrateRiferimento,
+    required double spesoBisogni,
+    required double spesoSvago,
+    required double spesoRisparmio,
+    required double totaleSpeseReali,
+    required double targetBisogni,
+    required double targetSvago,
+    required double targetRisparmio,
+    required double entrateRiferimento,
   }) {
-    final bool sforatoBisogni = spesoBisogni > targetBisogni && targetBisogni > 0;
-    final bool sforatoSvago = spesoSvago > targetSvago && targetSvago > 0;
-    final double margineRisparmioReale = (entrateRiferimento - spesoBisogni - spesoSvago).clamp(0.0, entrateRiferimento);
-    final bool risparmioEroso = margineRisparmioReale < targetRisparmio && entrateRiferimento > 0;
+    final walletProvider = context.watch<WalletProvider>();
+    final DateTime ora = DateTime.now();
+
+    final bool isMeseFuturo = _dataFiltroRipartizione.year > ora.year ||
+        (_dataFiltroRipartizione.year == ora.year && _dataFiltroRipartizione.month > ora.month);
+
+    double entrateUso = 0.0;
+    double bisogniUso = spesoBisogni;
+    double svagoUso = spesoSvago;
+
+    // Target di riferimento teorici dall'Onboarding
+    final double targetBaseOnboarding = _isVistaAnnuale 
+        ? (walletProvider.nettoTargetMensile * 12) 
+        : walletProvider.nettoTargetMensile;
+
+    double tBisogni = targetBaseOnboarding * 0.50;
+    double tSvago = targetBaseOnboarding * 0.30;
+    double tRisparmio = targetBaseOnboarding * 0.20;
+
+    double calcoloRisparmioMese = 0.0;
+
+    if (isMeseFuturo) {
+      // 🔮 MESI FUTURI: Proiezione di Budget
+      entrateUso = walletProvider.getEntrataPrevistaMeseFuturo(_dataFiltroRipartizione);
+      tBisogni = entrateUso * 0.50;
+      tSvago = entrateUso * 0.30;
+      tRisparmio = entrateUso * 0.20;
+
+      bisogniUso = walletProvider.vociPianificate
+          .where((v) => v['categoria'] == 'Bisogni (50%)')
+          .fold(0.0, (sum, v) => sum + (v['previsto'] as num).toDouble());
+
+      svagoUso = walletProvider.vociPianificate
+          .where((v) => v['categoria'] == 'Svago (30%)')
+          .fold(0.0, (sum, v) => sum + (v['previsto'] as num).toDouble());
+
+      calcoloRisparmioMese = (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso);
+    } else {
+      // 📜 MESI PASSATI / CORRENTE: Consuntivo Reale (Zero invenzioni)
+      entrateUso = entrateRiferimento; // Incassi REALI registrati nei movimenti
+      
+      calcoloRisparmioMese = entrateUso > 0
+          ? (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso)
+          : 0.0; // Se 0 incassi reali, il risparmio reale è 0 €
+    }
+
+    final bool sforatoBisogni = bisogniUso > tBisogni && tBisogni > 0;
+    final bool sforatoSvago = svagoUso > tSvago && tSvago > 0;
+    final bool risparmioEroso = calcoloRisparmioMese < tRisparmio && entrateUso > 0;
     final bool haSforamenti = sforatoBisogni || sforatoSvago || risparmioEroso;
 
     return AnimatedSize(
@@ -1251,11 +1607,17 @@ class _WalletScreenState extends State<WalletScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: purpleZen.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                          color: purpleZen.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Icon(Icons.explore_rounded, color: purpleZen, size: 16),
                       ),
                       const SizedBox(width: 8),
-                      const Text('Bussola Spese (50/30/20)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'Bussola Spese (50/30/20)',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(width: 4),
                       Icon(
                         _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -1264,10 +1626,43 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: haSforamenti ? const Color(0xFFEF4444).withOpacity(0.2) : oceanCyan.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                    child: Text(haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio', style: TextStyle(color: haSforamenti ? const Color(0xFFEF4444) : oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isMeseFuturo
+                              ? purpleZen.withOpacity(0.2)
+                              : (haSforamenti ? const Color(0xFFEF4444).withOpacity(0.2) : oceanCyan.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isMeseFuturo
+                              ? '🔮 PIANO BUDGET'
+                              : (haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio'),
+                          style: TextStyle(
+                            color: isMeseFuturo ? purpleZen : (haSforamenti ? const Color(0xFFEF4444) : oceanCyan),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // 🎯 TASTO PERMANENTE PER APRIRE LA RICALIBRAZIONE IN OGNI MOMENTO
+                      InkWell(
+                        onTap: () => _mostraModalRicalibrazioneTarget(context, walletProvider, walletProvider.statoRitmoFatturato == 'over'),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withOpacity(0.15)),
+                          ),
+                          child: const Icon(Icons.tune_rounded, color: Colors.white70, size: 14),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1279,12 +1674,24 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   Row(
                     children: [
-                      InkWell(onTap: () => _cambiaPeriodoRipartizione(-1), child: Icon(Icons.chevron_left_rounded, color: oceanCyan)),
+                      InkWell(
+                        onTap: () => _cambiaPeriodoRipartizione(-1),
+                        child: Icon(Icons.chevron_left_rounded, color: oceanCyan),
+                      ),
                       const SizedBox(width: 8),
-                      Text(_isVistaAnnuale ? '${_dataFiltroRipartizione.year}' : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      Text(
+                        _isVistaAnnuale
+                            ? '${_dataFiltroRipartizione.year}'
+                            : '${_nomiMesiBrevi[_dataFiltroRipartizione.month - 1]} ${_dataFiltroRipartizione.year}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(width: 8),
-                      InkWell(onTap: () => _cambiaPeriodoRipartizione(1), child: Icon(Icons.chevron_right_rounded, color: oceanCyan)),
-                      if (_dataFiltroRipartizione.year != DateTime.now().year || _dataFiltroRipartizione.month != DateTime.now().month) ...[
+                      InkWell(
+                        onTap: () => _cambiaPeriodoRipartizione(1),
+                        child: Icon(Icons.chevron_right_rounded, color: oceanCyan),
+                      ),
+                      if (_dataFiltroRipartizione.year != DateTime.now().year ||
+                          _dataFiltroRipartizione.month != DateTime.now().month) ...[
                         const SizedBox(width: 8),
                         InkWell(
                           onTap: () => setState(() => _dataFiltroRipartizione = DateTime.now()),
@@ -1307,9 +1714,29 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   Row(
                     children: [
-                      GestureDetector(onTap: () => setState(() => _isVistaAnnuale = false), child: Text('Mese', style: TextStyle(color: !_isVistaAnnuale ? oceanCyan : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12))),
+                      GestureDetector(
+                        onTap: () => setState(() => _isVistaAnnuale = false),
+                        child: Text(
+                          'Mese',
+                          style: TextStyle(
+                            color: !_isVistaAnnuale ? oceanCyan : Colors.white54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      GestureDetector(onTap: () => setState(() => _isVistaAnnuale = true), child: Text('Anno', style: TextStyle(color: _isVistaAnnuale ? oceanCyan : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12))),
+                      GestureDetector(
+                        onTap: () => setState(() => _isVistaAnnuale = true),
+                        child: Text(
+                          'Anno',
+                          style: TextStyle(
+                            color: _isVistaAnnuale ? oceanCyan : Colors.white54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -1320,27 +1747,49 @@ class _WalletScreenState extends State<WalletScreen> {
                 child: Container(
                   height: 8,
                   color: Colors.white.withOpacity(0.1),
-                  child: entrateRiferimento > 0 ? Row(
-                    children: [
-                      if (spesoBisogni > 0) Expanded(flex: (spesoBisogni / entrateRiferimento * 1000).toInt(), child: Container(color: oceanCyan)),
-                      if (spesoSvago > 0) Expanded(flex: (spesoSvago / entrateRiferimento * 1000).toInt(), child: Container(color: goldAccent)),
-                      if (margineRisparmioReale > 0) Expanded(flex: (margineRisparmioReale / entrateRiferimento * 1000).toInt(), child: Container(color: purpleZen)),
-                    ],
-                  ) : null,
+                  child: entrateUso > 0
+                      ? Row(
+                          children: [
+                            if (bisogniUso > 0)
+                              Expanded(
+                                flex: (bisogniUso / entrateUso * 1000).toInt(),
+                                child: Container(color: oceanCyan),
+                              ),
+                            if (svagoUso > 0)
+                              Expanded(
+                                flex: (svagoUso / entrateUso * 1000).toInt(),
+                                child: Container(color: goldAccent),
+                              ),
+                            if (calcoloRisparmioMese > 0)
+                              Expanded(
+                                flex: (calcoloRisparmioMese / entrateUso * 1000).toInt(),
+                                child: Container(color: purpleZen),
+                              ),
+                          ],
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(height: 20),
-              _buildTargetRow('Spese Fisse', 50, spesoBisogni, targetBisogni, oceanCyan),
+              _buildTargetRow('Spese Fisse', 50, bisogniUso, tBisogni, oceanCyan),
               const SizedBox(height: 12),
-              _buildTargetRow('Spese Variabili', 30, spesoSvago, targetSvago, goldAccent),
+              _buildTargetRow('Spese Variabili', 30, svagoUso, tSvago, goldAccent),
               const SizedBox(height: 12),
-              _buildTargetRow('Risparmio', 20, margineRisparmioReale, targetRisparmio, purpleZen, isRisparmio: true),
+              _buildTargetRow(
+                'Risparmio',
+                20,
+                calcoloRisparmioMese,
+                tRisparmio,
+                purpleZen,
+                isRisparmio: true,
+              ),
             ],
           ],
         ),
       ),
     );
   }
+    
 
   Widget _buildTargetRow(String title, int pct, double real, double target, Color color, {bool isRisparmio = false}) {
     final bool inAllarme = isRisparmio ? (real < target && target > 0) : (real > target && target > 0);

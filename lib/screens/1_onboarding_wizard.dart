@@ -272,7 +272,6 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
       Color colore = const Color(0xFFF59E0B); // Default Risparmio (Ambra)
       String sottotitolo = 'Riserva Liquidità';
 
-      // 🛡️ Conserviamo rigorosamente gli ID per i calcoli centrali del Wallet
       if (conto.id == 'main_account') {
         ruolo = AccountRole.principal;
         colore = const Color(0xFF2DD4BF); // Teal
@@ -287,7 +286,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
       }
 
       return AccountModel(
-        id: conto.id, // 👈 ID FONDAMENTALE INVIOLATO
+        id: conto.id,
         title: nome,
         subtitle: sottotitolo,
         amount: saldo,
@@ -305,7 +304,7 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     if (hasPiva) {
       final String codicePulito = (codiceAtecoSelezionato ?? '74.10.21').split(' ').first.trim();
       
-      // 3. SALVIAMO PROFILO FISCALE NEL PROVIDER
+      // 3. SALVIAMO PROFILO FISCALE NEL PROVIDER (PASSANDO LA MATRICE DEI MESI)
       wallet.salvaProfiloFiscale(
         codiceAteco: codicePulito,
         coeffRedditivitaVal: coefficienteRedditivita ?? 0.78,
@@ -314,13 +313,19 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
         nettoTarget: double.tryParse(_nettoTargetController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 2000.0,
         fatturatoStimato: double.tryParse(_fatturatoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 35000.0,
         mesiAttivi: _mesiAttiviConteggio > 0 ? _mesiAttiviConteggio : 12,
+        mesiAttiviStateCustom: _mesiAttiviState, // 👈 PASSAGGIO MATRICE MESI SELEZIONATI
         annoAperturaPiva: annoAperturaPiva,
         meseAperturaPiva: meseAperturaPiva,
       );
 
-      // 4. SALVIAMO I CONTI E LE ENTRATE EXTRA (SCOMMENTATI)
+      // 4. SALVIAMO CONTI ED ENTRATE EXTRA (PASSANDO LE MENSILITÀ 12/13/14)
       wallet.salvaContiIniziali(contiDaSalvare);
-      wallet.salvaEntrateExtra(importoMensile: entrataExtraMensile, dipendente: hasDipendente, pensione: hasPensione);
+      wallet.salvaEntrateExtra(
+        importoMensile: entrataExtraMensile, 
+        dipendente: hasDipendente, 
+        pensione: hasPensione,
+        numeroMensilita: mensilitaDipendente, // 👈 PASSAGGIO MENSILITÀ DIPENDENTE
+      );
 
       Navigator.pushReplacement(
         context, 
@@ -334,7 +339,12 @@ class _OnboardingWizardState extends State<OnboardingWizard> with SingleTickerPr
     } else {
       // SALVATAGGIO ANCHE SE HA SOLO LAVORO DIPENDENTE O PENSIONE
       wallet.salvaContiIniziali(contiDaSalvare);
-      wallet.salvaEntrateExtra(importoMensile: entrataExtraMensile, dipendente: hasDipendente, pensione: hasPensione);
+      wallet.salvaEntrateExtra(
+        importoMensile: entrataExtraMensile, 
+        dipendente: hasDipendente, 
+        pensione: hasPensione,
+        numeroMensilita: mensilitaDipendente, // 👈 PASSAGGIO MENSILITÀ DIPENDENTE
+      );
 
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainMenu(hasPartitaIva: false)));
     }

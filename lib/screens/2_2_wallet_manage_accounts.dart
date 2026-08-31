@@ -5,7 +5,8 @@ import '../data/wallet_provider.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_secondary_popup.dart';
-import '../widgets_shared/app_datepicker.dart'; // 👈 IMPORT DATEPICKER
+import '../widgets_shared/app_datepicker.dart';
+import '../widgets_shared/app_popup_wrapper.dart';
 
 class ManageAccountsSheet extends StatefulWidget {
   final bool? isPiva;
@@ -528,7 +529,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
     String daConto = accounts[0].title;
     String aConto = accounts[1].title;
-    DateTime dataGiroconto = DateTime.now(); // 👈 DATA INIZIALE
+    DateTime dataGiroconto = DateTime.now();
     bool isDaContoEspanso = false;
     bool isAContoEspanso = false;
 
@@ -584,7 +585,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   aAccountId: accA.id,
                   importo: importo,
                   isAccantonamentoTasse: false,
-                  date: dataGiroconto, // 👈 PASSAGGIO DATA SELEZIONATA
+                  date: dataGiroconto,
                 );
 
                 Navigator.pop(context);
@@ -642,7 +643,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 📅 SELETTORE DATA GIROCONTO
                   const Text('DATA TRASFERIMENTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   InkWell(
@@ -785,33 +785,27 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final walletProvider = context.watch<WalletProvider>();
     final double saldoTotale = walletProvider.patrimonioNetto;
     final accounts = walletProvider.accounts;
-    final bool mostraPiva = widget.isPiva ?? walletProvider.isPartitaIVA;
+    final bool mostraPiva = (widget.isPiva == true) || walletProvider.isPartitaIVA;
 
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
-    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
 
-    final double sommaContiLiquidi = accounts
-        .where((a) => !a.title.toLowerCase().contains('salvadanaio tasse') && !a.title.toLowerCase().contains('acconto tasse'))
-        .fold(0.0, (sum, a) => sum + a.amount);
-
-    final double tasseDaAccantonare = accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
-    // ✅ CODICE CORRETTO:
-final double postTasse = (sommaContiLiquidi - tasseDaAccantonare).clamp(0.0, double.infinity);
-final double cuscinettoFerie = walletProvider.cuscinettoResiduo; // 👈 Legge il residuo futuro dal Provider
-final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, double.infinity);
+    // 🎯 NUOVA LOGICA: Patrimonio Totale - Totale Tasse Dovute - Cuscinetto Mesi Off
+    final double totaleTasseDovute = walletProvider.totaleTasseDovute;
+    final double cuscinettoFerie = walletProvider.cuscinettoResiduo;
+    final double nettoRealeSpendibile = (saldoTotale - totaleTasseDovute - cuscinettoFerie).clamp(0.0, double.infinity);
 
     return AppBottomSheet(
       title: 'Gestione Conti',
       badgeText: 'Wallet',
       badgeColor: const Color(0xFF2DD4BF),
-      child: Container(
+      child: SizedBox(
         height: screenHeight * 0.55,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(16),
@@ -820,109 +814,160 @@ final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, dou
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'PATRIMONIO LIQUIDO TOTALE',
-                              style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _formattaValuta(saldoTotale),
-                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'PATRIMONIO LIQUIDO TOTALE',
+                    style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formattaValuta(saldoTotale),
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                   ),
                   if (mostraPiva) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     const Divider(color: Colors.white12, height: 1),
                     const SizedBox(height: 12),
-                    Column(
+                    Row(
                       children: [
-                        // 🟢 RIGA 1: LIQUIDITÀ SPENDIBILE
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 14),
-                                SizedBox(width: 6),
-                                Text(
-                                  'LIQUIDITÀ SPENDIBILE:',
-                                  style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formattaValuta(nettoRealeSpendibile),
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // 🟣 RIGA 2: CUSCINETTO MESI OFF
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Row(
+                        // 🟢 1. SPENDIBILE
+                        Expanded(
+                          child: InkWell(
+                            onLongPress: () {
+                              AppPopupWrapper.mostraInfo(
+                                context: context,
+                                icon: Icons.payments_rounded,
+                                color: const Color(0xFF10B981),
+                                titolo: 'Netto Reale Spendibile',
+                                descrizione: 'È la liquidità libera da qualsiasi vincolo fiscale o di riserva. Puoi spenderla in totale serenità.',
+                                formula: '💰 Patrimonio Totale: ${_formattaValuta(saldoTotale)}\n🛡️ Riserva Tasse Totale: -${_formattaValuta(totaleTasseDovute)}\n🏖️ Fondo Mesi Off: -${_formattaValuta(cuscinettoFerie)}\n──────────────────────\n✨ Netto Spendibile: ${_formattaValuta(nettoRealeSpendibile)}',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 14),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        'CUSCINETTO (${12 - mesiLavorati} MESI PAUSA):',
-                                        style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold),
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 11),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'SPENDIBILE',
+                                        style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      AppSecondaryPopup.mostra(
-                                        context: context,
-                                        icon: Icons.info_outline_rounded,
-                                        iconColor: const Color(0xFF8B5CF6),
-                                        titolo: 'Cuscinetto Mesi No-Lavoro',
-                                        testoAnnulla: 'Ho capito',
-                                        child: Text(
-                                          'È la riserva strategica accantonata per garantirti il tuo Target Netto nei ${12 - mesiLavorati} mesi in cui hai previsto di non fatturare.\n\nI fondi vengono sbloccati automaticamente durante i mesi di pausa per proteggere il tuo stile di vita.',
-                                          style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
-                                        ),
-                                      );
-                                    },
-                                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF8B5CF6), size: 13),
+                                  const SizedBox(height: 4),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _formattaValuta(nettoRealeSpendibile),
+                                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 14, fontWeight: FontWeight.w800),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formattaValuta(cuscinettoFerie),
-                              style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+
+                        Container(height: 24, width: 1, color: Colors.white12),
+                        const SizedBox(width: 6),
+
+                        // 🛡️ 2. TASSE TOTALI
+                        Expanded(
+                          child: InkWell(
+                            onLongPress: () {
+                              AppPopupWrapper.mostraInfo(
+                                context: context,
+                                icon: Icons.shield_rounded,
+                                color: const Color(0xFF3B82F6),
+                                titolo: 'Tasse Totali Dovute',
+                                descrizione: 'Quota complessiva di imposte e contributi INPS calcolata sulle fatture incassate fino ad oggi.',
+                                formula: 'Calcolata in base all\'aliquota fiscale del tuo profilo ATECO.',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 11),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'TASSE',
+                                        style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _formattaValuta(totaleTasseDovute),
+                                      style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
+                        ),
+
+                        Container(height: 24, width: 1, color: Colors.white12),
+                        const SizedBox(width: 6),
+
+                        // 🟣 3. MESI OFF
+                        Expanded(
+                          child: InkWell(
+                            onLongPress: () {
+                              AppPopupWrapper.mostraInfo(
+                                context: context,
+                                icon: Icons.beach_access_rounded,
+                                color: const Color(0xFF8B5CF6),
+                                titolo: 'Cuscinetto Mesi OFF',
+                                descrizione: 'Riserva strategica accantonata dagli incassi P.IVA per garantirti il tuo netto mensile desiderato durante i ${12 - mesiLavorati} mesi di pausa.',
+                                formula: 'Quota accumulata dagli incassi per coprire i mesi senza fatturato.',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.beach_access_rounded, color: Color(0xFF8B5CF6), size: 11),
+                                      const SizedBox(width: 3),
+                                      Expanded(
+                                        child: Text(
+                                          'MESI OFF (${12 - mesiLavorati}M)',
+                                          style: const TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _formattaValuta(cuscinettoFerie),
+                                      style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 14, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1006,8 +1051,13 @@ final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, dou
                       },
                       itemBuilder: (context, index) {
                         final account = accounts[index];
-                        final bool isPrincipal = account.id == '1' || account.title.toLowerCase().contains('principale');
-                        final double contoPostTasse = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
+                        final bool isPrincipal = account.role == AccountRole.principal ||
+                            account.id == 'main_account' ||
+                            account.id == '1' ||
+                            account.title.toLowerCase().contains('principale');
+
+                        // 🎯 Coerenza per il conto principale
+                        final double contoNettoSpendibile = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
 
                         return Container(
                           key: ValueKey(account.id),
@@ -1061,33 +1111,15 @@ final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, dou
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        if (mostraPiva && isPrincipal) ...[
-                                          const SizedBox(height: 6),
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 4,
+                                        if (mostraPiva && account.virtualTaxAmount > 0) ...[
+                                          const SizedBox(height: 3),
+                                          Row(
                                             children: [
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 10),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    _formattaValuta(contoPostTasse),
-                                                    style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ],
-                                              ),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(Icons.savings_rounded, color: Color(0xFF3B82F6), size: 10),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    _formattaValuta(account.virtualTaxAmount),
-                                                    style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ],
+                                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 11),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                'Tasse da accantonare: ${_formattaValuta(account.virtualTaxAmount)}',
+                                                style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w600),
                                               ),
                                             ],
                                           ),
@@ -1112,11 +1144,23 @@ final double nettoRealeSpendibile = (postTasse - cuscinettoFerie).clamp(0.0, dou
                                     itemBuilder: (context) => [
                                       const PopupMenuItem(
                                         value: 'edit',
-                                        child: Row(children: [Icon(Icons.edit_rounded, color: Colors.white, size: 16), SizedBox(width: 8), Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 12))]),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                                            SizedBox(width: 8),
+                                            Text('Modifica Conto', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                          ],
+                                        ),
                                       ),
                                       const PopupMenuItem(
                                         value: 'delete',
-                                        child: Row(children: [Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16), SizedBox(width: 8), Text('Elimina Conto', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12))]),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
+                                            SizedBox(width: 8),
+                                            Text('Elimina Conto', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),

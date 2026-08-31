@@ -279,6 +279,9 @@ class WalletProvider with ChangeNotifier {
   double _entrataExtraMensile = 0.0;
   double get entrataExtraMensile => _entrataExtraMensile;
 
+  int _numeroMensilitaExtra = 13; // 12, 13 o 14 mensilità
+  int get numeroMensilitaExtra => _numeroMensilitaExtra;
+
   bool _hasDipendente = false;
   bool get hasDipendente => _hasDipendente;
 
@@ -395,10 +398,14 @@ class WalletProvider with ChangeNotifier {
     required double importoMensile,
     required bool dipendente,
     required bool pensione,
+    int? numeroMensilita,
   }) {
     _entrataExtraMensile = importoMensile;
     _hasDipendente = dipendente;
     _hasPensione = pensione;
+    if (numeroMensilita != null) {
+      _numeroMensilitaExtra = numeroMensilita;
+    }
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -454,6 +461,98 @@ class WalletProvider with ChangeNotifier {
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
+  
+  // ===========================================================================
+  // 🔮 MOTORE PROIETTIVO: STIME E RICALIBRAZIONE
+  // ===========================================================================
+
+  bool _haRispostoRicalibrazione = false;
+  bool get haRispostoRicalibrazione => _haRispostoRicalibrazione;
+
+  void impostaRispostaRicalibrazione(bool valore) {
+    _haRispostoRicalibrazione = valore;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  /// Restituisce lo stato del ritmo di fatturato: 'in_linea', 'over', 'under'
+  String get statoRitmoFatturato {
+    if (!isPartitaIVA || _fatturatoStimatoAnnuo <= 0) return 'in_linea';
+
+    final int meseCorrente = DateTime.now().month;
+    // Calcoliamo quanti mesi lavorativi sono passati fino ad oggi
+    int mesiLavorativiPassati = 0;
+    for (int i = 0; i < meseCorrente; i++) {
+      if (_mesiAttiviState.length > i && _mesiAttiviState[i]) {
+        mesiLavorativiPassati++;
+      }
+    }
+
+    if (mesiLavorativiPassati == 0) return 'in_linea';
+
+    final double ritmoTeoricoMensile = _fatturatoStimatoAnnuo / _mesiAttiviIncasso;
+    final double targetAdOggi = ritmoTeoricoMensile * mesiLavorativiPassati;
+
+    if (targetAdOggi <= 0) return 'in_linea';
+
+    final double scostamento = (_fatturatoTotale - targetAdOggi) / targetAdOggi;
+
+    if (scostamento > 0.15) return 'over';   // +15% di deviazione
+    if (scostamento < -0.15) return 'under'; // -15% di deviazione
+    return 'in_linea';
+  }
+
+  /// Calcola l'entrata prevista per un MESE FUTURO
+  double getEntrataPrevistaMeseFuturo(DateTime meseFuturo) {
+    double stimaEntrata = 0.0;
+
+    // 1. Dipendente / Pensione (Gestione precisa 12, 13 o 14 mensilità)
+    if (_entrataExtraMensile > 0) {
+      bool isDoppiaMensilita = false;
+      if (_numeroMensilitaExtra == 13 && meseFuturo.month == 12) {
+        isDoppiaMensilita = true; // 13esima a Dicembre
+      } else if (_numeroMensilitaExtra == 14 && (meseFuturo.month == 6 || meseFuturo.month == 12)) {
+        isDoppiaMensilita = true; // 14esima a Giugno, 13esima a Dicembre
+      }
+      stimaEntrata += isDoppiaMensilita ? (_entrataExtraMensile * 2) : _entrataExtraMensile;
+    }
+
+    // 2. Stima P.IVA (solo nei Mesi ON di lavoro)
+    if (isPartitaIVA) {
+      final int indexMeseFuturo = meseFuturo.month - 1;
+      final bool isMeseLavorativo = _mesiAttiviState.length > indexMeseFuturo 
+          ? _mesiAttiviState[indexMeseFuturo] 
+          : true;
+
+      if (isMeseLavorativo) {
+        final int meseCorrente = DateTime.now().month; // Agosto = 8
+        int mesiLavorativiRimanenti = 0;
+        
+        // Conta tutti i mesi ON da Settembre (indice 8) a Dicembre (indice 11)
+        for (int i = meseCorrente; i < 12; i++) {
+          if (_mesiAttiviState.length > i && _mesiAttiviState[i]) {
+            mesiLavorativiRimanenti++;
+          }
+        }
+
+        final double fatturatoResiduo = (_fatturatoStimatoAnnuo - _fatturatoTotale).clamp(0.0, double.infinity);
+
+        double lordoMensileStima = mesiLavorativiRimanenti > 0 
+            ? (fatturatoResiduo / mesiLavorativiRimanenti) 
+            : (_fatturatoStimatoAnnuo / (_mesiAttiviIncasso > 0 ? _mesiAttiviIncasso : 12));
+
+        final double nettoMensileStima = lordoMensileStima * (1 - aliquotaFiscaleReale);
+        stimaEntrata += nettoMensileStima;
+      }
+    }
+
+    if (stimaEntrata <= 0 && _nettoTargetMensile > 0) {
+      return _nettoTargetMensile;
+    }
+
+    return stimaEntrata;
+  }
+  // ===========================================================================
 
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,
@@ -1025,6 +1124,7 @@ class WalletProvider with ChangeNotifier {
       _aliquotaInps = aliquotaInps;
 
       _textScaleFactor = prefs.getDouble('textScaleFactor') ?? 1.0;
+      _haRispostoRicalibrazione = prefs.getBool('haRispostoRicalibrazione') ?? false;
 
       accontiVersatiAnnoPrecedente = prefs.getDouble('accontiVersatiAnnoPrecedente') ?? 0.0;
       _accontiVersati = accontiVersatiAnnoPrecedente;
@@ -1044,6 +1144,7 @@ class WalletProvider with ChangeNotifier {
       _meseAperturaPiva = prefs.getInt('meseAperturaPiva') ?? 1;
 
       _entrataExtraMensile = prefs.getDouble('entrataExtraMensile') ?? 0.0;
+      _numeroMensilitaExtra = prefs.getInt('numeroMensilitaExtra') ?? 13;
       _hasDipendente = prefs.getBool('hasDipendente') ?? false;
       _hasPensione = prefs.getBool('hasPensione') ?? false;
 
@@ -1105,6 +1206,7 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
       
       await prefs.setDouble('textScaleFactor', _textScaleFactor);
+      await prefs.setBool('haRispostoRicalibrazione', _haRispostoRicalibrazione);
 
       await prefs.setBool('onboarding_completed', true);
       await prefs.setString('codiceAteco', _codiceAteco);
@@ -1120,6 +1222,7 @@ class WalletProvider with ChangeNotifier {
       }
 
       await prefs.setDouble('entrataExtraMensile', _entrataExtraMensile);
+      await prefs.setInt('numeroMensilitaExtra', _numeroMensilitaExtra);
       await prefs.setBool('hasDipendente', _hasDipendente);
       await prefs.setBool('hasPensione', _hasPensione);
 
@@ -1155,6 +1258,7 @@ class WalletProvider with ChangeNotifier {
         'annoAperturaPiva': _annoAperturaPiva,
         'meseAperturaPiva': _meseAperturaPiva,        
         'entrataExtraMensile': _entrataExtraMensile,
+        'numeroMensilitaExtra': _numeroMensilitaExtra,
         'hasDipendente': _hasDipendente,
         'hasPensione': _hasPensione,
         'fatturatoTotale': _fatturatoTotale,
@@ -1720,6 +1824,7 @@ class WalletProvider with ChangeNotifier {
     double nettoTarget = 2000.0,
     double fatturatoStimato = 35000.0,
     int mesiAttivi = 12,
+    List<bool>? mesiAttiviStateCustom,
     int? annoAperturaPiva,
     int? meseAperturaPiva,
   }) {
@@ -1738,15 +1843,15 @@ class WalletProvider with ChangeNotifier {
     _fatturatoStimatoAnnuo = fatturatoStimato;
     _mesiAttiviIncasso = mesiAttivi;
 
-    // 🎯 RIGENERA AUTOMATICAMENTE LA LISTA DEI MESI ATTIVI
-    _mesiAttiviState = List.generate(12, (index) => index < mesiAttivi);
+    // Preserva la selezione dei singoli mesi se fornita o già esistente
+    if (mesiAttiviStateCustom != null && mesiAttiviStateCustom.length == 12) {
+      _mesiAttiviState = List.from(mesiAttiviStateCustom);
+    } else if (_mesiAttiviState.where((m) => m).length != mesiAttivi) {
+      _mesiAttiviState = List.generate(12, (index) => index < mesiAttivi);
+    }
 
-    if (annoAperturaPiva != null) {
-      _annoAperturaPiva = annoAperturaPiva;
-    }
-    if (meseAperturaPiva != null) {
-      _meseAperturaPiva = meseAperturaPiva;
-    }
+    if (annoAperturaPiva != null) _annoAperturaPiva = annoAperturaPiva;
+    if (meseAperturaPiva != null) _meseAperturaPiva = meseAperturaPiva;
 
     _calcolaStatoCuscinetto();
     _salvaDatiInLocalStorage();
@@ -1781,6 +1886,12 @@ class WalletProvider with ChangeNotifier {
     ];
 
     _fatturatoTotale = 0.00;
+    _haRispostoRicalibrazione = false;
+
+    // 🎯 MATRICE ESATTA: Agosto (idx 7), Novembre (idx 10), Dicembre (idx 11) OFF
+    _mesiAttiviState = [true, true, true, true, true, true, true, false, true, true, false, false];
+    _mesiAttiviIncasso = 9;
+
     _transactions.clear();
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();

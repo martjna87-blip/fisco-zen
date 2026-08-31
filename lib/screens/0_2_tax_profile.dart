@@ -1,9 +1,7 @@
-// 📍 INIZIO CODICE COMPLETO: lib/screens/0_2_tax_profile.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
-import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
 import '../widgets_shared/f24_facsimile_sheet.dart';
@@ -27,11 +25,11 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
   late AnimationController _waveController;
   bool _mostraCalcoloF24 = false;
 
-  final Color coloreSfondo = const Color(0xFF080B0C);
-  final Color coloreCard = const Color(0xFF101618);
+  final Color coloreSfondo  = const Color(0xFF080B0C);
+  final Color coloreCard    = const Color(0xFF101618);
   final Color coloreOttanio = const Color(0xFF2DD4BF);
-  final Color coloreOro = const Color(0xFFF59E0B);
-  final Color coloreBlu = const Color(0xFF3B82F6);
+  final Color coloreOro     = const Color(0xFFF59E0B);
+  final Color coloreBlu     = const Color(0xFF38BDF8);
 
   static final List<Map<String, dynamic>> _databaseAteco = [
     {'codice': '85.52.09', 'descrizione': 'Formazione culturale e corsi', 'coef': 0.78},
@@ -48,6 +46,12 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
+
+  static String _formattaInt(num valore) {
+    final int val = valore.round().abs();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return val.toString().replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  }
 
   @override
   void initState() {
@@ -101,7 +105,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Centro Fiscale P.IVA', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Centro Fiscale & Obiettivi', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Stack(
@@ -123,23 +127,87 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   
-                  // 📋 PARAMETRI DI CALCOLO IN USO
+                  // ✏️ AZIONE RAPIDA IN ALTO: SCHEDA MODIFICA PROFILO & OBIETTIVI
+                  _buildCardWrapper(
+                    child: InkWell(
+                      onTap: () => _apriModaleModificaCompleta(context, walletProvider),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: coloreOttanio.withOpacity(0.18),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: coloreOttanio.withOpacity(0.4)),
+                            ),
+                            child: Icon(Icons.tune_rounded, color: coloreOttanio, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('Modifica Profilo & Obiettivi', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 6),
+                                    Icon(Icons.edit_note_rounded, color: coloreOttanio, size: 18),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Ricalibra target netto, fatturato P.IVA e mesi di lavoro',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.4), size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 🎯 OBIETTIVI UTENTE & RISORSE (TARGET "VOGLIO" + EXTRA)
                   _buildCardWrapper(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('PARAMETRI DI CALCOLO IN USO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                        const Text('OBIETTIVO PERSONALE & ENTRATE EXTRA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                         const SizedBox(height: 12),
-                        _buildInfoRiga(Icons.work_outline_rounded, 'Codice ATECO', walletProvider.codiceAteco),
-                        const Divider(color: Colors.white10, height: 20),
-                        _buildInfoRiga(Icons.pie_chart_outline_rounded, 'Coeff. Redditività', '${(walletProvider.coeffRedditivita * 100).toInt()}% (Automatico)'),
+                        _buildInfoRiga(Icons.track_changes_rounded, 'Target Netto ("Voglio")', '${TaxProfileScreen.formattaEuro(walletProvider.nettoTargetMensile)} / mese'),
                         const Divider(color: Colors.white10, height: 20),
                         _buildInfoRiga(
                           Icons.badge_outlined, 
-                          'Lavoro Dipendente', 
+                          'Lavoro Dipendente / Pensione', 
                           walletProvider.hasDipendente 
-                              ? 'Sì (Entrata Extra ${TaxProfileScreen.formattaEuro(walletProvider.entrataExtraMensile)}/mese)' 
+                              ? '${TaxProfileScreen.formattaEuro(walletProvider.entrataExtraMensile)}/mese (${walletProvider.numeroMensilitaExtra} mensilità)' 
                               : (walletProvider.hasPensione ? 'Pensione Attiva' : 'No (Solo P.IVA)')
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 📋 PARAMETRI DI CALCOLO P.IVA IN USO
+                  _buildCardWrapper(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('DATI FISCALI P.IVA IN USO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                        const SizedBox(height: 12),
+                        _buildInfoRiga(Icons.work_outline_rounded, 'Codice ATECO', walletProvider.codiceAteco),
+                        const Divider(color: Colors.white10, height: 20),
+                        _buildInfoRiga(Icons.pie_chart_outline_rounded, 'Coeff. Redditività', '${(walletProvider.coeffRedditivita * 100).toInt()}%'),
+                        const Divider(color: Colors.white10, height: 20),
+                        _buildInfoRiga(
+                          Icons.calendar_today_rounded, 
+                          'Anno Apertura / Mesi ON', 
+                          '$annoApertura • ${walletProvider.mesiAttivi} Mesi Lavorativi Attivi'
                         ),
                         const Divider(color: Colors.white10, height: 20),
                         _buildInfoRiga(
@@ -161,7 +229,14 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('SOGLIA FORFETTARIO (${TaxProfileScreen.formattaEuro(sogliaLimiteReale)})', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                            Expanded(
+                              child: Text(
+                                'SOGLIA FORFETTARIO (${TaxProfileScreen.formattaEuro(sogliaLimiteReale)})',
+                                style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             GestureDetector(
                               onTap: () => _mostraSpiegazioneSoglia(context, fatturatoReale, sogliaLimiteReale),
                               child: Container(
@@ -378,24 +453,6 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                   ),
 
                   const SizedBox(height: 24),
-
-                  // ✏️ PULSANTE MODIFICA
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _apriModaleModificaCompleta(context, walletProvider),
-                      icon: const Icon(Icons.edit_rounded, size: 18),
-                      label: const Text('Modifica Dati Fiscali P.IVA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: coloreOttanio,
-                        foregroundColor: coloreSfondo,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -419,11 +476,26 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
 
   Widget _buildInfoRiga(IconData icona, String titolo, String valore) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(icona, color: Colors.white54, size: 16),
         const SizedBox(width: 10),
-        Expanded(child: Text(titolo, style: const TextStyle(color: Colors.white54, fontSize: 12))),
-        Text(valore, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+        Expanded(
+          flex: 4,
+          child: Text(
+            titolo,
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 5,
+          child: Text(
+            valore,
+            textAlign: TextAlign.end,
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
@@ -432,22 +504,23 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(child: Text(titolo, style: const TextStyle(color: Colors.white54, fontSize: 11))),
-        Text(valore, style: TextStyle(color: isDetrazione ? Colors.redAccent : Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+        Expanded(
+          flex: 3,
+          child: Text(titolo, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: Text(
+            valore,
+            textAlign: TextAlign.end,
+            style: TextStyle(color: isDetrazione ? Colors.redAccent : Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
 
-  String _formattaDipendente(String? tipo) {
-    switch (tipo) {
-      case 'full': return 'Sì (Full-time)';
-      case 'part_over50': return 'Sì (Part-time > 50%)';
-      case 'part_under50': return 'Sì (Part-time ≤ 50%)';
-      default: return 'No (Solo P.IVA)';
-    }
-  }
-
-  // 📍 POPUP SPIEGAZIONE SOGLIA CON TASTO X A SINISTRA
   void _mostraSpiegazioneSoglia(BuildContext context, double incassato, double soglia) {
     final bool superato = incassato > soglia;
 
@@ -463,27 +536,24 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  Row(
+                    children: [
+                      Icon(superato ? Icons.warning_amber_rounded : Icons.verified_user_rounded, color: superato ? Colors.redAccent : coloreOttanio, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        superato ? 'Attenzione: Soglia Superata' : 'Regime Forfettario in Regola',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Icon(superato ? Icons.warning_amber_rounded : Icons.verified_user_rounded, color: superato ? Colors.redAccent : coloreOttanio, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            superato ? 'Attenzione: Soglia Superata' : 'Regime Forfettario in Regola',
-                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
+                  InkWell(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
                     ),
                   ),
                 ],
@@ -542,7 +612,7 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     );
   }
 
-  // 📍 MODALE MODIFICA COMPLETA CON TASTO X A SINISTRA
+ // 📍 MODALE RESTYLING MINIMALE & NON INVASIVO
   void _apriModaleModificaCompleta(BuildContext context, WalletProvider provider) {
     Map<String, dynamic> atecoSelezionato = _databaseAteco.firstWhere(
       (element) => provider.codiceAteco.startsWith(element['codice'].toString()),
@@ -550,27 +620,32 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     );
 
     final TextEditingController searchCtrl = TextEditingController();
-    final TextEditingController accontiCtrl = TextEditingController(text: provider.accontiVersati.toStringAsFixed(0));
-    final TextEditingController fatturatoCtrl = TextEditingController(text: provider.fatturatoStimato.toStringAsFixed(0));
+    final TextEditingController accontiCtrl = TextEditingController(text: _formattaInt(provider.accontiVersati));
+    final TextEditingController fatturatoCtrl = TextEditingController(text: _formattaInt(provider.fatturatoStimato));
     final TextEditingController annoCtrl = TextEditingController(text: (provider.annoAperturaPiva ?? DateTime.now().year).toString());
+    final TextEditingController targetNettoCtrl = TextEditingController(text: _formattaInt(provider.nettoTargetMensile));
+    final TextEditingController entrataExtraCtrl = TextEditingController(text: _formattaInt(provider.entrataExtraMensile));
     
-    // 💡 VERSION 1.2: Controller per Obiettivi e Lavoro Dipendente
-    final TextEditingController targetNettoCtrl = TextEditingController(text: provider.nettoTargetMensile.toStringAsFixed(0));
-    final TextEditingController mesiAttiviCtrl = TextEditingController(text: provider.mesiAttivi.toString());
-    final TextEditingController entrataExtraCtrl = TextEditingController(text: provider.entrataExtraMensile.toStringAsFixed(0));
-
+    List<bool> mesiAttiviLocal = List.from(provider.mesiAttiviState);
     double tempImposta = provider.aliquotaImposta;
     int tempMeseApertura = provider.meseAperturaPiva ?? 1;
+    int tempMensilitaExtra = provider.numeroMensilitaExtra;
     bool mostraListaAteco = false;
     String queryFiltro = '';
+
+    const Color tealBrand = Color(0xFF2DD4BF);
+    const Color cardBg = Color(0xFF151A1E);
 
     AppPopupWrapper.mostra(
       context: context,
       child: Material(
-        color: const Color(0xFF1F2428),
+        color: const Color(0xFF1B2026),
         borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.82,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: StatefulBuilder(
             builder: (context, setModalState) {
               final int annoInserito = int.tryParse(annoCtrl.text) ?? DateTime.now().year;
@@ -582,373 +657,393 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                        item['descrizione'].toString().toLowerCase().contains(q);
               }).toList();
 
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 🔝 HEADER ESSENZIALE
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Profilo & Obiettivi',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), shape: BoxShape.circle),
+                          child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Aggiorna Dati Fiscali P.IVA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                              SizedBox(height: 4),
-                              Text('Seleziona il tuo ATECO e l\'anno di apertura per calcolare le soglie reali.', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
 
-                    _buildInputLabel('CODICE ATECO & MANSIONE PRINCIPALE'),
-                    GestureDetector(
-                      onTap: () => setModalState(() => mostraListaAteco = !mostraListaAteco),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: coloreOttanio.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.style_rounded, color: coloreOttanio, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(
+                  // 📜 SCHEDE COMPATTE SCORREVOLI
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+
+                          // 🎯 CARD 1: OBIETTIVO PERSONALE
+                          _buildModalSectionCard(
+                            title: 'OBIETTIVO NETTO',
+                            icon: Icons.track_changes_rounded,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInputLabel('QUANTO VUOI IN TASCA OGNI MESE?'),
+                                _buildModalTextField(targetNettoCtrl, '2.500', suffix: '€ / mese', isNumber: true, formatThousands: true),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // 🏛️ CARD 2: FISCO & P.IVA
+                          _buildModalSectionCard(
+                            title: 'PARTITA IVA',
+                            icon: Icons.badge_outlined,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInputLabel('ATECO PRINCIPALE'),
+                                GestureDetector(
+                                  onTap: () => setModalState(() => mostraListaAteco = !mostraListaAteco),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${atecoSelezionato['codice']} • ${atecoSelezionato['descrizione']}',
+                                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Icon(mostraListaAteco ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: tealBrand, size: 18),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                if (mostraListaAteco) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF101418),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white10),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        TextField(
+                                          controller: searchCtrl,
+                                          style: const TextStyle(color: Colors.white, fontSize: 11),
+                                          onChanged: (v) => setModalState(() => queryFiltro = v),
+                                          decoration: InputDecoration(
+                                            hintText: 'Cerca ATECO...',
+                                            hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                                            prefixIcon: const Icon(Icons.search_rounded, color: Colors.white38, size: 16),
+                                            filled: true,
+                                            fillColor: Colors.black.withOpacity(0.3),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(maxHeight: 140),
+                                          child: ListView.separated(
+                                            shrinkWrap: true,
+                                            itemCount: listaFiltrata.length,
+                                            separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                                            itemBuilder: (context, idx) {
+                                              final item = listaFiltrata[idx];
+                                              final isSel = item['codice'] == atecoSelezionato['codice'];
+
+                                              return ListTile(
+                                                dense: true,
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                                onTap: () {
+                                                  setModalState(() {
+                                                    atecoSelezionato = item;
+                                                    mostraListaAteco = false;
+                                                  });
+                                                },
+                                                title: Text('${item['codice']} - ${item['descrizione']}', style: TextStyle(color: isSel ? tealBrand : Colors.white70, fontSize: 11)),
+                                                trailing: isSel ? const Icon(Icons.check_rounded, color: tealBrand, size: 16) : null,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                const SizedBox(height: 12),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildInputLabel('ANNO APERTURA'),
+                                          _buildModalTextField(
+                                            annoCtrl,
+                                            '2025',
+                                            isNumber: true,
+                                            onChanged: (val) => setModalState(() {}),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildInputLabel('ACCONTI F24 ANNO SCORSO'),
+                                          _buildModalTextField(accontiCtrl, '0', suffix: '€', isNumber: true, formatThousands: true),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+                                _buildInputLabel('FATTURATO LORDO PREVISTO ANNO'),
+                                _buildModalTextField(fatturatoCtrl, '35.000', suffix: '€ / anno', isNumber: true, formatThousands: true),
+
+                                const SizedBox(height: 12),
+                                _buildInputLabel('ALIQUOTA FISCALE'),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    _buildPillToggle('5% Startup', tempImposta == 0.05, () => setModalState(() => tempImposta = 0.05)),
+                                    const SizedBox(width: 8),
+                                    _buildPillToggle('15% Standard', tempImposta == 0.15, () => setModalState(() => tempImposta = 0.15)),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 14),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _buildInputLabel('MESI LAVORATIVI P.IVA (ON / OFF)'),
+                                    Text('${mesiAttiviLocal.where((m) => m).length}/12', style: const TextStyle(color: tealBrand, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+
+                                // 🗓️ GRIGLIA COMPATTA MESI
+                                Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children: List.generate(12, (index) {
+                                    final nomiShort = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+                                    final bool isAttivo = mesiAttiviLocal[index];
+                                    return GestureDetector(
+                                      onTap: () => setModalState(() => mesiAttiviLocal[index] = !mesiAttiviLocal[index]),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 120),
+                                        width: (MediaQuery.of(context).size.width - 82) / 4,
+                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isAttivo ? tealBrand.withOpacity(0.18) : Colors.white.withOpacity(0.03),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: isAttivo ? tealBrand : Colors.white10),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            nomiShort[index],
+                                            style: TextStyle(
+                                              color: isAttivo ? tealBrand : Colors.white38,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // 💼 CARD 3: DIPENDENTE / PENSIONE
+                          if (provider.hasDipendente || provider.hasPensione)
+                            _buildModalSectionCard(
+                              title: provider.hasDipendente ? 'STIPENDIO DIPENDENTE' : 'PENSIONE',
+                              icon: Icons.work_outline_rounded,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('${atecoSelezionato['codice']} - ${atecoSelezionato['descrizione']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const SizedBox(height: 2),
-                                  Text('Coeff. Redditività: ${(atecoSelezionato['coef'] * 100).toInt()}%', style: TextStyle(color: coloreOttanio, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildInputLabel('NETTO MENSILE'),
+_buildModalTextField(entrataExtraCtrl, '1.500', suffix: '€', isNumber: true, formatThousands: true),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        flex: 4,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildInputLabel('MENSILITÀ'),
+                                            Row(
+                                              children: [12, 13, 14].map((m) {
+                                                final bool isSel = tempMensilitaExtra == m;
+                                                return Expanded(
+                                                  child: GestureDetector(
+                                                    onTap: () => setModalState(() => tempMensilitaExtra = m),
+                                                    child: Container(
+                                                      margin: const EdgeInsets.only(right: 3),
+                                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                                      decoration: BoxDecoration(
+                                                        color: isSel ? const Color(0xFF38BDF8).withOpacity(0.2) : Colors.black.withOpacity(0.3),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(color: isSel ? const Color(0xFF38BDF8) : Colors.white10),
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          '$m',
+                                                          style: TextStyle(
+                                                            color: isSel ? const Color(0xFF38BDF8) : Colors.white54,
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
-                            Icon(mostraListaAteco ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: Colors.white70),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
+                  ),
 
-                    if (mostraListaAteco) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF12181B),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: searchCtrl,
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                              onChanged: (v) => setModalState(() => queryFiltro = v),
-                              decoration: InputDecoration(
-                                hintText: 'Cerca codice ATECO o mansione...',
-                                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                                prefixIcon: const Icon(Icons.search_rounded, color: Colors.white38, size: 18),
-                                filled: true,
-                                fillColor: Colors.black.withOpacity(0.3),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 180),
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                itemCount: listaFiltrata.length,
-                                separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
-                                itemBuilder: (context, idx) {
-                                  final item = listaFiltrata[idx];
-                                  final isSel = item['codice'] == atecoSelezionato['codice'];
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final double coeff = (atecoSelezionato['coef'] as num).toDouble();
+                        final double acconti = double.tryParse(accontiCtrl.text.replaceAll('.', '')) ?? 0.0;
+                        final double fatturato = double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 35000.0;
+                        final int anno = int.tryParse(annoCtrl.text) ?? DateTime.now().year;
+                        final String codiceCompleto = '${atecoSelezionato['codice']} - ${atecoSelezionato['descrizione']}';
+                        final double target = double.tryParse(targetNettoCtrl.text.replaceAll('.', '')) ?? 2500.0;
+                        final int mesi = mesiAttiviLocal.where((m) => m).length;
+                        final double extra = double.tryParse(entrataExtraCtrl.text.replaceAll('.', '')) ?? provider.entrataExtraMensile;
 
-                                  return ListTile(
-                                    dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                                    onTap: () {
-                                      setModalState(() {
-                                        atecoSelezionato = item;
-                                        mostraListaAteco = false;
-                                      });
-                                    },
-                                    title: Text('${item['codice']} - ${item['descrizione']}', style: TextStyle(color: isSel ? coloreOttanio : Colors.white70, fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                                    subtitle: Text('Coeff: ${(item['coef'] * 100).toInt()}%', style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                                    trailing: isSel ? Icon(Icons.check_circle_rounded, color: coloreOttanio, size: 18) : null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
+                        _gestisciSalvataggioProfiloV12(
+                          context: context,
+                          provider: provider,
+                          nuovoAteco: codiceCompleto,
+                          nuovoCoeff: coeff,
+                          nuovaAliquota: tempImposta,
+                          acconti: acconti,
+                          fatturato: fatturato,
+                          annoApertura: anno,
+                          meseApertura: tempMeseApertura,
+                          targetNetto: target,
+                          mesiAttivi: mesi,
+                          mesiAttiviStateCustom: mesiAttiviLocal,
+                          entrataExtra: extra,
+                          numeroMensilita: tempMensilitaExtra,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: tealBrand,
+                        foregroundColor: const Color(0xFF12181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
                       ),
-                    ],
-
-                    const SizedBox(height: 14),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputLabel('COEFF. REDDITIVITÀ (%)'),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white10),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('${(atecoSelezionato['coef'] * 100).toInt()}%', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
-                                    const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 14),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputLabel('ANNO APERTURA P.IVA'),
-                              _buildModalTextField(
-                                annoCtrl,
-                                '2024',
-                                isNumber: true,
-                                onChanged: (val) => setModalState(() {}),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      child: const Text('Salva Impostazioni 🎯', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
-
-                    if (isAnnoCorrente) ...[
-                      const SizedBox(height: 14),
-                      _buildInputLabel('MESE APERTURA (PER RAGGUAGLIO SOGLIA 85.000 €)'),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: tempMeseApertura,
-                            dropdownColor: const Color(0xFF1F2428),
-                            isExpanded: true,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
-                            items: List.generate(12, (index) {
-                              return DropdownMenuItem<int>(
-                                value: index + 1,
-                                child: Text(_nomiMesi[index]),
-                              );
-                            }),
-                            onChanged: (val) {
-                              if (val != null) setModalState(() => tempMeseApertura = val);
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 14),
-                    _buildInputLabel('ALIQUOTA IMPOSTA SOSTITUTIVA'),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setModalState(() => tempImposta = 0.05),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: tempImposta == 0.05 ? coloreOttanio.withOpacity(0.2) : Colors.black.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: tempImposta == 0.05 ? coloreOttanio : Colors.white10),
-                              ),
-                              child: Center(
-                                child: Text('5% Startup', style: TextStyle(color: tempImposta == 0.05 ? coloreOttanio : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setModalState(() => tempImposta = 0.15),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: tempImposta == 0.15 ? coloreOttanio.withOpacity(0.2) : Colors.black.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: tempImposta == 0.15 ? coloreOttanio : Colors.white10),
-                              ),
-                              child: Center(
-                                child: Text('15% Standard', style: TextStyle(color: tempImposta == 0.15 ? coloreOttanio : Colors.white54, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-                    _buildInputLabel('ACCONTI F24 ANNO PRECEDENTE (€)'),
-                    _buildModalTextField(accontiCtrl, '1.500', isNumber: true),
-
-                    const SizedBox(height: 14),
-                    _buildInputLabel('FATTURATO LORDO STIMATO ANNO CORRENTE (€)'),
-                    _buildModalTextField(fatturatoCtrl, '35.000', isNumber: true),
-
-                    const SizedBox(height: 24),
-                    const Divider(color: Colors.white10, height: 1),
-                    const SizedBox(height: 16),
-                    const Text('OBIETTIVI & LAVORO DIPENDENTE', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputLabel('TARGET NETTO MENSILE (€)'),
-                              _buildModalTextField(targetNettoCtrl, '2.500', isNumber: true),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputLabel('MESI LAVORATIVI P.IVA (SU 12)'),
-                              _buildModalTextField(mesiAttiviCtrl, '10', isNumber: true),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-                    if (provider.hasDipendente || provider.hasPensione) ...[
-                      _buildInputLabel(provider.hasDipendente ? 'NETTO MENSILE STIPENDIO DIPENDENTE (€)' : 'NETTO MENSILE PENSIONE (€)'),
-                      _buildModalTextField(entrataExtraCtrl, '1.500', isNumber: true),
-                    ],
-
-                    // 💡 AVVISO SOGLIE 85K / 100K SULLA STIMA FATTURATO
-                    if ((double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > provider.sogliaForfettarioReale) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                              ? const Color(0xFFEF4444).withOpacity(0.15)
-                              : const Color(0xFFF59E0B).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                                ? const Color(0xFFEF4444).withOpacity(0.4)
-                                : const Color(0xFFF59E0B).withOpacity(0.4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                                  ? Icons.warning_amber_rounded
-                                  : Icons.info_outline_rounded,
-                              color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                                  ? const Color(0xFFEF4444)
-                                  : const Color(0xFFF59E0B),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                                    ? '🚨 Oltre 100.000 €: Uscita immediata dal Forfettario in corso d\'anno.'
-                                    : '⚠️ Oltre ${TaxProfileScreen.formattaEuro(provider.sogliaForfettarioReale)}: Dal 1° Gennaio dell\'anno prossimo passerai al Regime Ordinario.',
-                                style: TextStyle(
-                                  color: (double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 0) > 100000
-                                      ? const Color(0xFFEF4444)
-                                      : const Color(0xFFF59E0B),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final double coeff = (atecoSelezionato['coef'] as num).toDouble();
-                          final double acconti = double.tryParse(accontiCtrl.text.replaceAll('.', '')) ?? 0.0;
-                          final double fatturato = double.tryParse(fatturatoCtrl.text.replaceAll('.', '')) ?? 35000.0;
-                          final int anno = int.tryParse(annoCtrl.text) ?? DateTime.now().year;
-                          final String codiceCompleto = '${atecoSelezionato['codice']} - ${atecoSelezionato['descrizione']}';
-
-                          // 💡 VERSION 1.2: Lettura valori Obiettivi
-                          final double target = double.tryParse(targetNettoCtrl.text.replaceAll('.', '')) ?? 2500.0;
-                          final int mesi = int.tryParse(mesiAttiviCtrl.text) ?? 10;
-                          final double extra = double.tryParse(entrataExtraCtrl.text.replaceAll('.', '')) ?? provider.entrataExtraMensile;
-
-                          _gestisciSalvataggioProfiloV12(
-                            context: context,
-                            provider: provider,
-                            nuovoAteco: codiceCompleto,
-                            nuovoCoeff: coeff,
-                            nuovaAliquota: tempImposta,
-                            acconti: acconti,
-                            fatturato: fatturato,
-                            annoApertura: anno,
-                            meseApertura: tempMeseApertura,
-                            targetNetto: target,
-                            mesiAttivi: mesi,
-                            entrataExtra: extra,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: coloreOttanio,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 0,
-                        ),
-                        child: const Text('Salva Parametri', style: TextStyle(color: Color(0xFF12181B), fontWeight: FontWeight.bold, fontSize: 15)),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🛠️ HELPER GRAFICI MINIMALI
+  Widget _buildModalSectionCard({required String title, required IconData icon, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14191D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFF2DD4BF), size: 14),
+              const SizedBox(width: 6),
+              Text(title, style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPillToggle(String text, bool isSelected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.18) : Colors.black.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white10),
+          ),
+          child: Center(
+            child: Text(text, style: TextStyle(color: isSelected ? const Color(0xFF2DD4BF) : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
           ),
         ),
       ),
@@ -958,30 +1053,54 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
   Widget _buildInputLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+      child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
     );
   }
 
-  Widget _buildModalTextField(TextEditingController controller, String hint, {bool isNumber = false, String? suffix, Function(String)? onChanged}) {
+  Widget _buildModalTextField(
+    TextEditingController controller, 
+    String hint, {
+    bool isNumber = false, 
+    bool formatThousands = false, 
+    String? suffix, 
+    Function(String)? onChanged
+  }) {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: Colors.white, fontSize: 13),
-      onChanged: onChanged,
+      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+      onChanged: (val) {
+        // Formattazione Live Migliaia
+        if (formatThousands && val.isNotEmpty) {
+          String soloNumeri = val.replaceAll(RegExp(r'[^0-9]'), '');
+          if (soloNumeri.isNotEmpty) {
+            String formattato = _formattaInt(int.parse(soloNumeri));
+            if (controller.text != formattato) {
+              controller.value = TextEditingValue(
+                text: formattato,
+                selection: TextSelection.collapsed(offset: formattato.length),
+              );
+            }
+          } else {
+            controller.text = '';
+          }
+        }
+        if (onChanged != null) onChanged(val);
+      },
       decoration: InputDecoration(
         filled: true,
         fillColor: Colors.black.withOpacity(0.3),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
         suffixText: suffix,
-        suffixStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+        suffixStyle: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  // 🎯 SALVATAGGIO PREFERENZE PROFILO (PRESET PER LE PROSSIME FATTURE)
+  // 🎯 SALVATAGGIO FINALE
   void _gestisciSalvataggioProfiloV12({
     required BuildContext context,
     required WalletProvider provider,
@@ -994,9 +1113,10 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
     required int meseApertura,
     required double targetNetto,
     required int mesiAttivi,
+    required List<bool> mesiAttiviStateCustom,
     required double entrataExtra,
+    required int numeroMensilita,
   }) {
-    // 1. Salva Parametri P.IVA (Live)
     provider.salvaProfiloFiscale(
       codiceAteco: nuovoAteco,
       coeffRedditivitaVal: nuovoCoeff,
@@ -1007,16 +1127,17 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
       meseAperturaPiva: meseApertura,
       nettoTarget: targetNetto,
       mesiAttivi: mesiAttivi,
+      mesiAttiviStateCustom: mesiAttiviStateCustom,
     );
 
-    // 2. Aggiorna eventuale Entrata Extra
     provider.salvaEntrateExtra(
       importoMensile: entrataExtra,
       dipendente: provider.hasDipendente,
       pensione: provider.hasPensione,
+      numeroMensilita: numeroMensilita,
     );
 
     Navigator.pop(context);
-    AppNotifications.mostraInAlto(context, 'Preferenze e Obiettivi aggiornati! ✨');
+    AppNotifications.mostraInAlto(context, 'Profilo Fiscale e Obiettivi aggiornati! ✨');
   }
 }
