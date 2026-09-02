@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/1_setup_screen.dart';       // La vecchia schermata
+import 'screens/1_setup_screen.dart';
 import 'screens/1_onboarding_wizard.dart';
 import 'screens/1_main_menu.dart';
 import 'data/wallet_provider.dart';
@@ -16,21 +16,17 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'data/ateco_database.dart';
 import 'data/ateco_uploader.dart';
+import 'widgets_shared/app_lock_wrapper.dart'; // 🛡️ Import Wrapper Blocco Schermo
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  //debugPrintRebuildDirtyWidgets = true; // 👈 AGGIUNGI QUESTA RIGA QUI
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 👇 AGGIUNGI QUESTA RIGA TEMPORANEA per caricare la lista su FireBase:
-  // await AtecoUploader.caricaTuttoSuFirebase();
-
   await AtecoDatabase.sincronizzaCodiciDaFirebase();
   
-  // 🛡️ ATTIVAZIONE CRASHLYTICS (Solo su dispositivi mobili iOS/Android)
   if (!kIsWeb) {
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     PlatformDispatcher.instance.onError = (error, stack) {
@@ -96,7 +92,10 @@ class FiscOnApp extends StatelessWidget {
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(wallet.textScaleFactor),
               ),
-              child: childWidget!,
+              child: AppLockWrapper(
+                lockThreshold: const Duration(minutes: 1), // 👈 BLOCCO AUTOMATICO ATTIVO DOPO 1 MINUTO
+                child: childWidget!,
+              ),
             );
           },
           home: const SplashScreen(),

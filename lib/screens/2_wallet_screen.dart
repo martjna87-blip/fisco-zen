@@ -1,4 +1,4 @@
-import 'dart:ui'; 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/wallet_provider.dart';
@@ -23,6 +23,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   String _filtroMeseMovimenti = 'ultimi_5';
+  bool _isFiltroMovimentiAperto = false;
 
   final Color oceanCyan   = const Color(0xFF38BDF8); 
   final Color goldAccent  = const Color(0xFFFBBF24); 
@@ -76,6 +77,97 @@ class _WalletScreenState extends State<WalletScreen> {
         _dataFiltroRipartizione = DateTime(_dataFiltroRipartizione.year, _dataFiltroRipartizione.month + delta);
       }
     });
+  }
+
+  Widget _buildCustomSelectorMovimenti() {
+    final Map<String, String> opzioni = {
+      'ultimi_5': 'Ultimi 5 Movimenti',
+      'ricorrenti': '🔄 Solo Ricorrenti',
+      '8_2026': 'Agosto 2026',
+      '7_2026': 'Luglio 2026',
+      '6_2026': 'Giugno 2026',
+      '5_2026': 'Maggio 2026',
+    };
+
+    final String etichettaCorrente = opzioni[_filtroMeseMovimenti] ?? 'Ultimi 5 Movimenti';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF12161A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: oceanCyan.withOpacity(0.5), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isFiltroMovimentiAperto = !_isFiltroMovimentiAperto),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    _filtroMeseMovimenti == 'ricorrenti' ? Icons.sync_rounded : Icons.filter_alt_rounded,
+                    color: oceanCyan,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      etichettaCorrente,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Icon(
+                    _isFiltroMovimentiAperto ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isFiltroMovimentiAperto) ...[
+            Divider(color: oceanCyan.withOpacity(0.2), height: 1),
+            Column(
+              children: opzioni.entries.map((entry) {
+                final bool isSelected = _filtroMeseMovimenti == entry.key;
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _filtroMeseMovimenti = entry.key;
+                      _isFiltroMovimentiAperto = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    color: isSelected ? oceanCyan.withOpacity(0.12) : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                          color: isSelected ? oceanCyan : Colors.white24,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          entry.value,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildTargetECuscinettoGlass({required WalletProvider walletProvider}) {
@@ -710,10 +802,8 @@ class _WalletScreenState extends State<WalletScreen> {
     }).fold(0.0, (sum, tx) => sum + tx.amount);
 
     final double targetBase = _isVistaAnnuale ? (walletProvider.nettoTargetMensile * 12) : walletProvider.nettoTargetMensile;
-    // Nel passato/presente le entrate di riferimento devono essere esattamente quelle reali (anche se sono 0)
     final double entrateRiferimento = entratePeriodo; 
 
-    // I target di spesa si basano sull'obiettivo dell'Onboarding o su quanto hai realmente incassato se sei sopra al target
     final double basePerTarget = entratePeriodo > targetBase ? entratePeriodo : (targetBase > 0 ? targetBase : 2500.0);
     final double targetBisogni = basePerTarget * 0.50;
     final double targetSvago = basePerTarget * 0.30;
@@ -725,6 +815,15 @@ class _WalletScreenState extends State<WalletScreen> {
 
       if (_filtroMeseMovimenti == 'ultimi_5') {
         return lista.take(5).toList();
+      } else if (_filtroMeseMovimenti == 'ricorrenti') {
+        final Map<String, dynamic> uniciRicorrenti = {};
+        for (var tx in lista.where((t) => (t.isRecurrent ?? false) == true)) {
+          final String chiaveUnica = (tx.title ?? '').toString().toLowerCase().trim();
+          if (!uniciRicorrenti.containsKey(chiaveUnica)) {
+            uniciRicorrenti[chiaveUnica] = tx;
+          }
+        }
+        return uniciRicorrenti.values.toList();
       } else {
         final parts = _filtroMeseMovimenti.split('_');
         final m = int.tryParse(parts[0]) ?? 8;
@@ -824,7 +923,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         context: context,
                         icon: Icons.account_balance_rounded,
                         color: Colors.white,
-                        titolo: 'Patrimonio Netto',
+                        titolo: 'Patrimonio globale',
                         descrizione: 'Somma totale dei saldi di tutti i tuoi conti correnti e del salvadanaio tasse.',
                       );
                     },
@@ -832,7 +931,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'PATRIMONIO NETTO',
+                          'PATRIMONIO GLOBALE',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 11,
@@ -1025,38 +1124,18 @@ class _WalletScreenState extends State<WalletScreen> {
 
                       const SizedBox(height: 24),
 
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                            child: Text(
                               'MOVIMENTI',
                               style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5),
                             ),
-                            _buildGlassContainer(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              borderRadius: BorderRadius.circular(12),
-                              child: DropdownButton<String>(
-                                value: _filtroMeseMovimenti,
-                                dropdownColor: const Color(0xFF18181B),
-                                underline: const SizedBox(),
-                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: oceanCyan, size: 16),
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _filtroMeseMovimenti = val);
-                                },
-                                items: const [
-                                  DropdownMenuItem(value: 'ultimi_5', child: Text('Ultimi 5')),
-                                  DropdownMenuItem(value: '8_2026', child: Text('Agosto 2026')),
-                                  DropdownMenuItem(value: '7_2026', child: Text('Luglio 2026')),
-                                  DropdownMenuItem(value: '6_2026', child: Text('Giugno 2026')),
-                                  DropdownMenuItem(value: '5_2026', child: Text('Maggio 2026')),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                          _buildCustomSelectorMovimenti(),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
@@ -1548,7 +1627,6 @@ class _WalletScreenState extends State<WalletScreen> {
     double bisogniUso = spesoBisogni;
     double svagoUso = spesoSvago;
 
-    // Target di riferimento teorici dall'Onboarding
     final double targetBaseOnboarding = _isVistaAnnuale 
         ? (walletProvider.nettoTargetMensile * 12) 
         : walletProvider.nettoTargetMensile;
@@ -1560,7 +1638,6 @@ class _WalletScreenState extends State<WalletScreen> {
     double calcoloRisparmioMese = 0.0;
 
     if (isMeseFuturo) {
-      // 🔮 MESI FUTURI: Proiezione di Budget
       entrateUso = walletProvider.getEntrataPrevistaMeseFuturo(_dataFiltroRipartizione);
       tBisogni = entrateUso * 0.50;
       tSvago = entrateUso * 0.30;
@@ -1576,12 +1653,11 @@ class _WalletScreenState extends State<WalletScreen> {
 
       calcoloRisparmioMese = (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso);
     } else {
-      // 📜 MESI PASSATI / CORRENTE: Consuntivo Reale (Zero invenzioni)
-      entrateUso = entrateRiferimento; // Incassi REALI registrati nei movimenti
+      entrateUso = entrateRiferimento; 
       
       calcoloRisparmioMese = entrateUso > 0
           ? (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso)
-          : 0.0; // Se 0 incassi reali, il risparmio reale è 0 €
+          : 0.0; 
     }
 
     final bool sforatoBisogni = bisogniUso > tBisogni && tBisogni > 0;
@@ -1603,33 +1679,42 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: purpleZen.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: purpleZen.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.explore_rounded, color: purpleZen, size: 15),
                         ),
-                        child: Icon(Icons.explore_rounded, color: purpleZen, size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Bussola Spese (50/30/20)',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white70,
-                        size: 18,
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Bussola Spese (50/30/20)',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          _isBussolaEspansa ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                         decoration: BoxDecoration(
                           color: isMeseFuturo
                               ? purpleZen.withOpacity(0.2)
@@ -1638,22 +1723,21 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         child: Text(
                           isMeseFuturo
-                              ? '🔮 PIANO BUDGET'
+                              ? '🔮 PIANIFICATO'
                               : (haSforamenti ? '⚠️ Fuori Target' : 'In Equilibrio'),
                           style: TextStyle(
                             color: isMeseFuturo ? purpleZen : (haSforamenti ? const Color(0xFFEF4444) : oceanCyan),
-                            fontSize: 10,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      // 🎯 TASTO PERMANENTE PER APRIRE LA RICALIBRAZIONE IN OGNI MOMENTO
+                      const SizedBox(width: 5),
                       InkWell(
                         onTap: () => _mostraModalRicalibrazioneTarget(context, walletProvider, walletProvider.statoRitmoFatturato == 'over'),
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.all(5),
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(8),
@@ -1789,7 +1873,6 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
-    
 
   Widget _buildTargetRow(String title, int pct, double real, double target, Color color, {bool isRisparmio = false}) {
     final bool inAllarme = isRisparmio ? (real < target && target > 0) : (real > target && target > 0);
@@ -1865,6 +1948,8 @@ class _WalletScreenState extends State<WalletScreen> {
     else if (titleLower.contains('sblocco')) { icon = Icons.shield_outlined; color = goldAccent; detail = 'Da Salvadanaio Tasse'; amountStr = _formattaValuta(tx.amount); }
     else if (titleLower.contains('giroconto')) { icon = Icons.sync_alt_rounded; color = Colors.white54; detail = 'Tra i tuoi conti'; amountStr = _formattaValuta(tx.amount); }
 
+    final bool isSoloRicorrenteView = _filtroMeseMovimenti == 'ricorrenti';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -1892,7 +1977,12 @@ class _WalletScreenState extends State<WalletScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(detail.split('-').first.trim(), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  isSoloRicorrenteView ? '$nomeConto • Ricorrenza Mensile' : detail.split('-').first.trim(),
+                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fisco_zen/data/recurrence_manager.dart';
 
 enum AccountRole {
   principal,  
@@ -84,7 +85,9 @@ class TransactionModel {
   final bool isRecurrent; 
   final String? frequenza; 
   final String? giornoRicorrenza; 
+  final DateTime? dataInizio;
   final DateTime? dataFineRicorrenza;
+  final bool isArchived;
 
   TransactionModel({
     required this.id,
@@ -98,7 +101,9 @@ class TransactionModel {
     this.isRecurrent = false,
     this.frequenza,
     this.giornoRicorrenza,
+    this.dataInizio,
     this.dataFineRicorrenza,
+    this.isArchived = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -113,7 +118,9 @@ class TransactionModel {
         'isRecurrent': isRecurrent,
         'frequenza': frequenza,
         'giornoRicorrenza': giornoRicorrenza,
+        'dataInizio': dataInizio?.toIso8601String(),
         'dataFineRicorrenza': dataFineRicorrenza?.toIso8601String(),
+        'isArchived': isArchived,
       };
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) => TransactionModel(
@@ -128,9 +135,11 @@ class TransactionModel {
         isRecurrent: json['isRecurrent'] as bool? ?? false,
         frequenza: json['frequenza'] as String?,
         giornoRicorrenza: json['giornoRicorrenza'] as String?,
+        dataInizio: json['dataInizio'] != null ? DateTime.parse(json['dataInizio'] as String) : null,
         dataFineRicorrenza: json['dataFineRicorrenza'] != null 
             ? DateTime.parse(json['dataFineRicorrenza'] as String) 
             : null,
+        isArchived: json['isArchived'] as bool? ?? false,
       );
 }
 
@@ -193,6 +202,11 @@ class WalletProvider with ChangeNotifier {
     _userTier = valore ? UserTier.pro : UserTier.free;
     _salvaDatiInLocalStorage();
     notifyListeners();
+  }
+
+  // 🔹 INCOLLA QUI IL NUOVO METODO:
+  void setProUser(bool valore) {
+    impostaStatoPro(valore);
   }
 
   void attivaPro() {
@@ -698,109 +712,221 @@ class WalletProvider with ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
-  List<Map<String, dynamic>> _vociPianificate = [
-    {
-      'id': '1',
-      'nome': 'Affitto / Mutuo',
-      'categoria': 'Bisogni (50%)',
-      'sottocategoria': 'Casa/Affitto',
-      'previsto': 650.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '2',
-      'nome': 'Bollette & Utenze',
-      'categoria': 'Bisogni (50%)',
-      'sottocategoria': 'Canoni/Bollette',
-      'previsto': 140.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '3',
-      'nome': 'Spesa Alimentare',
-      'categoria': 'Bisogni (50%)',
-      'sottocategoria': 'Alimentari',
-      'previsto': 350.00,
-      'tipo': 'variabile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '4',
-      'nome': 'Assicurazione Auto',
-      'categoria': 'Bisogni (50%)',
-      'sottocategoria': 'Auto',
-      'previsto': 120.00,
-      'tipo': 'annuale_spalmata',
-      'totaleAnnuale': 1440.00,
-      'meseScadenza': 'SET',
-    },
-    {
-      'id': '5',
-      'nome': 'Ristoranti & Uscite',
-      'categoria': 'Svago (30%)',
-      'sottocategoria': 'Divertimento',
-      'previsto': 200.00,
-      'tipo': 'variabile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '6',
-      'nome': 'Hobby & Palestra',
-      'categoria': 'Svago (30%)',
-      'sottocategoria': 'Divertimento',
-      'previsto': 80.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '7',
-      'nome': 'Abbonamenti Streaming',
-      'categoria': 'Svago (30%)',
-      'sottocategoria': 'Canoni/Bollette',
-      'previsto': 30.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '8',
-      'nome': 'Fondo Emergenze',
-      'categoria': 'Risparmio (20%)',
-      'sottocategoria': 'Altro',
-      'previsto': 300.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
-    {
-      'id': '9',
-      'nome': 'Accantonamento Vacanze',
-      'categoria': 'Risparmio (20%)',
-      'sottocategoria': 'Viaggi',
-      'previsto': 200.00,
-      'tipo': 'mensile',
-      'frequenzaMensile': 'tutti',
-    },
+  // ⚙️ PERCENTUALI BUSSOLA BUDGET PERSONALIZZATE
+  double _percentBisogni = 50.0;
+  double _percentSvago = 30.0;
+  double _percentRisparmio = 20.0;
+
+  double get percentBisogni => _percentBisogni;
+  double get percentSvago => _percentSvago;
+  double get percentRisparmio => _percentRisparmio;
+
+  // 📊 PILOTAGGIO FATTURATO P.IVA MESE PER MESE (12 MESI)
+  Map<int, double> _pilotaggioFatturatoMesi = {
+    1: 3000.0, 2: 3000.0, 3: 3500.0, 4: 3500.0, 5: 4000.0, 6: 4000.0,
+    7: 3500.0, 8: 0.0, 9: 4500.0, 10: 4500.0, 11: 0.0, 12: 0.0,
+  };
+
+  Map<int, double> get pilotaggioFatturatoMesi => Map.unmodifiable(_pilotaggioFatturatoMesi);
+
+  double get totaleFatturatoPilotato =>
+      _pilotaggioFatturatoMesi.values.fold(0.0, (sum, val) => sum + val);
+
+  // 🔒 Lista Reale per utenti PRO (Inizia VUOTA)
+  List<Map<String, dynamic>> _vociPianificateReali = [];
+
+  // 🎨 Lista Demo per la modalità Anteprima FREE
+  final List<Map<String, dynamic>> _vociPianificateDemo = [
+    {'id': '1', 'nome': 'Affitto / Mutuo', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Casa/Affitto', 'previsto': 650.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
+    {'id': '2', 'nome': 'Bollette & Utenze', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Canoni/Bollette', 'previsto': 140.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
+    {'id': '3', 'nome': 'Spesa Alimentare', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Alimentari', 'previsto': 350.00, 'tipo': 'variabile', 'frequenzaMensile': 'tutti'},
+    {'id': '4', 'nome': 'Assicurazione Auto', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Auto', 'previsto': 120.00, 'tipo': 'annuale_spalmata', 'totaleAnnuale': 1440.00, 'meseScadenza': 'SET'},
+    {'id': '5', 'nome': 'Ristoranti & Uscite', 'categoria': 'Svago (30%)', 'sottocategoria': 'Divertimento', 'previsto': 200.00, 'tipo': 'variabile', 'frequenzaMensile': 'tutti'},
+    {'id': '6', 'nome': 'Hobby & Palestra', 'categoria': 'Svago (30%)', 'sottocategoria': 'Divertimento', 'previsto': 80.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
+    {'id': '7', 'nome': 'Abbonamenti Streaming', 'categoria': 'Svago (30%)', 'sottocategoria': 'Canoni/Bollette', 'previsto': 30.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
+    {'id': '8', 'nome': 'Fondo Emergenze', 'categoria': 'Risparmio (20%)', 'sottocategoria': 'Altro', 'previsto': 300.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
+    {'id': '9', 'nome': 'Accantonamento Vacanze', 'categoria': 'Risparmio (20%)', 'sottocategoria': 'Viaggi', 'previsto': 200.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
   ];
 
-  List<Map<String, dynamic>> get vociPianificate => List.unmodifiable(_vociPianificate);
+  List<Map<String, dynamic>> get vociPianificate {
+    if (!isProUser) return List.unmodifiable(_vociPianificateDemo);
+
+    final List<Map<String, dynamic>> result = [];
+    final Set<String> rootIdsProcessati = {};
+
+    // 1. Controlliamo le voci salvate in Pianificazione (2.4)
+    for (var v in _vociPianificateReali) {
+      if (v['isArchived'] == true) continue;
+      final rootId = RecurrenceManager.getRootId((v['id'] ?? '').toString());
+
+      if (rootIdsProcessati.contains(rootId)) continue;
+
+      // Interroghiamo il Manager per sapere se la regola è ancora viva
+      if (RecurrenceManager.isRicorrenzaAttiva(
+          elementId: rootId,
+          transactions: _transactions,
+          vociReali: _vociPianificateReali,
+          skippedPredictions: _skippedPredictions,
+          oggi: DateTime.now())) {
+        rootIdsProcessati.add(rootId);
+        result.add(Map<String, dynamic>.from(v));
+      }
+    }
+
+    // 2. Controlliamo le ricorrenze create dal Wallet (2.1)
+    final txsRicorrenti = _transactions.where((tx) =>
+        tx.isRecurrent && !tx.isArchived && !tx.id.startsWith('rec_real_') && !tx.id.startsWith('prev_'));
+
+    for (var tx in txsRicorrenti) {
+      final rootId = RecurrenceManager.getRootId(tx.id);
+      if (rootIdsProcessati.contains(rootId)) continue;
+
+      // Interroghiamo di nuovo il Manager
+      if (RecurrenceManager.isRicorrenzaAttiva(
+          elementId: rootId,
+          transactions: _transactions,
+          vociReali: _vociPianificateReali,
+          skippedPredictions: _skippedPredictions,
+          oggi: DateTime.now())) {
+        rootIdsProcessati.add(rootId);
+        int giornoAddebito = int.tryParse(tx.giornoRicorrenza.toString()) ?? tx.date.day;
+
+        result.add({
+          'id': tx.id,
+          'nome': tx.title,
+          'previsto': tx.amount,
+          'tipoMovimento': tx.isIncome ? 'entrata' : 'uscita',
+          'sottocategoria': tx.category,
+          'categoria': tx.category,
+          'frequenza': tx.frequenza ?? 'Ogni mese',
+          'giornoAddebito': giornoAddebito,
+          'accountId': tx.accountId,
+          'dataInizio': tx.dataInizio ?? tx.date,
+          'dataFineRicorrenza': tx.dataFineRicorrenza,
+          'isTransaction': true,
+          'isArchived': tx.isArchived,
+        });
+      }
+    }
+    return List.unmodifiable(result);
+  }
+
+  // 🎯 GETTER PER LE RICORRENZE ARCHIVIATE (CESTINO / DISATTIVATE)
+  List<Map<String, dynamic>> get vociArchiviate {
+    final List<Map<String, dynamic>> archiviate = [];
+
+    for (var v in _vociPianificateReali.where((v) => v['isArchived'] == true)) {
+      archiviate.add(Map<String, dynamic>.from(v));
+    }
+
+    for (var tx in _transactions.where((t) => t.isRecurrent && t.isArchived)) {
+      archiviate.add({
+        'id': tx.id,
+        'nome': tx.title,
+        'previsto': tx.amount,
+        'tipoMovimento': tx.isIncome ? 'entrata' : 'uscita',
+        'sottocategoria': tx.category,
+        'categoria': tx.category,
+        'frequenza': tx.frequenza ?? 'Ogni mese',
+        'giornoAddebito': tx.giornoRicorrenza ?? tx.date.day.toString(),
+        'accountId': tx.accountId,
+        'dataInizio': tx.dataInizio ?? tx.date,
+        'dataFineRicorrenza': tx.dataFineRicorrenza,
+        'isTransaction': true,
+        'isArchived': true,
+      });
+    }
+
+    return List.unmodifiable(archiviate);
+  }
 
   void aggiungiSpesaPianificata(Map<String, dynamic> voce) {
-    _vociPianificate.add(voce);
+    // 1. Estrae o crea il rootId univoco
+    final String rootId = (voce['id'] != null && voce['id'].toString().isNotEmpty)
+        ? RecurrenceManager.getRootId(voce['id'].toString())
+        : DateTime.now().millisecondsSinceEpoch.toString();
+
+    final vocePulita = {...voce, 'id': rootId};
+
+    // 2. Aggiorna o inserisce la voce in 2.4
+    final pIdx = _vociPianificateReali.indexWhere((v) =>
+        RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+    if (pIdx != -1) {
+      _vociPianificateReali[pIdx] = vocePulita;
+    } else {
+      _vociPianificateReali.add(vocePulita);
+    }
+
+    // 3. Sincronizza creando la "Regola Madre" nel Wallet (2.1)
+    final txIdx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
+    if (txIdx == -1) {
+      final DateTime dataUso = voce['dataInizio'] != null
+          ? (voce['dataInizio'] is DateTime
+              ? voce['dataInizio'] as DateTime
+              : DateTime.tryParse(voce['dataInizio'].toString()) ?? DateTime.now())
+          : DateTime.now();
+
+      _transactions.insert(
+        0,
+        TransactionModel(
+          id: rootId,
+          title: voce['nome'] ?? 'Spesa Pianificata',
+          subtitle: '${dataUso.day}/${dataUso.month} • ${voce['categoria'] ?? 'Altro'}',
+          amount: (voce['previsto'] as num?)?.toDouble() ?? 0.0,
+          isIncome: voce['tipoMovimento'] == 'entrata',
+          category: voce['categoria'] ?? 'Altro',
+          date: dataUso,
+          accountId: voce['accountId'] ?? 'main_account',
+          isRecurrent: true,
+          frequenza: voce['frequenza'] ?? 'Ogni mese',
+          giornoRicorrenza: (voce['giornoAddebito'] ?? dataUso.day).toString(),
+          dataInizio: dataUso,
+          dataFineRicorrenza: voce['dataFineRicorrenza'] != null
+              ? (voce['dataFineRicorrenza'] is DateTime
+                  ? voce['dataFineRicorrenza'] as DateTime
+                  : DateTime.tryParse(voce['dataFineRicorrenza'].toString()))
+              : null,
+        ),
+      );
+    }
+
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
   void rimuoviSpesaPianificata(String id) {
-    _vociPianificate.removeWhere((v) => v['id'] == id);
+    // Ora usa il metodo centralizzato che stornare i soldi e aggiorna anche 2.1!
+    deleteTransaction(id); 
+  }
+
+  void azzeraPianificazioneSpese() {
+    _vociPianificateReali.clear();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
-  void azzeraPianificazioneSpese() {
-    _vociPianificate.clear();
+  void impostaFatturatoMese(int mese, double importo) {
+    _pilotaggioFatturatoMesi[mese] = importo;
     _salvaDatiInLocalStorage();
     notifyListeners();
+  }
+
+  void salvaRegolaBudget(double bisogni, double svago, double risparmio) {
+    _percentBisogni = bisogni;
+    _percentSvago = svago;
+    _percentRisparmio = risparmio;
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  void aggiornaSpesaPianificata(String id, Map<String, dynamic> datiAggiornati) {
+    final rootId = RecurrenceManager.getRootId(id);
+    final idx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+    if (idx != -1) {
+      _vociPianificateReali[idx] = {..._vociPianificateReali[idx], ...datiAggiornati};
+      _salvaDatiInLocalStorage();
+      notifyListeners();
+    }
   }
 
   List<Map<String, dynamic>> _fattureDaIncassare = [];
@@ -869,11 +995,23 @@ class WalletProvider with ChangeNotifier {
     return dVirtuale.isAfter(dFine);
   }
 
-  List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
+ List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
-    final ricorrenti = _transactions.where((t) => t.isRecurrent).toList();
 
-    for (var tx in ricorrenti) {
+    // Mantiene una sola regola master per serie
+    final Map<String, TransactionModel> masterMap = {};
+    for (var tx in _transactions.where((t) => t.isRecurrent && !t.isArchived)) {
+      if (tx.id.startsWith('rec_real_') || tx.id.startsWith('prev_')) continue;
+
+      final cleanId = RecurrenceManager.getRootId(tx.id);
+      if (!masterMap.containsKey(cleanId)) {
+        masterMap[cleanId] = tx;
+      }
+    }
+
+    for (var tx in masterMap.values) {
+      final String cleanParentId = RecurrenceManager.getRootId(tx.id);
+
       if (tx.frequenza != 'Ogni settimana') {
         int stepMesi = 1;
         if (tx.frequenza == 'Ogni 2 mesi') stepMesi = 2;
@@ -884,76 +1022,128 @@ class WalletProvider with ChangeNotifier {
         int mesiDiff = (meseRiferimento.year - tx.date.year) * 12 + (meseRiferimento.month - tx.date.month);
 
         if (mesiDiff >= 0 && mesiDiff % stepMesi == 0) {
-          int giornoPrevisto = int.tryParse(tx.giornoRicorrenza ?? '1') ?? tx.date.day;
+          final String keySkip = '${cleanParentId}_${meseRiferimento.year}_${meseRiferimento.month}';
 
+          if (_skippedPredictions.contains(keySkip)) continue;
+
+          int giornoPrevisto = int.tryParse(tx.giornoRicorrenza ?? '1') ?? tx.date.day;
           int maxGiorniMese = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0).day;
           int giornoEffettivo = giornoPrevisto > maxGiorniMese ? maxGiorniMese : giornoPrevisto;
 
           DateTime dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoEffettivo);
 
-          if (_superaDataFine(dataVirtuale, tx.dataFineRicorrenza)) {
-            continue;
-          }
+          if (_superaDataFine(dataVirtuale, tx.dataFineRicorrenza)) continue;
 
           bool isStessoMeseCreazione = dataVirtuale.year == tx.date.year && dataVirtuale.month == tx.date.month;
 
-          if (!isStessoMeseCreazione) {
+          final giaContabilizzato = _transactions.any((t) =>
+              t.id == 'rec_real_${cleanParentId}_${dataVirtuale.year}_${dataVirtuale.month}' ||
+              (!t.id.startsWith('rule_') &&
+               !t.id.startsWith('prev_') &&
+               t.title == tx.title &&
+               t.date.year == dataVirtuale.year &&
+               t.date.month == dataVirtuale.month));
+
+          if (!isStessoMeseCreazione && !giaContabilizzato) {
             previsti.add(TransactionModel(
-              id: 'prev_${tx.id}_${dataVirtuale.year}_${dataVirtuale.month}', 
+              id: 'prev_${cleanParentId}_${dataVirtuale.year}_${dataVirtuale.month}',
               title: tx.title,
-              subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}', 
+              subtitle: 'In arrivo il ${dataVirtuale.day}/${dataVirtuale.month}',
               amount: tx.amount,
               isIncome: tx.isIncome,
               category: tx.category,
               date: dataVirtuale,
               accountId: tx.accountId,
-              isRecurrent: true, 
+              isRecurrent: true,
             ));
           }
         }
       }
-      else if (tx.frequenza == 'Ogni settimana' && tx.giornoRicorrenza != null) {
-        final keySettimanale = '${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}';
-        if (_skippedPredictions.contains(keySettimanale)) continue;
-
-        int targetWeekday = _stringToWeekday(tx.giornoRicorrenza!);
-        int numOccorrenze = 0;
-        DateTime? primaDataValida;
-        
-        int daysInMonth = DateTime(meseRiferimento.year, meseRiferimento.month + 1, 0).day;
-        for (int i = 1; i <= daysInMonth; i++) {
-          DateTime checkDate = DateTime(meseRiferimento.year, meseRiferimento.month, i);
-          if (checkDate.weekday == targetWeekday) {
-            if (_superaDataFine(checkDate, tx.dataFineRicorrenza)) {
-              continue;
-            }
-
-            if (checkDate.isAfter(tx.date)) {
-              numOccorrenze++;
-              primaDataValida ??= checkDate; 
-            }
-          }
-        }
-        
-        if (numOccorrenze > 0) {
-          final String etichettaOccorrenze = tx.isIncome ? 'entrate' : 'uscite';
-          previsti.add(TransactionModel(
-            id: 'prev_${tx.id}_${meseRiferimento.year}_${meseRiferimento.month}', 
-            title: '${tx.title} ($numOccorrenze $etichettaOccorrenze)', 
-            subtitle: 'Previsto', 
-            amount: tx.amount * numOccorrenze, 
-            isIncome: tx.isIncome,
-            category: tx.category,
-            date: primaDataValida ?? meseRiferimento, 
-            accountId: tx.accountId,
-            isRecurrent: true, 
-          ));
-        }
-      }
     }
-    
+
     previsti.sort((a, b) => a.date.compareTo(b.date));
     return previsti;
+  }
+
+  // ⚡ CONVERTE AUTOMATICAMENTE LE RATE SCADUTE O ODIERNE IN MOVIMENTI REALI
+  void sincronizzaRicorrenzeScadute() {
+    final ora = DateTime.now();
+    final oggi = DateTime(ora.year, ora.month, ora.day);
+
+    final masterRicorrenti = _transactions
+        .where((t) => t.isRecurrent && !t.isArchived && !t.id.startsWith('rec_real_') && !t.id.startsWith('prev_'))
+        .toList();
+
+    bool modificaEffettuata = false;
+
+    for (var master in masterRicorrenti) {
+      DateTime dataInizio = master.dataInizio ?? master.date;
+      DateTime dataCorrente = DateTime(dataInizio.year, dataInizio.month, dataInizio.day);
+
+      int stepMesi = 1;
+      if (master.frequenza == 'Ogni 2 mesi') stepMesi = 2;
+      else if (master.frequenza == 'Ogni 3 mesi (Trimestrale)') stepMesi = 3;
+      else if (master.frequenza == 'Ogni 6 mesi (Semestrale)') stepMesi = 6;
+      else if (master.frequenza == 'Ogni anno (Annuale)') stepMesi = 12;
+
+      while (!dataCorrente.isAfter(oggi)) {
+        if (_superaDataFine(dataCorrente, master.dataFineRicorrenza)) break;
+
+        final cleanId = RecurrenceManager.getRootId(master.id);
+        final keySkip = '${cleanId}_${dataCorrente.year}_${dataCorrente.month}';
+
+        if (!_skippedPredictions.contains(keySkip)) {
+          final giaRegistrato = _transactions.any((t) =>
+              t.id == 'rec_real_${cleanId}_${dataCorrente.year}_${dataCorrente.month}' ||
+              (t.title == master.title &&
+                  t.date.year == dataCorrente.year &&
+                  t.date.month == dataCorrente.month &&
+                  !t.id.startsWith('rule_')));
+
+          if (!giaRegistrato) {
+            final targetAccount = _accounts.firstWhere(
+              (a) => a.id == (master.accountId ?? 'main_account'),
+              orElse: () => _accounts.first,
+            );
+
+            if (master.isIncome) {
+              targetAccount.amount += master.amount;
+            } else {
+              targetAccount.amount -= master.amount;
+            }
+
+            _transactions.insert(
+              0,
+              TransactionModel(
+                id: 'rec_real_${cleanId}_${dataCorrente.year}_${dataCorrente.month}',
+                title: master.title,
+                subtitle: '${dataCorrente.day}/${dataCorrente.month} • ${master.category}',
+                amount: master.amount,
+                isIncome: master.isIncome,
+                category: master.category,
+                date: dataCorrente,
+                accountId: targetAccount.id,
+                isRecurrent: true,
+                frequenza: master.frequenza,
+                giornoRicorrenza: master.giornoRicorrenza,
+                dataInizio: master.dataInizio,
+                dataFineRicorrenza: master.dataFineRicorrenza,
+              ),
+            );
+
+            modificaEffettuata = true;
+          }
+        }
+
+        dataCorrente = DateTime(dataCorrente.year, dataCorrente.month + stepMesi, dataCorrente.day);
+      }
+    }
+
+    if (modificaEffettuata) {
+      _aggiornaTasseVirtuali();
+      _calcolaStatoCuscinetto();
+      _salvaDatiInLocalStorage();
+    }
   }
 
   void deleteAccount(String accountId) {
@@ -1180,14 +1370,25 @@ class WalletProvider with ChangeNotifier {
         _skippedPredictions = decoded.map((s) => s.toString()).toList();
       }
 
-      final vociPianificateStr = prefs.getString('vociPianificate');
+      final vociPianificateStr = prefs.getString('vociPianificateReali');
       if (vociPianificateStr != null) {
         final List decoded = jsonDecode(vociPianificateStr);
-        _vociPianificate = decoded.map((v) => Map<String, dynamic>.from(v)).toList();
+        _vociPianificateReali = decoded.map((v) => Map<String, dynamic>.from(v)).toList();
+      }
+
+      _percentBisogni = prefs.getDouble('percentBisogni') ?? 50.0;
+      _percentSvago = prefs.getDouble('percentSvago') ?? 30.0;
+      _percentRisparmio = prefs.getDouble('percentRisparmio') ?? 20.0;
+
+      final pilotaggioStr = prefs.getString('pilotaggioFatturatoMesi');
+      if (pilotaggioStr != null) {
+        final Map<String, dynamic> decoded = jsonDecode(pilotaggioStr);
+        _pilotaggioFatturatoMesi = decoded.map((k, v) => MapEntry(int.parse(k), (v as num).toDouble()));
       }
 
       _aggiornaTasseVirtuali();
       _calcolaStatoCuscinetto();
+      sincronizzaRicorrenzeScadute(); // 👈 Converti le rate scadute in reali
       notifyListeners();
     } catch (e) {
       debugPrint('Errore durante la lettura: $e');
@@ -1233,7 +1434,12 @@ class WalletProvider with ChangeNotifier {
       await prefs.setString('fattureDaIncassare', jsonEncode(_fattureDaIncassare));
       await prefs.setString('fattureIncassate', jsonEncode(_fattureIncassate));
       await prefs.setString('skippedPredictions', jsonEncode(_skippedPredictions));
-      await prefs.setString('vociPianificate', jsonEncode(_vociPianificate));
+      await prefs.setString('vociPianificateReali', jsonEncode(_vociPianificateReali));
+
+      await prefs.setDouble('percentBisogni', _percentBisogni);
+      await prefs.setDouble('percentSvago', _percentSvago);
+      await prefs.setDouble('percentRisparmio', _percentRisparmio);
+      await prefs.setString('pilotaggioFatturatoMesi', jsonEncode(_pilotaggioFatturatoMesi.map((k, v) => MapEntry(k.toString(), v))));
 
       await _salvaDatiSuCloud();
     } catch (e) {
@@ -1266,7 +1472,7 @@ class WalletProvider with ChangeNotifier {
         'transactions': _transactions.map((t) => t.toJson()).toList(),
         'fattureDaIncassare': _fattureDaIncassare,
         'fattureIncassate': _fattureIncassate,
-        'vociPianificate': _vociPianificate,
+        'vociPianificate': _vociPianificateReali,
         'lastUpdate': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -1315,8 +1521,9 @@ class WalletProvider with ChangeNotifier {
     String? accountId,
     DateTime? date,
     bool isRecurrent = false, 
-    String? frequenza,        
+    String? frequenza,         
     String? giornoRicorrenza, 
+    DateTime? dataInizio,
     DateTime? dataFineRicorrenza,
     String? customId,
   }) {
@@ -1339,6 +1546,7 @@ class WalletProvider with ChangeNotifier {
       isRecurrent: isRecurrent,
       frequenza: frequenza,
       giornoRicorrenza: giornoRicorrenza,
+      dataInizio: dataInizio ?? (isRecurrent ? dataUso : null),
       dataFineRicorrenza: dataFineRicorrenza,
     );
 
@@ -1352,6 +1560,7 @@ class WalletProvider with ChangeNotifier {
 
     _aggiornaTasseVirtuali();
     _calcolaStatoCuscinetto();
+    sincronizzaRicorrenzeScadute(); // 👈 Converti subito se la data inserita è odierna o passata
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1474,49 +1683,124 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void deleteTransaction(String id) {
-    final idx = _transactions.indexWhere((t) => t.id == id);
-    if (idx == -1) return;
+  // 📦 ARCHIVIA (DISATTIVA SULL'ARCHIVIO SENZA CANCELLARE LO STORICO PASSATO)
+  void archiviaRicorrenza(String id) {
+    final rootId = RecurrenceManager.getRootId(id);
 
-    final tx = _transactions[idx];
-
-    String? targetGemelloId;
-    if (id.endsWith('_da')) {
-      targetGemelloId = id.replaceAll('_da', '_verso');
-    } else if (id.endsWith('_verso')) {
-      targetGemelloId = id.replaceAll('_verso', '_da');
+    final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
+    if (idx != -1) {
+      final tx = _transactions[idx];
+      _transactions[idx] = TransactionModel(
+        id: tx.id,
+        title: tx.title,
+        subtitle: tx.subtitle,
+        amount: tx.amount,
+        isIncome: tx.isIncome,
+        category: tx.category,
+        date: tx.date,
+        accountId: tx.accountId,
+        isRecurrent: true,
+        frequenza: tx.frequenza,
+        giornoRicorrenza: tx.giornoRicorrenza,
+        dataInizio: tx.dataInizio,
+        dataFineRicorrenza: tx.dataFineRicorrenza,
+        isArchived: true, // 👈 Contrassegnato come archiviato
+      );
     }
 
-    _stornaSaldoConto(tx);
+    final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+    if (pIdx != -1) {
+      _vociPianificateReali[pIdx]['isArchived'] = true;
+    }
 
-    if (targetGemelloId != null) {
-      final gemelloIdx = _transactions.indexWhere((t) => t.id == targetGemelloId);
-      if (gemelloIdx != -1) {
-        _stornaSaldoConto(_transactions[gemelloIdx]);
-        _transactions.removeAt(gemelloIdx);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 🔄 RIPRISTINA DALL'ARCHIVIO
+  void ripristinaRicorrenzaArchiviata(String id, {double? nuovoImporto, DateTime? nuovaDataInizio, DateTime? nuovaDataFine}) {
+    final rootId = RecurrenceManager.getRootId(id);
+
+    final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
+    if (idx != -1) {
+      final tx = _transactions[idx];
+      _transactions[idx] = TransactionModel(
+        id: tx.id,
+        title: tx.title,
+        subtitle: tx.subtitle,
+        amount: nuovoImporto ?? tx.amount,
+        isIncome: tx.isIncome,
+        category: tx.category,
+        date: nuovaDataInizio ?? tx.date,
+        accountId: tx.accountId,
+        isRecurrent: true,
+        frequenza: tx.frequenza,
+        giornoRicorrenza: tx.giornoRicorrenza,
+        dataInizio: nuovaDataInizio ?? tx.dataInizio,
+        dataFineRicorrenza: nuovaDataFine,
+        isArchived: false, // 👈 Riattivato
+      );
+    }
+
+    final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+    if (pIdx != -1) {
+      _vociPianificateReali[pIdx]['isArchived'] = false;
+      if (nuovoImporto != null) _vociPianificateReali[pIdx]['previsto'] = nuovoImporto;
+      if (nuovaDataInizio != null) _vociPianificateReali[pIdx]['dataInizio'] = nuovaDataInizio.toIso8601String();
+      if (nuovaDataFine != null) _vociPianificateReali[pIdx]['dataFineRicorrenza'] = nuovaDataFine.toIso8601String();
+    }
+
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 💥 ELIMINAZIONE TRANSAZIONE O SINGOLA RATA SCADUTA
+  void deleteTransaction(String id) {
+    final String rootId = RecurrenceManager.getRootId(id);
+
+    // 1. Se l'ID appartiene a una rata specifica (reale o prevista), aggiungiamo l'eccezione
+    if (id.startsWith('rec_real_') || id.startsWith('prev_')) {
+      final parts = id.split('_');
+      if (parts.length >= 4) {
+        final month = parts.last;
+        final year = parts[parts.length - 2];
+        
+        final keySkip = '${rootId}_${year}_${month}';
+        if (!_skippedPredictions.contains(keySkip)) {
+          _skippedPredictions.add(keySkip);
+        }
+      }
+      
+      // Storniamo e rimuoviamo solo quella singola rata
+      final idx = _transactions.indexWhere((t) => t.id == id);
+      if (idx != -1) {
+        _stornaSaldoConto(_transactions[idx]);
+        _transactions.removeAt(idx);
       }
     } else {
-      final bool isGiroconto = tx.category == 'Giroconto' ||
-          tx.category == 'Trasferimento' ||
-          tx.title.toLowerCase().contains('giroconto') ||
-          tx.title.toLowerCase().contains('salvadanaio') ||
-          tx.title.toLowerCase().contains('accantonamento');
+      // 2. Se l'ID NON è una rata specifica, controlliamo se è una Regola Madre o una transazione normale
+      final idx = _transactions.indexWhere((t) => t.id == id);
+      if (idx != -1) {
+        final bool isMotherRule = _transactions[idx].isRecurrent;
 
-      if (isGiroconto) {
-        final gemelloIdx = _transactions.indexWhere((t) =>
-            t.id != tx.id &&
-            t.isIncome != tx.isIncome &&
-            (t.amount - tx.amount).abs() < 0.01 &&
-            t.date.difference(tx.date).inHours.abs() <= 24);
+        if (isMotherRule) {
+          // Rimuoviamo TUTTO: la regola madre, le rate reali generate e la pianificazione
+          final daRimuovere = _transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
 
-        if (gemelloIdx != -1) {
-          _stornaSaldoConto(_transactions[gemelloIdx]);
-          _transactions.removeAt(gemelloIdx);
+          for (var tx in daRimuovere) {
+            _stornaSaldoConto(tx);
+          }
+
+          _transactions.removeWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
+          _vociPianificateReali.removeWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+          _skippedPredictions.removeWhere((k) => k.startsWith(rootId));
+        } else {
+          // 3. È solo una transazione normale (es. un caffè o incasso)
+          _stornaSaldoConto(_transactions[idx]);
+          _transactions.removeAt(idx);
         }
       }
     }
-
-    _transactions.removeWhere((t) => t.id == id);
 
     _aggiornaTasseVirtuali();
     _calcolaStatoCuscinetto();
@@ -1524,7 +1808,103 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 1️⃣ ELIMINA SOLO QUESTO MESE
+  void eliminaSoloQuestoMese(String id, DateTime dataRata) {
+    final String rootId = RecurrenceManager.getRootId(id);
+    final String keySkip = '${rootId}_${dataRata.year}_${dataRata.month}';
+
+    if (!_skippedPredictions.contains(keySkip)) {
+      _skippedPredictions.add(keySkip);
+    }
+
+    // Se l'ID è una rata generata (rec_real_...)
+    if (id.startsWith('rec_real_')) {
+      final idx = _transactions.indexWhere((t) => t.id == id);
+      if (idx != -1) {
+        _stornaSaldoConto(_transactions[idx]);
+        _transactions.removeAt(idx);
+      }
+    } 
+    // Se l'ID è la Regola Madre del primo mese, storna e trasforma la transazione in regola pura
+    else if (id == rootId) {
+      final idx = _transactions.indexWhere((t) => t.id == rootId);
+      if (idx != -1) {
+        final tx = _transactions[idx];
+        _stornaSaldoConto(tx);
+        _transactions[idx] = TransactionModel(
+          id: 'rule_${tx.id}',
+          title: tx.title,
+          subtitle: tx.subtitle,
+          amount: tx.amount,
+          isIncome: tx.isIncome,
+          category: tx.category,
+          date: tx.date,
+          accountId: tx.accountId,
+          isRecurrent: true,
+          frequenza: tx.frequenza,
+          giornoRicorrenza: tx.giornoRicorrenza,
+          dataInizio: tx.dataInizio,
+          dataFineRicorrenza: tx.dataFineRicorrenza,
+        );
+      }
+    }
+
+    _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 2️⃣ ELIMINA QUESTO E I FUTURI
+  void eliminaQuestoEFuturi(String id, DateTime dataRata) {
+    final String rootId = RecurrenceManager.getRootId(id);
+
+    // 1. Ferma la regola madre per i mesi futuri
+    stopRecurrenceFromDate(rootId, dataRata);
+
+    // 2. Cancella la rata del mese corrente e rimborsa se è una spesa reale
+    if (id.startsWith('rec_real_')) {
+      final idx = _transactions.indexWhere((t) => t.id == id);
+      if (idx != -1) {
+        _stornaSaldoConto(_transactions[idx]);
+        _transactions.removeAt(idx);
+      }
+    } else if (id == rootId) {
+      final idx = _transactions.indexWhere((t) => t.id == rootId);
+      if (idx != -1) {
+        final tx = _transactions[idx];
+        _stornaSaldoConto(tx);
+        _transactions[idx] = TransactionModel(
+          id: 'rule_${tx.id}',
+          title: tx.title,
+          subtitle: tx.subtitle,
+          amount: tx.amount,
+          isIncome: tx.isIncome,
+          category: tx.category,
+          date: tx.date,
+          accountId: tx.accountId,
+          isRecurrent: true,
+          frequenza: tx.frequenza,
+          giornoRicorrenza: tx.giornoRicorrenza,
+          dataInizio: tx.dataInizio,
+          dataFineRicorrenza: tx.dataFineRicorrenza,
+        );
+      }
+    }
+
+    _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 3️⃣ ELIMINA L'INTERA SERIE
+  void eliminaInteraSerie(String id) {
+    deleteTransaction(RecurrenceManager.getRootId(id));
+  }
+
   void _stornaSaldoConto(TransactionModel tx) {
+    if (tx.id.startsWith('rule_') || tx.id.startsWith('prev_')) return;
     if (tx.accountId == null || tx.accountId!.isEmpty) return;
 
     final accIdx = _accounts.indexWhere((a) => a.id == tx.accountId);
@@ -1538,9 +1918,13 @@ class WalletProvider with ChangeNotifier {
   }
 
   void stopRecurrence(String id) {
-    final idx = _transactions.indexWhere((t) => t.id == id);
+    final rootId = RecurrenceManager.getRootId(id);
+    final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId && !t.id.startsWith('rec_real_'));
+
     if (idx != -1) {
       final tx = _transactions[idx];
+      final dataFine = DateTime.now().subtract(const Duration(days: 1));
+
       _transactions[idx] = TransactionModel(
         id: tx.id,
         title: tx.title,
@@ -1550,24 +1934,38 @@ class WalletProvider with ChangeNotifier {
         category: tx.category,
         date: tx.date,
         accountId: tx.accountId,
-        isRecurrent: false, 
-        frequenza: null,
-        giornoRicorrenza: null,
+        isRecurrent: true,
+        frequenza: tx.frequenza,
+        giornoRicorrenza: tx.giornoRicorrenza,
+        dataInizio: tx.dataInizio,
+        dataFineRicorrenza: dataFine,
+        isArchived: tx.isArchived,
       );
+
+      final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+      if (pIdx != -1) {
+        _vociPianificateReali[pIdx]['dataFineRicorrenza'] = dataFine.toIso8601String();
+      }
+
       _salvaDatiInLocalStorage();
       notifyListeners();
     }
   }
 
   void stopRecurrenceFromDate(String id, DateTime meseRiferimento) {
-    final idx = _transactions.indexWhere((t) => t.id == id);
+    final rootId = RecurrenceManager.getRootId(id);
+
+    final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId && !t.id.startsWith('rec_real_'));
     if (idx != -1) {
       final tx = _transactions[idx];
+      DateTime dataInizio = tx.dataInizio ?? tx.date;
 
-      if (tx.date.year == meseRiferimento.year && tx.date.month == meseRiferimento.month) {
-        stopRecurrence(id);
+      if (meseRiferimento.year < dataInizio.year || 
+         (meseRiferimento.year == dataInizio.year && meseRiferimento.month <= dataInizio.month)) {
+        stopRecurrence(rootId);
       } else {
         final dataFine = DateTime(meseRiferimento.year, meseRiferimento.month, 1).subtract(const Duration(days: 1));
+
         _transactions[idx] = TransactionModel(
           id: tx.id,
           title: tx.title,
@@ -1580,8 +1978,16 @@ class WalletProvider with ChangeNotifier {
           isRecurrent: true,
           frequenza: tx.frequenza,
           giornoRicorrenza: tx.giornoRicorrenza,
+          dataInizio: tx.dataInizio,
           dataFineRicorrenza: dataFine,
+          isArchived: tx.isArchived,
         );
+
+        final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+        if (pIdx != -1) {
+          _vociPianificateReali[pIdx]['dataFineRicorrenza'] = dataFine.toIso8601String();
+        }
+
         _salvaDatiInLocalStorage();
         notifyListeners();
       }
@@ -1601,14 +2007,11 @@ class WalletProvider with ChangeNotifier {
     final idx = _transactions.indexWhere((t) => t.id == id);
     if (idx != -1) {
       final tx = _transactions[idx];
-      final targetAccount = _accounts.firstWhere((a) => a.id == (tx.accountId ?? 'main_account'), orElse: () => _accounts.first);
 
-      if (tx.isIncome) {
-        targetAccount.amount -= tx.amount;
-      } else {
-        targetAccount.amount += tx.amount;
-      }
+      // 🛡️ Storico saldo conto istantaneo
+      _stornaSaldoConto(tx);
 
+      // Trasforma la transazione in regola pura per i mesi futuri
       _transactions[idx] = TransactionModel(
         id: 'rule_${tx.id}',
         title: tx.title,
@@ -1621,6 +2024,7 @@ class WalletProvider with ChangeNotifier {
         isRecurrent: true,
         frequenza: tx.frequenza,
         giornoRicorrenza: tx.giornoRicorrenza,
+        dataFineRicorrenza: tx.dataFineRicorrenza,
       );
 
       _aggiornaTasseVirtuali();
@@ -1683,7 +2087,7 @@ class WalletProvider with ChangeNotifier {
     _transactions.clear();
     _fattureDaIncassare.clear();
     _fattureIncassate.clear();
-    _vociPianificate.clear();
+    _vociPianificateReali.clear();
 
     _aggiornaTasseVirtuali();
     _calcolaStatoCuscinetto();

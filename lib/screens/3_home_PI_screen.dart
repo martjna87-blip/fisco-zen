@@ -538,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'FATTURATO LORDO',
+                          'FATTURATO P.IVA',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 11,

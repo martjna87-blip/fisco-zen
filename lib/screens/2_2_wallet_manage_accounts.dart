@@ -132,27 +132,15 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                   ),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: contoSceltoSaldo,
-                    dropdownColor: const Color(0xFF18181B),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
+                  AppSecondaryDropdown<String>(
+                    label: 'Destinazione Saldo Residuo',
+                    accentColor: const Color(0xFFEF4444),
+                    selectedValue: contoSceltoSaldo ?? 'AZZERA',
                     items: [
-                      ...altriConti.map((c) => DropdownMenuItem(
-                            value: c.id,
-                            child: Text('Trasferisci a: ${c.title}'),
-                          )),
-                      const DropdownMenuItem(
-                        value: 'AZZERA',
-                        child: Text('Azzeramento (Denaro speso/prelevato)'),
-                      ),
+                      ...altriConti.map((c) => AppDropdownItem(value: c.id, label: 'Trasferisci a: ${c.title}')),
+                      const AppDropdownItem(value: 'AZZERA', label: 'Azzeramento (Denaro speso/prelevato)'),
                     ],
-                    onChanged: (v) => setDialogState(() => contoSceltoSaldo = v),
+                    onSelect: (v) => setDialogState(() => contoSceltoSaldo = v),
                   ),
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white12, height: 1),
@@ -182,29 +170,14 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<String>(
-                            value: scelteRicorrenze[tx.id],
-                            dropdownColor: const Color(0xFF18181B),
-                            style: const TextStyle(color: Colors.white, fontSize: 11),
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.black.withOpacity(0.3),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            ),
+                          AppSecondaryDropdown<String>(
+                            accentColor: const Color(0xFF2DD4BF),
+                            selectedValue: scelteRicorrenze[tx.id] ?? 'ANNULLA',
                             items: [
-                              ...altriConti.map((c) => DropdownMenuItem(
-                                    value: c.id,
-                                    child: Text('Sposta su: ${c.title}'),
-                                  )),
-                              const DropdownMenuItem(
-                                value: 'ANNULLA',
-                                child: Text('Annulla Ricorrenza futura', style: TextStyle(color: Color(0xFFEF4444))),
-                              ),
+                              ...altriConti.map((c) => AppDropdownItem(value: c.id, label: 'Sposta su: ${c.title}')),
+                              const AppDropdownItem(value: 'ANNULLA', label: 'Annulla Ricorrenza futura'),
                             ],
-                            onChanged: (v) => setDialogState(() {
-                              if (v != null) scelteRicorrenze[tx.id] = v;
-                            }),
+                            onSelect: (v) => setDialogState(() => scelteRicorrenze[tx.id] = v),
                           ),
                         ],
                       ),
@@ -410,7 +383,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     final TextEditingController dettaglioController = TextEditingController();
     final TextEditingController saldoController = TextEditingController();
     String tipoSelezionato = 'Conto Corrente';
-    bool isTipoEspanso = false;
 
     final List<String> opzioniTipo = [
       'Conto Corrente',
@@ -488,19 +460,12 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('TIPOLOGIA CONTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                _buildDialogInlineSelector(
+                AppSecondaryDropdown<String>(
+                  label: 'Tipologia Conto',
+                  accentColor: const Color(0xFF2DD4BF),
                   selectedValue: tipoSelezionato,
-                  isExpanded: isTipoEspanso,
-                  items: opzioniTipo,
-                  onToggle: () => setDialogState(() => isTipoEspanso = !isTipoEspanso),
-                  onSelect: (val) {
-                    setDialogState(() {
-                      tipoSelezionato = val;
-                      isTipoEspanso = false;
-                    });
-                  },
+                  items: opzioniTipo.map((t) => AppDropdownItem(value: t, label: t)).toList(),
+                  onSelect: (val) => setDialogState(() => tipoSelezionato = val),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -530,8 +495,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     String daConto = accounts[0].title;
     String aConto = accounts[1].title;
     DateTime dataGiroconto = DateTime.now();
-    bool isDaContoEspanso = false;
-    bool isAContoEspanso = false;
 
     final List<String> nomiConti = accounts.map((c) => c.title).toList();
     final TextEditingController importoController = TextEditingController();
@@ -606,40 +569,20 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('DA CONTO (ADDEBITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  _buildDialogInlineSelector(
+                  AppSecondaryDropdown<String>(
+                    label: 'Da Conto (Addebito)',
+                    accentColor: const Color(0xFF2DD4BF),
                     selectedValue: daConto,
-                    isExpanded: isDaContoEspanso,
-                    items: nomiConti,
-                    onToggle: () => setDialogState(() {
-                      isDaContoEspanso = !isDaContoEspanso;
-                      if (isDaContoEspanso) isAContoEspanso = false;
-                    }),
-                    onSelect: (val) {
-                      setDialogState(() {
-                        daConto = val;
-                        isDaContoEspanso = false;
-                      });
-                    },
+                    items: nomiConti.map((c) => AppDropdownItem(value: c, label: c)).toList(),
+                    onSelect: (val) => setDialogState(() => daConto = val),
                   ),
                   const SizedBox(height: 12),
-                  const Text('A CONTO (ACCREDITO)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  _buildDialogInlineSelector(
+                  AppSecondaryDropdown<String>(
+                    label: 'A Conto (Accredito)',
+                    accentColor: const Color(0xFF2DD4BF),
                     selectedValue: aConto,
-                    isExpanded: isAContoEspanso,
-                    items: nomiConti,
-                    onToggle: () => setDialogState(() {
-                      isAContoEspanso = !isAContoEspanso;
-                      if (isAContoEspanso) isDaContoEspanso = false;
-                    }),
-                    onSelect: (val) {
-                      setDialogState(() {
-                        aConto = val;
-                        isAContoEspanso = false;
-                      });
-                    },
+                    items: nomiConti.map((c) => AppDropdownItem(value: c, label: c)).toList(),
+                    onSelect: (val) => setDialogState(() => aConto = val),
                   ),
                   const SizedBox(height: 12),
 
@@ -698,87 +641,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  Widget _buildDialogInlineSelector({
-    required String selectedValue,
-    required bool isExpanded,
-    required List<String> items,
-    required VoidCallback onToggle,
-    required Function(String) onSelect,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isExpanded ? const Color(0xFF2DD4BF).withOpacity(0.4) : Colors.transparent,
-        ),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      selectedValue,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  Icon(
-                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white54,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (isExpanded) ...[
-            const Divider(color: Colors.white12, height: 1),
-            Column(
-              children: items.map((item) {
-                final bool isSelected = item == selectedValue;
-                return InkWell(
-                  onTap: () => onSelect(item),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    color: isSelected ? const Color(0xFF2DD4BF).withOpacity(0.12) : Colors.transparent,
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                          color: isSelected ? const Color(0xFF2DD4BF) : Colors.white24,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -789,7 +651,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
 
-    // 🎯 NUOVA LOGICA: Patrimonio Totale - Totale Tasse Dovute - Cuscinetto Mesi Off
     final double totaleTasseDovute = walletProvider.totaleTasseDovute;
     final double cuscinettoFerie = walletProvider.cuscinettoResiduo;
     final double nettoRealeSpendibile = (saldoTotale - totaleTasseDovute - cuscinettoFerie).clamp(0.0, double.infinity);
@@ -829,7 +690,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        // 🟢 1. SPENDIBILE
                         Expanded(
                           child: InkWell(
                             onLongPress: () {
@@ -876,7 +736,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                         Container(height: 24, width: 1, color: Colors.white12),
                         const SizedBox(width: 6),
 
-                        // 🛡️ 2. TASSE TOTALI
                         Expanded(
                           child: InkWell(
                             onLongPress: () {
@@ -923,7 +782,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                         Container(height: 24, width: 1, color: Colors.white12),
                         const SizedBox(width: 6),
 
-                        // 🟣 3. MESI OFF
                         Expanded(
                           child: InkWell(
                             onLongPress: () {
@@ -1051,14 +909,6 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                       },
                       itemBuilder: (context, index) {
                         final account = accounts[index];
-                        final bool isPrincipal = account.role == AccountRole.principal ||
-                            account.id == 'main_account' ||
-                            account.id == '1' ||
-                            account.title.toLowerCase().contains('principale');
-
-                        // 🎯 Coerenza per il conto principale
-                        final double contoNettoSpendibile = (account.amount - account.virtualTaxAmount).clamp(0.0, double.infinity);
-
                         return Container(
                           key: ValueKey(account.id),
                           margin: const EdgeInsets.only(bottom: 10),

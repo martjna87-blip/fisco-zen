@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 👈 Motore Haptic per la vibrazione nativa
+import 'package:flutter/services.dart';
 
 class AppPopupWrapper extends StatelessWidget {
   final String title;
@@ -33,7 +33,12 @@ class AppPopupWrapper extends StatelessWidget {
       barrierLabel: 'Chiudi',
       barrierColor: Colors.black.withOpacity(0.70),
       transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, anim1, anim2) => child,
+      pageBuilder: (context, anim1, anim2) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: child,
+        ),
+      ),
       transitionBuilder: (context, anim1, anim2, childWidget) {
         final curve = Curves.easeOutCubic;
         final tweenScale = Tween<double>(begin: 0.92, end: 1.0).animate(
@@ -54,7 +59,7 @@ class AppPopupWrapper extends StatelessWidget {
     );
   }
 
-  /// 💡 POP-UP INFORMATIVO UNIVERSALE (Con Vibrazione Haptic e Simmetria Assoluta)
+  /// 💡 POP-UP INFORMATIVO UNIVERSALE
   static Future<void> mostraInfo({
     required BuildContext context,
     required IconData icon,
@@ -63,10 +68,8 @@ class AppPopupWrapper extends StatelessWidget {
     required String descrizione,
     String? formula,
   }) {
-    // 📳 1. VIBRAZIONE NATIVA (Garantita su iOS/Android per QUALSIASI elemento)
     HapticFeedback.mediumImpact();
 
-    // 🖼️ 2. APERTURA SCHEDA INFORMATIVA
     return mostra(
       context: context,
       child: Dialog(
@@ -135,33 +138,29 @@ class AppPopupWrapper extends StatelessWidget {
     );
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
 
-    // 🎯 ALTEZZA DALL'ALTO MASTER (Standard Registra Fattura)
-    final notchHeight = MediaQuery.of(context).viewPadding.top;
-    final topMargin = (notchHeight > 0 ? notchHeight : 44.0) + 55.0; //Posizione dall'alto
-
     return Dialog(
       backgroundColor: Colors.transparent,
-      alignment: Alignment.topCenter,
-      insetPadding: EdgeInsets.only( //Larghezza finestra
+      alignment: Alignment.center,
+      insetPadding: EdgeInsets.only(
         left: 14,
         right: 14,
-        top: topMargin,
-        bottom: isKeyboardOpen ? 10 : 30, //Spazio in basso
+        top: 10,
+        bottom: isKeyboardOpen ? 10 : 20,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: SizedBox(
           width: double.infinity,
-          height: MediaQuery.of(context).size.height * 0.76, // Altezza totale
+          height: MediaQuery.of(context).size.height * 0.76,
           child: Container(
             color: const Color(0xFF18181B),
             child: Stack(
-              fit: StackFit.expand, // 👈 AGGIUNGI QUESTA RIGA: Forza lo Stack ad occupare SEMPRE il 76% di altezza
+              fit: StackFit.expand,
               children: [
                 Positioned.fill(
                   child: Image.network(

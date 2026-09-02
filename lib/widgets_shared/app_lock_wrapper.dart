@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart'; // 👈 Per identificare kIsWeb
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -35,6 +36,9 @@ class _AppLockWrapperState extends State<AppLockWrapper> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 🌐 Nel browser web disattiviamo il blocco per consentire i test
+    if (kIsWeb) return;
+
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       _backgroundTime = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
@@ -53,6 +57,12 @@ class _AppLockWrapperState extends State<AppLockWrapper> with WidgetsBindingObse
   }
 
   Future<void> _eseguiSblocco() async {
+    // 🌐 Se siamo sul Web sblocca immediatamente
+    if (kIsWeb) {
+      setState(() => _isLocked = false);
+      return;
+    }
+
     try {
       final bool canCheck = await _auth.canCheckBiometrics;
       final bool isSupported = await _auth.isDeviceSupported();
@@ -64,10 +74,6 @@ class _AppLockWrapperState extends State<AppLockWrapper> with WidgetsBindingObse
 
       final bool didAuthenticate = await _auth.authenticate(
         localizedReason: 'Sblocca per accedere ai tuoi dati fiscali',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false,
-        ),
       );
 
       if (didAuthenticate) {
@@ -75,6 +81,8 @@ class _AppLockWrapperState extends State<AppLockWrapper> with WidgetsBindingObse
       }
     } catch (e) {
       debugPrint("Errore Sblocco Biometrico: $e");
+      // Fallback in caso di errore su emulatore
+      setState(() => _isLocked = false);
     }
   }
 
@@ -84,7 +92,7 @@ class _AppLockWrapperState extends State<AppLockWrapper> with WidgetsBindingObse
       children: [
         widget.child,
 
-        if (_isLocked)
+        if (_isLocked && !kIsWeb)
           Positioned.fill(
             child: Material(
               color: const Color(0xFF080B0C),
