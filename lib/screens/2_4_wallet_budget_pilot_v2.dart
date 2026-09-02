@@ -19,7 +19,7 @@ class PianoSpesaSheet extends StatefulWidget {
 
 class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   int _tabSelezionata = 0; // 0 = 🔄 Ricorrenze, 1 = 🎯 Pilotaggio & Regole
-
+  int _subTabRicorrenze = 0; // 👈 AGGIUNTO: 0 = Attive, 1 = Passate
   final Color oceanCyan   = const Color(0xFF38BDF8);
   final Color goldAccent  = const Color(0xFFFBBF24);
   final Color purpleZen   = const Color(0xFFC084FC);
@@ -211,23 +211,20 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   }
 
   // ===========================================================================
-  // TAB 1: 🔄 RICORRENZE E CONTRATTI
+  // TAB 1: 🔄 RICORRENZE E CONTRATTI (RESTYLING PREMIUM)
   // ===========================================================================
   Widget _buildTabRicorrenze(WalletProvider provider) {
     final bool isPro = provider.isProUser;
 
-    // 🎯 Unifichiamo le regole pianificate e i movimenti ricorrenti da 2.1
-    final List<Map<String, dynamic>> vociPianificate = [];
+    final List<Map<String, dynamic>> tutteLeVoci = [];
     final Set<String> nomiProcessati = {};
 
-    // 1. Regole da provider.vociPianificate
     for (var v in provider.vociPianificate) {
       final String nome = (v['nome'] ?? 'Ricorrenza').toString().toLowerCase().trim();
       if (nome.isNotEmpty) nomiProcessati.add(nome);
-      vociPianificate.add(Map<String, dynamic>.from(v));
+      tutteLeVoci.add(Map<String, dynamic>.from(v));
     }
 
-    // 2. Movimenti ricorrenti reali da provider.transactions (inseriti da 2.1)
     final txsRicorrenti = provider.transactions.where((tx) => (tx.isRecurrent ?? false) == true).toList();
     for (var tx in txsRicorrenti) {
       final String nome = (tx.title ?? 'Ricorrenza').toString().toLowerCase().trim();
@@ -239,7 +236,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           giornoAddebito = int.tryParse(tx.giornoRicorrenza.toString()) ?? tx.date.day;
         }
 
-        vociPianificate.add({
+        tutteLeVoci.add({
           'id': tx.id,
           'nome': tx.title,
           'previsto': tx.amount,
@@ -249,111 +246,81 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           'frequenza': tx.frequenza ?? 'Ogni mese',
           'giornoAddebito': giornoAddebito,
           'isTransaction': true,
-          'dataFineRicorrenza': tx.dataFineRicorrenza?.toIso8601String(), // 👈 Aggiunto per tracciare la scadenza!
+          'dataFineRicorrenza': tx.dataFineRicorrenza?.toIso8601String(),
         });
+      }
+    }
+
+    // 🎯 SEPARAZIONE REGOLE ATTIVE E TERMINATE
+    final List<Map<String, dynamic>> vociAttive = [];
+    final List<Map<String, dynamic>> vociTerminate = [];
+
+    for (var voce in tutteLeVoci) {
+      DateTime? dataFine;
+      if (voce['dataFineRicorrenza'] != null) {
+        dataFine = voce['dataFineRicorrenza'] is DateTime 
+            ? voce['dataFineRicorrenza'] 
+            : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
+      }
+      final bool isTerminata = dataFine != null && dataFine.isBefore(DateTime.now());
+
+      if (isTerminata) {
+        vociTerminate.add(voce);
+      } else {
+        vociAttive.add(voce);
       }
     }
 
     final double stipendioOnboarding = provider.entrataExtraMensile;
     final String etichettaLavoro = provider.hasDipendente ? 'Stipendio' : 'Pensione';
 
+    final List<Map<String, dynamic>> listaDaMostrare = _subTabRicorrenze == 0 ? vociAttive : vociTerminate;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (stipendioOnboarding > 0)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: greenProfit.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: greenProfit.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome_rounded, color: greenProfit, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Da Onboarding: $etichettaLavoro', style: TextStyle(color: greenProfit, fontSize: 11, fontWeight: FontWeight.bold)),
-                      Text('${_formattaInt(stipendioOnboarding)} / mese previsti', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: greenProfit,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                  ),
-                  onPressed: () {
-                    if (!isPro) {
-                      _mostraModalPRO(context);
-                    } else {
-                      _mostraFormRegolaAvanzata(provider, importoIniziale: stipendioOnboarding, nomeIniziale: etichettaLavoro, isEntrata: true);
-                    }
-                  },
-                  child: const Text('Configura', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-
+        // 🔹 INTESTAZIONE MINIMALE CON TOGGLE
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              isPro ? 'REGOLE ATTIVE E STORICO PASSATO' : 'ESEMPIO REGOLE RICORRENTI',
+              _subTabRicorrenze == 0 ? 'REGOLE ATTIVE (${vociAttive.length})' : 'REGOLE PASSATE (${vociTerminate.length})',
               style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
             ),
             Row(
               children: [
                 if (isPro && provider.vociArchiviate.isNotEmpty)
-                  InkWell(
+                  GestureDetector(
                     onTap: () => _mostraModalArchivio(context, provider),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: goldAccent.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: goldAccent.withOpacity(0.3)),
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.inventory_2_outlined, color: goldAccent, size: 13),
+                          const Icon(Icons.inventory_2_outlined, color: Colors.white54, size: 12),
                           const SizedBox(width: 4),
-                          Text(
-                            'Archivio (${provider.vociArchiviate.length})',
-                            style: TextStyle(color: goldAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
+                          Text('${provider.vociArchiviate.length}', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                   ),
-                InkWell(
-                  onTap: () {
-                    if (!isPro) {
-                      _mostraModalPRO(context);
-                    } else {
-                      _mostraFormRegolaAvanzata(provider);
-                    }
-                  },
+                GestureDetector(
+                  onTap: () => setState(() => _subTabRicorrenze = _subTabRicorrenze == 0 ? 1 : 0),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: oceanCyan.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.add_rounded, color: oceanCyan, size: 14),
+                        Icon(_subTabRicorrenze == 0 ? Icons.history_rounded : Icons.check_circle_outline_rounded, color: Colors.white, size: 12),
                         const SizedBox(width: 4),
-                        Text('Nuova Regola', style: TextStyle(color: oceanCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(_subTabRicorrenze == 0 ? 'Storico' : 'Attive', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -363,160 +330,265 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           ],
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
+        // 📋 ELENCO REGOLE
         Expanded(
-          child: vociPianificate.isEmpty
-              ? Center(
-                  child: Text(
-                    'Nessuna spesa, entrata o giroconto pianificato.\nPremi "+ Nuova Regola" per iniziare.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            children: [
+              // 🌿 CARD ONBOARDING (Mostrata solo tra le attive, stilizzata come le altre)
+              if (_subTabRicorrenze == 0 && stipendioOnboarding > 0)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: greenProfit.withOpacity(0.3), width: 1),
                   ),
-                )
-              : ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: vociPianificate.length,
-                  itemBuilder: (context, index) {
-                    final voce = vociPianificate[index];
-                    final double importo = (voce['previsto'] as num).toDouble();
-                    final String nome = voce['nome'] ?? 'Regola Ricorrente';
-                    final String tipoMov = voce['tipoMovimento'] ?? 'uscita';
-                    final String cat = voce['sottocategoria'] ?? voce['categoria'] ?? 'Generale';
-                    final String freq = voce['frequenza'] ?? 'Ogni mese';
-                    final int giorno = voce['giornoAddebito'] ?? 1;
-
-                    // 🎯 RECUPERA DATA FINE
-                    DateTime? dataFine;
-                    if (voce['dataFineRicorrenza'] != null) {
-                      dataFine = voce['dataFineRicorrenza'] is DateTime 
-                          ? voce['dataFineRicorrenza'] 
-                          : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
-                    }
-                    
-                    // 🎯 CONTROLLA STATO (Terminata se la data è passata)
-                    final bool isTerminata = dataFine != null && dataFine.isBefore(DateTime.now());
-
-                    Color coloreIcona = oceanCyan;
-                    IconData iconaMov = Icons.sync_rounded;
-
-                    if (tipoMov == 'uscita') {
-                      coloreIcona = const Color(0xFFEF4444);
-                      iconaMov = Icons.arrow_downward_rounded;
-                    } else if (tipoMov == 'entrata') {
-                      coloreIcona = greenProfit;
-                      iconaMov = Icons.arrow_upward_rounded;
-                    } else if (tipoMov == 'giroconto') {
-                      coloreIcona = oceanCyan;
-                      iconaMov = Icons.swap_horiz_rounded;
-                    }
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isTerminata ? Colors.white.withOpacity(0.01) : Colors.white.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: isTerminata ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Opacity(
-                        opacity: isTerminata ? 0.45 : 1.0, // 👈 Trasparenza attiva se terminata
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: coloreIcona.withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(iconaMov, color: coloreIcona, size: 16),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: greenProfit.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.auto_awesome_rounded, color: greenProfit, size: 16),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(nome, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      
-                                      // 🏷️ BADGE STATO REGOLA (Novità)
-                                      if (isTerminata)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orangeAccent.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.orangeAccent.withOpacity(0.4)),
-                                          ),
-                                          child: Text(
-                                            'Terminata ${dataFine!.day.toString().padLeft(2, '0')}/${dataFine.month.toString().padLeft(2, '0')}',
-                                            style: const TextStyle(color: Colors.orangeAccent, fontSize: 8, fontWeight: FontWeight.bold),
-                                          ),
-                                        )
-                                      else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: greenProfit.withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: greenProfit.withOpacity(0.3)),
-                                          ),
-                                          child: Text(
-                                            'Attiva',
-                                            style: TextStyle(color: greenProfit, fontSize: 8, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                    ],
+                                  Text(etichettaLavoro, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: greenProfit.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text('Da Onboarding', style: TextStyle(color: greenProfit, fontSize: 8, fontWeight: FontWeight.bold)),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text('$cat • $freq (gg $giorno)', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
                                 ],
                               ),
-                            ),
-                            Text(
-                              tipoMov == 'uscita' ? '- ${_formattaValuta(importo)}' : '+ ${_formattaValuta(importo)}',
-                              style: TextStyle(color: coloreIcona, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                            if (isPro) ...[
-                              const SizedBox(width: 10),
-                              InkWell(
-                                onTap: () => _mostraFormRegolaAvanzata(provider, voceEsistente: voce),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.edit_outlined, color: Colors.white70, size: 15),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () => _mostraGestioneEliminazioneRicorrenza(context, provider, voce),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEF4444).withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 15),
-                                ),
-                              ),
+                              const SizedBox(height: 4),
+                              Text('Entrata stimata automatica', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                        Text('+ ${_formattaValuta(stipendioOnboarding)}', style: TextStyle(color: greenProfit, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 10),
+                        InkWell(
+                          onTap: () {
+                            if (!isPro) {
+                              _mostraModalPRO(context);
+                            } else {
+                              _mostraFormRegolaAvanzata(provider, importoIniziale: stipendioOnboarding, nomeIniziale: etichettaLavoro, isEntrata: true);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.edit_outlined, color: Colors.white70, size: 15),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+
+              // LISTA REGOLE REALI
+              if (listaDaMostrare.isEmpty && stipendioOnboarding == 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  child: Center(
+                    child: Text(
+                      _subTabRicorrenze == 0 
+                          ? 'Nessuna regola attiva al momento.'
+                          : 'Nessuna regola conclusa nello storico.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                    ),
+                  ),
+                )
+              else
+                ...listaDaMostrare.map((voce) => _buildCardRicorrenza(context, provider, voce, isTerminata: _subTabRicorrenze == 1)),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 🔘 BOTTONE PRIMARIO MINIMALE
+        Center(
+          child: TextButton.icon(
+            style: TextButton.styleFrom(
+              backgroundColor: oceanCyan.withOpacity(0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: oceanCyan.withOpacity(0.3)),
+              ),
+            ),
+            icon: Icon(Icons.add_rounded, size: 18, color: oceanCyan),
+            label: Text(
+              'Nuova Regola Ricorrente',
+              style: TextStyle(color: oceanCyan, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            onPressed: () {
+              if (!isPro) {
+                _mostraModalPRO(context);
+              } else {
+                _mostraFormRegolaAvanzata(provider);
+              }
+            },
+          ),
         ),
       ],
+    );
+  }
+
+  // 🎨 CARD SINGOLA RICORRENZA PULITA
+  Widget _buildCardRicorrenza(
+    BuildContext context,
+    WalletProvider provider,
+    Map<String, dynamic> voce, {
+    required bool isTerminata,
+  }) {
+    final double importo = (voce['previsto'] as num).toDouble();
+    final String nome = voce['nome'] ?? 'Regola Ricorrente';
+    final String tipoMov = voce['tipoMovimento'] ?? 'uscita';
+    final String cat = voce['sottocategoria'] ?? voce['categoria'] ?? 'Generale';
+    final String freq = voce['frequenza'] ?? 'Ogni mese';
+    final int giorno = voce['giornoAddebito'] ?? 1;
+
+    DateTime? dataFine;
+    if (voce['dataFineRicorrenza'] != null) {
+      dataFine = voce['dataFineRicorrenza'] is DateTime 
+          ? voce['dataFineRicorrenza'] 
+          : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
+    }
+
+    Color coloreIcona = oceanCyan;
+    IconData iconaMov = Icons.sync_rounded;
+
+    if (tipoMov == 'uscita') {
+      coloreIcona = const Color(0xFFEF4444);
+      iconaMov = Icons.arrow_downward_rounded;
+    } else if (tipoMov == 'entrata') {
+      coloreIcona = greenProfit;
+      iconaMov = Icons.arrow_upward_rounded;
+    } else if (tipoMov == 'giroconto') {
+      coloreIcona = oceanCyan;
+      iconaMov = Icons.swap_horiz_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isTerminata ? Colors.white.withOpacity(0.01) : Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isTerminata ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.08)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            if (isTerminata) {
+              _mostraGestioneTerminata(context, provider, voce);
+            } else {
+              _mostraGestioneEliminazioneRicorrenza(context, provider, voce);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Opacity(
+              opacity: isTerminata ? 0.45 : 1.0,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: coloreIcona.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(iconaMov, color: coloreIcona, size: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                nome,
+                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // 🏷️ BADGE STATO GRIGIO NEUTRO PER TERMINATA
+                            if (isTerminata)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: Text(
+                                  'Terminata ${dataFine != null ? "${dataFine.day.toString().padLeft(2, '0')}/${dataFine.month.toString().padLeft(2, '0')}" : ""}',
+                                  style: const TextStyle(color: Colors.white60, fontSize: 8, fontWeight: FontWeight.bold),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: greenProfit.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: greenProfit.withOpacity(0.3)),
+                                ),
+                                child: Text(
+                                  'Attiva',
+                                  style: TextStyle(color: greenProfit, fontSize: 8, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$cat • $freq (gg $giorno)',
+                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    tipoMov == 'uscita' ? '- ${_formattaValuta(importo)}' : '+ ${_formattaValuta(importo)}',
+                    style: TextStyle(color: coloreIcona, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -695,6 +767,244 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       ],
     );
   }
+
+void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String, dynamic>) onAggiunto) {
+    final TextEditingController nameController = TextEditingController();
+    IconData iconaNuova = Icons.shopping_bag_outlined;
+    String categoriaNuova = 'Supermercato';
+    String bussolaNuova = 'Bisogni (50%)';
+
+    final List<IconData> icone = [
+      Icons.shopping_bag_outlined, Icons.shopping_cart_outlined, Icons.home_outlined,
+      Icons.bolt_outlined, Icons.restaurant_outlined, Icons.local_gas_station_outlined,
+      Icons.fitness_center_outlined, Icons.pets_outlined, Icons.directions_bus_outlined,
+      Icons.medical_services_outlined, Icons.subscriptions_outlined, Icons.wifi_rounded,
+      Icons.flight_takeoff_rounded, Icons.build_outlined, Icons.work_outline,
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AppSecondaryPopup(
+            backgroundColor: const Color(0xFF18181B),
+            icon: Icons.add_circle_outline_rounded,
+            iconColor: const Color(0xFF38BDF8),
+            titolo: 'Crea Preferito Rapido',
+            testoConferma: 'Aggiungi',
+            onConferma: () {
+              if (nameController.text.trim().isNotEmpty) {
+                onAggiunto({
+                  'nome': nameController.text.trim(),
+                  'cat': categoriaNuova,
+                  'bussola': bussolaNuova,
+                  'icon': iconaNuova,
+                });
+                Navigator.pop(ctx);
+                AppNotifications.mostraInAlto(context, 'Preferito aggiunto! ✨');
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Nome Preferito (es. Palestra)',
+                      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppSecondaryDropdown<String>(
+                    label: 'Categoria Specifica',
+                    accentColor: const Color(0xFF38BDF8),
+                    selectedValue: categoriaNuova,
+                    items: const [
+                      AppDropdownItem(value: 'Supermercato', label: 'Supermercato', icon: Icons.shopping_cart_outlined),
+                      AppDropdownItem(value: 'Casa/Affitto', label: 'Casa/Affitto', icon: Icons.home_outlined),
+                      AppDropdownItem(value: 'Mutuo', label: 'Mutuo', icon: Icons.account_balance_outlined),
+                      AppDropdownItem(value: 'Canoni/Bollette', label: 'Canoni/Bollette', icon: Icons.bolt_outlined),
+                      AppDropdownItem(value: 'Ristoranti & Bar', label: 'Ristoranti & Bar', icon: Icons.restaurant_outlined),
+                      AppDropdownItem(value: 'Divertimento & Hobby', label: 'Divertimento & Hobby', icon: Icons.sports_esports_outlined),
+                      AppDropdownItem(value: 'Altro', label: 'Altro', icon: Icons.more_horiz_outlined),
+                    ],
+                    onSelect: (val) => setDialogState(() => categoriaNuova = val),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSecondaryDropdown<String>(
+                    label: 'Bussola Spese',
+                    accentColor: const Color(0xFF38BDF8),
+                    selectedValue: bussolaNuova,
+                    items: const [
+                      AppDropdownItem(value: 'Bisogni (50%)', label: '50% Spese Fisse', icon: Icons.pie_chart_outline),
+                      AppDropdownItem(value: 'Svago (30%)', label: '30% Svago', icon: Icons.attractions_outlined),
+                      AppDropdownItem(value: 'Risparmio (20%)', label: '20% Risparmi', icon: Icons.savings_outlined),
+                    ],
+                    onSelect: (val) => setDialogState(() => bussolaNuova = val),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: icone.map((icon) {
+                      final isSelected = iconaNuova == icon;
+                      return GestureDetector(
+                        onTap: () => setDialogState(() => iconaNuova = icon),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF38BDF8) : Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 18),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _mostraGestionePreferitoRegolaModal(BuildContext context, Map<String, dynamic> pref, Function(Map<String, dynamic>?, bool) onConcluso) {
+    final TextEditingController nameController = TextEditingController(text: pref['nome']);
+    IconData iconaTemp = pref['icon'] as IconData;
+    String catTemp = pref['cat'] ?? 'Supermercato';
+    String bussolaTemp = pref['bussola'] ?? 'Bisogni (50%)';
+
+    final List<IconData> icone = [
+      Icons.shopping_bag_outlined, Icons.shopping_cart_outlined, Icons.home_outlined,
+      Icons.bolt_outlined, Icons.restaurant_outlined, Icons.local_gas_station_outlined,
+      Icons.fitness_center_outlined, Icons.pets_outlined, Icons.directions_bus_outlined,
+      Icons.medical_services_outlined, Icons.subscriptions_outlined, Icons.wifi_rounded,
+      Icons.flight_takeoff_rounded, Icons.build_outlined, Icons.work_outline,
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AppSecondaryPopup(
+            backgroundColor: const Color(0xFF18181B),
+            icon: Icons.edit_note_rounded,
+            iconColor: const Color(0xFF38BDF8),
+            titolo: 'Gestisci Preferito',
+            testoAnnulla: 'Chiudi',
+            testoConferma: 'Salva Modifiche',
+            onConferma: () {
+              if (nameController.text.trim().isNotEmpty) {
+                onConcluso({
+                  'nome': nameController.text.trim(),
+                  'cat': catTemp,
+                  'bussola': bussolaTemp,
+                  'icon': iconaTemp,
+                }, false);
+                Navigator.pop(ctx);
+                AppNotifications.mostraInAlto(context, 'Preferito aggiornato! ✨');
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Nome Preferito',
+                      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.black.withOpacity(0.4),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppSecondaryDropdown<String>(
+                    label: 'Categoria Specifica',
+                    accentColor: const Color(0xFF38BDF8),
+                    selectedValue: catTemp,
+                    items: const [
+                      AppDropdownItem(value: 'Supermercato', label: 'Supermercato', icon: Icons.shopping_cart_outlined),
+                      AppDropdownItem(value: 'Casa/Affitto', label: 'Casa/Affitto', icon: Icons.home_outlined),
+                      AppDropdownItem(value: 'Mutuo', label: 'Mutuo', icon: Icons.account_balance_outlined),
+                      AppDropdownItem(value: 'Canoni/Bollette', label: 'Canoni/Bollette', icon: Icons.bolt_outlined),
+                      AppDropdownItem(value: 'Ristoranti & Bar', label: 'Ristoranti & Bar', icon: Icons.restaurant_outlined),
+                      AppDropdownItem(value: 'Divertimento & Hobby', label: 'Divertimento & Hobby', icon: Icons.sports_esports_outlined),
+                      AppDropdownItem(value: 'Altro', label: 'Altro', icon: Icons.more_horiz_outlined),
+                    ],
+                    onSelect: (val) => setDialogState(() => catTemp = val),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSecondaryDropdown<String>(
+                    label: 'Bussola Spese',
+                    accentColor: const Color(0xFF38BDF8),
+                    selectedValue: bussolaTemp,
+                    items: const [
+                      AppDropdownItem(value: 'Bisogni (50%)', label: '50% Spese Fisse', icon: Icons.pie_chart_outline),
+                      AppDropdownItem(value: 'Svago (30%)', label: '30% Svago', icon: Icons.attractions_outlined),
+                      AppDropdownItem(value: 'Risparmio (20%)', label: '20% Risparmi', icon: Icons.savings_outlined),
+                    ],
+                    onSelect: (val) => setDialogState(() => bussolaTemp = val),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('SCEGLI PITTOGRAMMA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: icone.map((icon) {
+                      final isSelected = iconaTemp == icon;
+                      return GestureDetector(
+                        onTap: () => setDialogState(() => iconaTemp = icon),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF38BDF8) : Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: isSelected ? Colors.black : Colors.white, size: 18),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444).withOpacity(0.15),
+                        foregroundColor: const Color(0xFFEF4444),
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: const Text('Elimina Questo Preferito', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                      onPressed: () {
+                        onConcluso(null, true);
+                        Navigator.pop(ctx);
+                        AppNotifications.mostraInAlto(context, 'Preferito eliminato', type: NotificationType.error);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }  
 
  void _mostraFormRegolaAvanzata(
     WalletProvider provider, {
@@ -934,44 +1244,103 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
                 const SizedBox(height: 12),
 
-                // 🚀 PREFERITI RAPIDI CHIPS
+                // 🚀 PREFERITI RAPIDI CHIPS (CON PULSANTE + E GESTIONE)
                 if (tipoMovimentoSel != 'giroconto') ...[
-                  const Text('PREFERITI RAPIDI', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('PREFERITI RAPIDI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                      const Text('Tieni premuto per gestire/modificare', style: TextStyle(color: Colors.white38, fontSize: 8, fontStyle: FontStyle.italic)),
+                    ],
+                  ),
                   const SizedBox(height: 6),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: preferitiRapidi.map((pref) {
+                  SizedBox(
+                    height: 34,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: preferitiRapidi.length + 1,
+                      itemBuilder: (context, index) {
+                        // 🟢 TASTO + PER NUOVO PREFERITO
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: InkWell(
+                              onTap: () {
+                                _mostraDialogNuovoPreferitoRegola(context, (nuovoPref) {
+                                  setPopupState(() {
+                                    preferitiRapidi.add(nuovoPref);
+                                    nomeCtrl.text = nuovoPref['nome'];
+                                    categoriaSel = nuovoPref['cat'];
+                                    bussolaSel = nuovoPref['bussola'];
+                                  });
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: oceanCyan.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: oceanCyan.withOpacity(0.4)),
+                                ),
+                                child: Icon(Icons.add, size: 16, color: oceanCyan),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final item = preferitiRapidi[index - 1];
+                        final bool isSelected = nomeCtrl.text == item['nome'];
+
                         return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: InkWell(
-                            onTap: () {
-                              setPopupState(() {
-                                nomeCtrl.text = pref['nome'];
-                                categoriaSel = pref['cat'];
-                                bussolaSel = pref['bussola'];
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: GestureDetector(
+                            onLongPress: () {
+                              _mostraGestionePreferitoRegolaModal(context, item, (modificato, eliminato) {
+                                setPopupState(() {
+                                  if (eliminato) {
+                                    preferitiRapidi.removeAt(index - 1);
+                                  } else if (modificato != null) {
+                                    preferitiRapidi[index - 1] = modificato;
+                                  }
+                                });
                               });
                             },
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withOpacity(0.12)),
-                              ),
-                              child: Row(
+                            child: FilterChip(
+                              showCheckmark: false,
+                              selected: isSelected,
+                              avatar: Icon(item['icon'] as IconData, size: 14, color: isSelected ? Colors.white : oceanCyan),
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(pref['icon'] as IconData, size: 12, color: oceanCyan),
-                                  const SizedBox(width: 5),
-                                  Text(pref['nome'] as String, style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    item['nome'] as String,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.edit_outlined, size: 10, color: isSelected ? Colors.white60 : Colors.white24),
                                 ],
                               ),
+                              backgroundColor: Colors.black.withOpacity(0.35),
+                              selectedColor: oceanCyan.withOpacity(0.4),
+                              side: BorderSide(color: isSelected ? oceanCyan : Colors.white.withOpacity(0.1)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              onSelected: (_) {
+                                setPopupState(() {
+                                  nomeCtrl.text = item['nome'];
+                                  categoriaSel = item['cat'];
+                                  bussolaSel = item['bussola'];
+                                });
+                              },
                             ),
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1292,6 +1661,73 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+  void _mostraGestioneTerminata(
+    BuildContext context,
+    WalletProvider provider,
+    Map<String, dynamic> voce,
+  ) {
+    if (voce.isEmpty) return;
+    final String id = voce['id'].toString();
+    final String nome = voce['nome'] ?? 'Ricorrenza';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
+        icon: Icons.history_toggle_off_rounded,
+        iconColor: Colors.white54,
+        titolo: 'Ricorrenza Conclusa',
+        testoAnnulla: 'Chiudi',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'La spesa "$nome" risulta già terminata nel passato. Cosa desideri fare?',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+
+              // 1️⃣ DUPLICA / RIATTIVA
+              AppActionCard(
+                icon: Icons.control_point_duplicate_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Duplica / Riattiva regola',
+                subtitle: 'Crea una nuova regola attiva riutilizzando nome, importo e categoria di questa spesa.',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _mostraFormRegolaAvanzata(provider, importoIniziale: (voce['previsto'] as num?)?.toDouble(), nomeIniziale: nome);
+                },
+              ),
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 12),
+
+              // 2️⃣ ELIMINA DEFINITIVAMENTE
+              AppActionCard(
+                icon: Icons.delete_forever_rounded,
+                iconColor: const Color(0xFFEF4444),
+                title: 'Elimina definitivamente dallo storico',
+                subtitle: 'Rimuove del tutto la traccia di questa regola terminata. Irreversibile.',
+                isDanger: true,
+                onTap: () {
+                  provider.deleteTransaction(id);
+                  provider.rimuoviSpesaPianificata(id);
+                  Navigator.pop(ctx);
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Regola "$nome" eliminata definitivamente dallo storico',
+                    type: NotificationType.error,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -266,9 +266,10 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
     final movimentiConto = transactions
         .where((t) =>
-            t.accountId == account.id ||
+            !t.id.startsWith('rule_') && // 👈 QUESTO È IL FILTRO MAGICO DA AGGIUNGERE
+            (t.accountId == account.id ||
             t.title.contains(account.title) ||
-            account.title.contains(t.title))
+            account.title.contains(t.title)))
         .toList();
 
     movimentiConto.sort((a, b) => b.date.compareTo(a.date));

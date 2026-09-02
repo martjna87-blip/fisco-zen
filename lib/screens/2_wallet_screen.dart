@@ -734,7 +734,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
     final walletProvider = context.watch<WalletProvider>();
     final patrimonioNetto = walletProvider.patrimonioNetto;
-    final movimenti = walletProvider.transactions;
+    final movimenti = walletProvider.transactions.where((t) => !t.id.startsWith('rule_')).toList();
     final bool mostraPiva = widget.isPiva || walletProvider.isPartitaIVA;
 
     final double tasseRealiFatture = walletProvider.fattureIncassate
