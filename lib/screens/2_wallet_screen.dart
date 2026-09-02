@@ -11,6 +11,10 @@ import '../widgets_shared/app_popup_wrapper.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '2_4_wallet_budget_pilot_v2.dart';
 import '../widgets_shared/fiscon_logo.dart';
+import '../widgets_shared/app_secondary_popup.dart';
+import '../widgets_shared/app_action_card.dart';
+import '../data/recurrence_manager.dart';
+import '0_1_pro_upgrade.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -62,11 +66,12 @@ class _WalletScreenState extends State<WalletScreen> {
 
   String _formattaInt(double importo) {
     final int intVal = importo.round();
+    final String segno = intVal < 0 ? '-' : ''; // 👈 Controlla se è negativo
     final strVal = intVal.abs().toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     );
-    return '$strVal €';
+    return '$segno$strVal €'; // 👈 Riapplica il segno
   }
 
   void _cambiaPeriodoRipartizione(int delta) {
@@ -432,121 +437,134 @@ class _WalletScreenState extends State<WalletScreen> {
     }
 
     final bool isRecurrent = tx.isRecurrent ?? false;
+    final provider = context.read<WalletProvider>();
+
+    // 🔒 GUARDRAIL DEMO/FREE: SE L'UTENTE NON È PRO APRE IL PAYWALL
+    if (isRecurrent && !provider.isProUser) {
+      AppBottomSheet.mostra(
+        context: context,
+        child: const ProUpgradeSheet(funzionalita: 'Gestione Ricorrenze'),
+      );
+      return;
+    }
+
     final String desc = tx.title ?? 'Movimento';
     final String id = tx.id as String;
     final DateTime date = tx.date as DateTime;
 
+    if (!isRecurrent) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
+              SizedBox(width: 8),
+              Text('Elimina Movimento', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà aggiornato.',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                provider.deleteTransaction(id);
+                Navigator.pop(ctx);
+                setState(() {});
+                AppNotifications.mostraInAlto(context, 'Movimento "$desc" eliminato 🎉');
+              },
+              child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 🎯 MODALE RICORRENZA IDENTICA A 2.1 CON APPACTIONCARD
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppSecondaryPopup(
         backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(isRecurrent ? Icons.event_repeat_rounded : Icons.warning_amber_rounded, color: const Color(0xFFEF4444), size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                isRecurrent ? 'Gestisci Ricorrenza' : 'Elimina Movimento',
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis,
+        icon: Icons.event_repeat_rounded,
+        iconColor: const Color(0xFF38BDF8),
+        titolo: 'Gestisci Ricorrenza',
+        testoAnnulla: 'Chiudi',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Scegli come modificare la spesa/entrata per "$desc":',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRecurrent
-                  ? 'Stai eliminando "$desc" (ricorrente).\nScegli come procedere:'
-                  : 'Vuoi davvero eliminare "$desc"?\nIl saldo del conto verrà aggiornato.',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            if (isRecurrent) ...[
+              const SizedBox(height: 16),
+
+              // 1️⃣ ELIMINA SOLO QUESTO MESE
+              AppActionCard(
+                icon: Icons.event_busy_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Elimina solo per questo mese',
+                subtitle: 'Cancella la singola registrazione. La spesa tornerà regolarmente il mese prossimo.',
+                onTap: () {
+                  provider.eliminaSoloQuestoMese(id, date);
+                  Navigator.pop(ctx);
+                  setState(() {});
+                  AppNotifications.mostraInAlto(context, 'Movimento eliminato solo per questo mese 🎉');
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // 2️⃣ ELIMINA QUESTO E I FUTURI
+              AppActionCard(
+                icon: Icons.block_rounded,
+                iconColor: const Color(0xFFF59E0B),
+                title: 'Elimina questo e i futuri',
+                subtitle: 'Rimborsa questo mese e blocca la spesa per il futuro. Lo storico passato è salvo.',
+                onTap: () {
+                  provider.eliminaQuestoEFuturi(id, date);
+                  Navigator.pop(ctx);
+                  setState(() {});
+                  AppNotifications.mostraInAlto(
+                    context,
+                    'Spesa interrotta da questo mese in poi! Storico passato salvato.',
+                    type: NotificationType.warning,
+                  );
+                },
+              ),
               const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF2DD4BF)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  onPressed: () {
-                    context.read<WalletProvider>().deleteButKeepRecurrence(id);
-                    Navigator.pop(ctx);
-                    setState(() {});
-                    AppNotifications.mostraInAlto(context, 'Movimento eliminato solo per questo mese! 🎉');
-                  },
-                  child: const Text('Elimina solo questo mese', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 11)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  onPressed: () {
-                    context.read<WalletProvider>().stopRecurrenceFromDate(id, date);
-                    Navigator.pop(ctx);
-                    setState(() {});
-                    AppNotifications.mostraInAlto(
-                      context,
-                      'Ricorrenza disdetta da questo mese in poi! (Storico salvato)',
-                      type: NotificationType.warning,
-                    );
-                  },
-                  child: const Text('Elimina questa e future (Salva passato)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-                ),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
-                  icon: const Icon(Icons.delete_forever_rounded, size: 16),
-                  label: const Text('Elimina TUTTE (comprese le passate)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _mostraAlertConfermaEliminazioneTotale(context, id, desc);
-                  },
-                ),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 14),
+
+              // 3️⃣ ELIMINA L'INTERA SERIE
+              AppActionCard(
+                icon: Icons.delete_forever_rounded,
+                iconColor: const Color(0xFFEF4444),
+                title: 'Elimina l\'intera serie',
+                subtitle: 'Cancella la regola e lo storico passato nei mesi precedenti. Irreversibile.',
+                isDanger: true,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final rootId = RecurrenceManager.getRootId(id);
+                  _mostraAlertConfermaEliminazioneTotale(context, rootId, desc);
+                },
               ),
             ],
-          ],
+          ),
         ),
-        actions: isRecurrent
-            ? [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-                ),
-              ]
-            : [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    context.read<WalletProvider>().deleteTransaction(id);
-                    Navigator.pop(ctx);
-                    setState(() {});
-                    AppNotifications.mostraInAlto(context, 'Movimento "$desc" eliminato 🎉');
-                  },
-                  child: const Text('Elimina', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
       ),
     );
   }

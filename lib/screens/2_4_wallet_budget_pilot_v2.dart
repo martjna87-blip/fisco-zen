@@ -163,8 +163,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // ===========================================================================
-  // TAB 1: 🔄 RICORRENZE (DESIGN REVOLUT ESSENZIALE)
+ // ===========================================================================
+  // TAB 1: 🔄 RICORRENZE (CON TOGGLE ATTIVE / STORICO PASSATE)
   // ===========================================================================
   Widget _buildTabRicorrenze(WalletProvider provider) {
     final bool isPro = provider.isProUser;
@@ -183,65 +183,126 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       final String nome = (tx.title ?? 'Ricorrenza').toString().toLowerCase().trim();
       if (!nomiProcessati.contains(nome)) {
         nomiProcessati.add(nome);
+
+        int giornoAddebito = tx.date.day;
+        if (tx.giornoRicorrenza != null) {
+          giornoAddebito = int.tryParse(tx.giornoRicorrenza.toString()) ?? tx.date.day;
+        }
+
         tutteLeVoci.add({
           'id': tx.id,
           'nome': tx.title,
           'previsto': tx.amount,
           'tipoMovimento': tx.isIncome ? 'entrata' : 'uscita',
+          'sottocategoria': tx.category,
           'categoria': tx.category,
           'frequenza': tx.frequenza ?? 'Ogni mese',
-          'giornoAddebito': tx.date.day,
+          'giornoAddebito': giornoAddebito,
+          'isTransaction': true,
+          'dataFineRicorrenza': tx.dataFineRicorrenza?.toIso8601String(),
         });
       }
     }
 
-    final List<Map<String, dynamic>> vociAttive = tutteLeVoci;
+    // 🎯 SEPARAZIONE REGOLE ATTIVE E TERMINATE/PASSATE
+    final List<Map<String, dynamic>> vociAttive = [];
+    final List<Map<String, dynamic>> vociTerminate = [];
 
-    // 📊 HERO METRIC REVOLUT: PROIEZIONE CUSCINETTO 6 MESI
-    final double entrateMensili = vociAttive
-        .where((v) => v['tipoMovimento'] == 'entrata')
-        .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+    for (var voce in tutteLeVoci) {
+      DateTime? dataFine;
+      if (voce['dataFineRicorrenza'] != null) {
+        dataFine = voce['dataFineRicorrenza'] is DateTime 
+            ? voce['dataFineRicorrenza'] 
+            : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
+      }
+      final bool isTerminata = dataFine != null && dataFine.isBefore(DateTime.now());
 
-    final double usciteMensili = vociAttive
-        .where((v) => v['tipoMovimento'] == 'uscita')
-        .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+      if (isTerminata) {
+        vociTerminate.add(voce);
+      } else {
+        vociAttive.add(voce);
+      }
+    }
 
-    final double risparmioNettoMensile = entrateMensili - usciteMensili;
-    final double proiezione6Mesi = risparmioNettoMensile * 6;
+    final List<Map<String, dynamic>> listaDaMostrare = _subTabRicorrenze == 0 ? vociAttive : vociTerminate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        
-
-        // INTESTAZIONE LISTA
+        // 🔹 INTESTAZIONE CON PULSANTE TOGGLE STORICO
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'REGOLE ATTIVE (${vociAttive.length})',
+              _subTabRicorrenze == 0 
+                  ? 'REGOLE ATTIVE (${vociAttive.length})' 
+                  : 'REGOLE PASSATE (${vociTerminate.length})',
               style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
             ),
-            if (isPro && provider.vociArchiviate.isNotEmpty)
-              GestureDetector(
-                onTap: () => _mostraModalArchivio(context, provider),
-                child: Text('Archivio (${provider.vociArchiviate.length})', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
+            Row(
+              children: [
+                if (isPro && provider.vociArchiviate.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => _mostraModalArchivio(context, provider),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Text('Archivio (${provider.vociArchiviate.length})', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                GestureDetector(
+                  onTap: () => setState(() => _subTabRicorrenze = _subTabRicorrenze == 0 ? 1 : 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _subTabRicorrenze == 0 ? Icons.history_rounded : Icons.check_circle_outline_rounded,
+                          color: Colors.white70,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _subTabRicorrenze == 0 ? 'Storico' : 'Attive',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         // 📋 LISTA FLUIDA DELLE REGOLE
         Expanded(
-          child: ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            itemCount: vociAttive.length,
-            itemBuilder: (context, index) {
-              final voce = vociAttive[index];
-              return _buildCardRicorrenza(context, provider, voce, isTerminata: false);
-            },
-          ),
+          child: listaDaMostrare.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  child: Center(
+                    child: Text(
+                      _subTabRicorrenze == 0 
+                          ? 'Nessuna regola attiva al momento.'
+                          : 'Nessuna regola passata nello storico.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: listaDaMostrare.length,
+                  itemBuilder: (context, index) {
+                    final voce = listaDaMostrare[index];
+                    return _buildCardRicorrenza(context, provider, voce, isTerminata: _subTabRicorrenze == 1);
+                  },
+                ),
         ),
 
         const SizedBox(height: 12),
