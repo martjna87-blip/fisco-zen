@@ -9,6 +9,7 @@ import '../widgets_shared/app_secondary_popup.dart';
 import '0_1_pro_upgrade.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_action_card.dart';
+import '../screens/0_1_pro_upgrade.dart';
 
 class PianoSpesaSheet extends StatefulWidget {
   const PianoSpesaSheet({super.key});
@@ -48,10 +49,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     return '$intPart,${parti[1]} €';
   }
 
+  // 🚀 APERTURA DEL NUOVO PAYWALL PREMIUM
   void _mostraModalPRO(BuildContext context) {
     AppBottomSheet.mostra(
       context: context,
-      child: const ProUpgradeSheet(funzionalita: 'pianificazione'),
+      child: const ProUpgradeSheet(funzionalita: 'Pianificazione Strategica'),
     );
   }
 
@@ -67,40 +69,12 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       badgeColor: isPro ? greenProfit : goldAccent,
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.55,
+          maxHeight: screenHeight * 0.65,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isPro)
-              GestureDetector(
-                onTap: () => _mostraModalPRO(context),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: goldAccent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: goldAccent.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.lock_rounded, color: goldAccent, size: 14),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Anteprima Demo PRO • Tocca per attivare con i tuoi dati reali',
-                          style: TextStyle(color: goldAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Icon(Icons.chevron_right_rounded, color: goldAccent, size: 16),
-                    ],
-                  ),
-                ),
-              ),
-
-            // 🔘 SELETTORE TAB
+            // 🔘 SELETTORE TAB MINIMALE
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -176,34 +150,13 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             Expanded(
               child: _tabSelezionata == 0
                   ? _buildTabRicorrenze(walletProvider)
                   : _buildTabPilotaggioERegole(walletProvider),
             ),
-
-            if (!isPro) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: greenProfit,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon: const Icon(Icons.lock_open_rounded, size: 16),
-                  label: const Text(
-                    'Passa a PRO per la Pianificazione Reale',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                  onPressed: () => _mostraModalPRO(context),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -211,7 +164,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   }
 
   // ===========================================================================
-  // TAB 1: 🔄 RICORRENZE E CONTRATTI (RESTYLING PREMIUM)
+  // TAB 1: 🔄 RICORRENZE (DESIGN REVOLUT ESSENZIALE)
   // ===========================================================================
   Widget _buildTabRicorrenze(WalletProvider provider) {
     final bool isPro = provider.isProUser;
@@ -230,219 +183,84 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       final String nome = (tx.title ?? 'Ricorrenza').toString().toLowerCase().trim();
       if (!nomiProcessati.contains(nome)) {
         nomiProcessati.add(nome);
-
-        int giornoAddebito = tx.date.day;
-        if (tx.giornoRicorrenza != null) {
-          giornoAddebito = int.tryParse(tx.giornoRicorrenza.toString()) ?? tx.date.day;
-        }
-
         tutteLeVoci.add({
           'id': tx.id,
           'nome': tx.title,
           'previsto': tx.amount,
           'tipoMovimento': tx.isIncome ? 'entrata' : 'uscita',
-          'sottocategoria': tx.category,
           'categoria': tx.category,
           'frequenza': tx.frequenza ?? 'Ogni mese',
-          'giornoAddebito': giornoAddebito,
-          'isTransaction': true,
-          'dataFineRicorrenza': tx.dataFineRicorrenza?.toIso8601String(),
+          'giornoAddebito': tx.date.day,
         });
       }
     }
 
-    // 🎯 SEPARAZIONE REGOLE ATTIVE E TERMINATE
-    final List<Map<String, dynamic>> vociAttive = [];
-    final List<Map<String, dynamic>> vociTerminate = [];
+    final List<Map<String, dynamic>> vociAttive = tutteLeVoci;
 
-    for (var voce in tutteLeVoci) {
-      DateTime? dataFine;
-      if (voce['dataFineRicorrenza'] != null) {
-        dataFine = voce['dataFineRicorrenza'] is DateTime 
-            ? voce['dataFineRicorrenza'] 
-            : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
-      }
-      final bool isTerminata = dataFine != null && dataFine.isBefore(DateTime.now());
+    // 📊 HERO METRIC REVOLUT: PROIEZIONE CUSCINETTO 6 MESI
+    final double entrateMensili = vociAttive
+        .where((v) => v['tipoMovimento'] == 'entrata')
+        .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
 
-      if (isTerminata) {
-        vociTerminate.add(voce);
-      } else {
-        vociAttive.add(voce);
-      }
-    }
+    final double usciteMensili = vociAttive
+        .where((v) => v['tipoMovimento'] == 'uscita')
+        .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
 
-    final double stipendioOnboarding = provider.entrataExtraMensile;
-    final String etichettaLavoro = provider.hasDipendente ? 'Stipendio' : 'Pensione';
-
-    final List<Map<String, dynamic>> listaDaMostrare = _subTabRicorrenze == 0 ? vociAttive : vociTerminate;
+    final double risparmioNettoMensile = entrateMensili - usciteMensili;
+    final double proiezione6Mesi = risparmioNettoMensile * 6;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🔹 INTESTAZIONE MINIMALE CON TOGGLE
+        
+
+        // INTESTAZIONE LISTA
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _subTabRicorrenze == 0 ? 'REGOLE ATTIVE (${vociAttive.length})' : 'REGOLE PASSATE (${vociTerminate.length})',
+              'REGOLE ATTIVE (${vociAttive.length})',
               style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
             ),
-            Row(
-              children: [
-                if (isPro && provider.vociArchiviate.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => _mostraModalArchivio(context, provider),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.inventory_2_outlined, color: Colors.white54, size: 12),
-                          const SizedBox(width: 4),
-                          Text('${provider.vociArchiviate.length}', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                GestureDetector(
-                  onTap: () => setState(() => _subTabRicorrenze = _subTabRicorrenze == 0 ? 1 : 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(_subTabRicorrenze == 0 ? Icons.history_rounded : Icons.check_circle_outline_rounded, color: Colors.white, size: 12),
-                        const SizedBox(width: 4),
-                        Text(_subTabRicorrenze == 0 ? 'Storico' : 'Attive', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            if (isPro && provider.vociArchiviate.isNotEmpty)
+              GestureDetector(
+                onTap: () => _mostraModalArchivio(context, provider),
+                child: Text('Archivio (${provider.vociArchiviate.length})', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
           ],
+        ),
+
+        const SizedBox(height: 8),
+
+        // 📋 LISTA FLUIDA DELLE REGOLE
+        Expanded(
+          child: ListView.builder(
+            physics: const BouncingScrollPhysics(),
+            itemCount: vociAttive.length,
+            itemBuilder: (context, index) {
+              final voce = vociAttive[index];
+              return _buildCardRicorrenza(context, provider, voce, isTerminata: false);
+            },
+          ),
         ),
 
         const SizedBox(height: 12),
 
-        // 📋 ELENCO REGOLE
-        Expanded(
-          child: ListView(
-            physics: const BouncingScrollPhysics(),
-            children: [
-              // 🌿 CARD ONBOARDING (Mostrata solo tra le attive, stilizzata come le altre)
-              if (_subTabRicorrenze == 0 && stipendioOnboarding > 0)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: greenProfit.withOpacity(0.3), width: 1),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: greenProfit.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.auto_awesome_rounded, color: greenProfit, size: 16),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(etichettaLavoro, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: greenProfit.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text('Da Onboarding', style: TextStyle(color: greenProfit, fontSize: 8, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text('Entrata stimata automatica', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
-                            ],
-                          ),
-                        ),
-                        Text('+ ${_formattaValuta(stipendioOnboarding)}', style: TextStyle(color: greenProfit, fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 10),
-                        InkWell(
-                          onTap: () {
-                            if (!isPro) {
-                              _mostraModalPRO(context);
-                            } else {
-                              _mostraFormRegolaAvanzata(provider, importoIniziale: stipendioOnboarding, nomeIniziale: etichettaLavoro, isEntrata: true);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.edit_outlined, color: Colors.white70, size: 15),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // LISTA REGOLE REALI
-              if (listaDaMostrare.isEmpty && stipendioOnboarding == 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 30),
-                  child: Center(
-                    child: Text(
-                      _subTabRicorrenze == 0 
-                          ? 'Nessuna regola attiva al momento.'
-                          : 'Nessuna regola conclusa nello storico.',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-                    ),
-                  ),
-                )
-              else
-                ...listaDaMostrare.map((voce) => _buildCardRicorrenza(context, provider, voce, isTerminata: _subTabRicorrenze == 1)),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // 🔘 BOTTONE PRIMARIO MINIMALE
-        Center(
-          child: TextButton.icon(
-            style: TextButton.styleFrom(
-              backgroundColor: oceanCyan.withOpacity(0.12),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: oceanCyan.withOpacity(0.3)),
-              ),
+        // 🔘 UNICO ED ESCLUSIVO BOTTONE D'AZIONE IN BASSO
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: oceanCyan,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
-            icon: Icon(Icons.add_rounded, size: 18, color: oceanCyan),
+            icon: Icon(isPro ? Icons.add_rounded : Icons.bolt_rounded, size: 18, color: Colors.black),
             label: Text(
-              'Nuova Regola Ricorrente',
-              style: TextStyle(color: oceanCyan, fontWeight: FontWeight.bold, fontSize: 13),
+              isPro ? 'Aggiungi Regola Ricorrente' : 'Sblocca Pianificazione Reale',
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 13),
             ),
             onPressed: () {
               if (!isPro) {
@@ -457,13 +275,14 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // 🎨 CARD SINGOLA RICORRENZA PULITA
+  // 🎨 CARD SINGOLA RICORRENZA CON SEGNALAZIONE DEMO INTELLIGENTE
   Widget _buildCardRicorrenza(
     BuildContext context,
     WalletProvider provider,
     Map<String, dynamic> voce, {
     required bool isTerminata,
   }) {
+    final bool isPro = provider.isProUser;
     final double importo = (voce['previsto'] as num).toDouble();
     final String nome = voce['nome'] ?? 'Regola Ricorrente';
     final String tipoMov = voce['tipoMovimento'] ?? 'uscita';
@@ -504,6 +323,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () {
+            if (!isPro) {
+              _mostraModalPRO(context);
+              return;
+            }
+
             if (isTerminata) {
               _mostraGestioneTerminata(context, provider, voce);
             } else {
@@ -539,7 +363,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // 🏷️ BADGE STATO GRIGIO NEUTRO PER TERMINATA
                             if (isTerminata)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -557,13 +380,13 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: greenProfit.withOpacity(0.15),
+                                  color: isPro ? greenProfit.withOpacity(0.15) : oceanCyan.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: greenProfit.withOpacity(0.3)),
+                                  border: Border.all(color: isPro ? greenProfit.withOpacity(0.3) : oceanCyan.withOpacity(0.4)),
                                 ),
                                 child: Text(
-                                  'Attiva',
-                                  style: TextStyle(color: greenProfit, fontSize: 8, fontWeight: FontWeight.bold),
+                                  isPro ? 'Attiva' : 'Simulata',
+                                  style: TextStyle(color: isPro ? greenProfit : oceanCyan, fontSize: 8, fontWeight: FontWeight.bold),
                                 ),
                               ),
                           ],
@@ -581,8 +404,12 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     tipoMov == 'uscita' ? '- ${_formattaValuta(importo)}' : '+ ${_formattaValuta(importo)}',
                     style: TextStyle(color: coloreIcona, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
+                  const SizedBox(width: 6),
+                  Icon(
+                    isPro ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
+                    color: isPro ? Colors.white24 : oceanCyan.withOpacity(0.7),
+                    size: 16,
+                  ),
                 ],
               ),
             ),
@@ -1737,6 +1564,13 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
     Map<String, dynamic> voce,
   ) {
     if (voce.isEmpty) return;
+
+    // 🔒 SE L'UTENTE NON È PRO, APRE IL PAYWALL E CHIUDE IL DIALOG
+    if (!provider.isProUser) {
+      _mostraModalPRO(context);
+      return;
+    }
+
     final String id = voce['id'].toString();
     final String nome = voce['nome'] ?? 'Ricorrenza';
     final bool isTransaction = voce['isTransaction'] == true;

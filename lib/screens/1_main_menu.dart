@@ -15,6 +15,7 @@ import '4_notifications_screen.dart';
 import '../widgets_shared/app_speed_dial_menu.dart'; 
 import '3_2_PI_registra_fattura.dart'; 
 import '0_profile_screen.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
 
 class MainMenu extends StatefulWidget {
   final bool hasPartitaIva;
@@ -177,13 +178,13 @@ class _MainMenuState extends State<MainMenu> {
             );
           },
           onNuovaEntrata: () {
-            AppPopupWrapper.mostra(
+            AppBottomSheet.mostra(
               context: context,
               child: const AddMovementSheet(initialTab: 'entrata'),
             );
           },
           onNuovaUscita: () {
-            AppPopupWrapper.mostra(
+            AppBottomSheet.mostra(
               context: context,
               child: const AddMovementSheet(initialTab: 'uscita'),
             );
