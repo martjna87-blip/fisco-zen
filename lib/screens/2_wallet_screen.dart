@@ -1638,44 +1638,113 @@ class _WalletScreenState extends State<WalletScreen> {
     final walletProvider = context.watch<WalletProvider>();
     final DateTime ora = DateTime.now();
 
-    final bool isMeseFuturo = _dataFiltroRipartizione.year > ora.year ||
-        (_dataFiltroRipartizione.year == ora.year && _dataFiltroRipartizione.month > ora.month);
+    final bool isMeseCorrente = _dataFiltroRipartizione.year == ora.year && _dataFiltroRipartizione.month == ora.month;
+    final bool isMesePassato = _dataFiltroRipartizione.year < ora.year || (_dataFiltroRipartizione.year == ora.year && _dataFiltroRipartizione.month < ora.month);
+    final bool isMeseFuturo = !isMeseCorrente && !isMesePassato;
+
+    // ⚡ RECUPERA LA MATRICE AI CENTRALE
+    final matrice = walletProvider.calcolaMatriceProiezioneAnnuale(annoSelezionato: _dataFiltroRipartizione.year);
 
     double entrateUso = 0.0;
+    double tBisogni = 0.0;
+    double tSvago = 0.0;
+    double tRisparmio = 0.0;
+
     double bisogniUso = spesoBisogni;
     double svagoUso = spesoSvago;
-
-    final double targetBaseOnboarding = _isVistaAnnuale 
-        ? (walletProvider.nettoTargetMensile * 12) 
-        : walletProvider.nettoTargetMensile;
-
-    double tBisogni = targetBaseOnboarding * 0.50;
-    double tSvago = targetBaseOnboarding * 0.30;
-    double tRisparmio = targetBaseOnboarding * 0.20;
-
     double calcoloRisparmioMese = 0.0;
 
-    if (isMeseFuturo) {
-      entrateUso = walletProvider.getEntrataPrevistaMeseFuturo(_dataFiltroRipartizione);
-      tBisogni = entrateUso * 0.50;
-      tSvago = entrateUso * 0.30;
-      tRisparmio = entrateUso * 0.20;
+    // Legge le percentuali esatte scelte da te negli slider
+    final double percBisogni = walletProvider.percentBisogni / 100;
+    final double percSvago = walletProvider.percentSvago / 100;
+    final double percRisparmio = walletProvider.percentRisparmio / 100;
 
-      bisogniUso = walletProvider.vociPianificate
-          .where((v) => v['categoria'] == 'Bisogni (50%)')
-          .fold(0.0, (sum, v) => sum + (v['previsto'] as num).toDouble());
+    if (_isVistaAnnuale) {
+      // 📊 LOGICA ANNUALE (Aggrega tutta la matrice)
+      entrateUso = matrice.fold(0.0, (sum, m) {
+        final bool isFuturoRow = !(m['isPassato'] as bool) && !(m['isCorrente'] as bool);
+        if (isFuturoRow) {
+          return sum + (m['entrataTotaleNetta'] as double? ?? 0.0); // AI Netta futura
+        } else {
+          // Passato/Corrente: Puro Netto Reale incassato (No Cuscinetto)
+          return sum + (m['entrataPivaNetta'] as double? ?? 0.0) + (m['entrataStipendio'] as double? ?? 0.0);
+        }
+      });
 
-      svagoUso = walletProvider.vociPianificate
-          .where((v) => v['categoria'] == 'Svago (30%)')
-          .fold(0.0, (sum, v) => sum + (v['previsto'] as num).toDouble());
-
-      calcoloRisparmioMese = (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso);
-    } else {
-      entrateUso = entrateRiferimento; 
+      tBisogni = entrateUso * percBisogni;
+      tSvago = entrateUso * percSvago;
+      tRisparmio = entrateUso * percRisparmio;
       
-      calcoloRisparmioMese = entrateUso > 0
-          ? (entrateUso - bisogniUso - svagoUso).clamp(0.0, entrateUso)
-          : 0.0; 
+      // Nessun .clamp, lascia che i risparmi vadano in negativo se le spese superano le entrate
+      calcoloRisparmioMese = entrateUso - bisogniUso - svagoUso;
+
+    } else {
+      // 📅 LOGICA MENSILE
+      final meseMatrice = matrice.firstWhere((m) => m['meseIdx'] == _dataFiltroRipartizione.month, orElse: () => {});
+      final double entrataNettaAI = meseMatrice['entrataTotaleNetta'] as double? ?? 0.0; 
+      final double stipendioPuro = meseMatrice['entrataStipendio'] as double? ?? 0.0;
+      final double pivaNettaPura = meseMatrice['entrataPivaNetta'] as double? ?? 0.0;
+      final double entrateRealiPure = stipendioPuro + pivaNettaPura; // Pura liquidità reale
+
+      if (isMeseFuturo) {
+        // 🔮 FUTURO: Gestione distinta Cuscinetto tra Accantonamento (Mese ON) ed Erogazione (Mese OFF)
+        final bool isMeseOFFRow = !(meseMatrice['isMeseON'] as bool? ?? true);
+        final double quotaCuscinettoAI = (meseMatrice['quotaCuscinetto'] as double? ?? 0.0);
+
+        if (isMeseOFFRow) {
+          // Mese OFF: Il cuscinetto viene Erogato (Ingresso), l'entrata totale netta include già l'integrazione
+          entrateUso = entrataNettaAI;
+        } else {
+          // Mese ON: Il cuscinetto viene Accantonato (Uscita), va sottratto dalla base spendibile
+          entrateUso = (entrataNettaAI - quotaCuscinettoAI).clamp(0.0, double.infinity);
+        }
+
+        tBisogni = entrateUso * percBisogni;
+        tSvago = entrateUso * percSvago;
+        tRisparmio = entrateUso * percRisparmio;
+
+        // Le spese future mostrano l'impegno delle ricorrenze pianificate
+        bisogniUso = walletProvider.vociPianificate
+            .where((v) => (v['categoria'] ?? '').toString().contains('Bisogni'))
+            .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+
+        svagoUso = walletProvider.vociPianificate
+            .where((v) => (v['categoria'] ?? '').toString().contains('Svago'))
+            .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+
+        calcoloRisparmioMese = entrateUso - bisogniUso - svagoUso;
+
+      } else {
+        // 🔴 CORRENTE & 🔒 PASSATO: 100% Reale da Transazioni Registrate ad oggi
+        final double incassatoPivaReale = walletProvider.transactions.where((tx) {
+          return tx.isIncome &&
+                 tx.date.year == _dataFiltroRipartizione.year &&
+                 tx.date.month == _dataFiltroRipartizione.month &&
+                 (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+        final double stipendioRealeReg = walletProvider.transactions.where((tx) {
+          return tx.isIncome &&
+                 tx.date.year == _dataFiltroRipartizione.year &&
+                 tx.date.month == _dataFiltroRipartizione.month &&
+                 tx.category != 'P.IVA' &&
+                 !tx.title.toLowerCase().contains('incasso') &&
+                 !tx.category.toLowerCase().contains('giroconto');
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+        final double nettoPivaReale = walletProvider.isPartitaIVA 
+            ? (incassatoPivaReale * (1 - walletProvider.aliquotaFiscaleReale)) 
+            : 0.0;
+
+        entrateUso = nettoPivaReale + stipendioRealeReg;
+
+        tBisogni = entrateUso * percBisogni;
+        tSvago = entrateUso * percSvago;
+        tRisparmio = entrateUso * percRisparmio;
+
+        // Consuntivo puro: Entrate Reali Ad Oggi - Spese Reali Sostenute
+        calcoloRisparmioMese = entrateUso - bisogniUso - svagoUso;
+      }
     }
 
     final bool sforatoBisogni = bisogniUso > tBisogni && tBisogni > 0;

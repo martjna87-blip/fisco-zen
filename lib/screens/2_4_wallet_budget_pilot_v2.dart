@@ -481,108 +481,264 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   }
 
   // ===========================================================================
-  // TAB 2: 🎯 PILOTAGGIO FATTURATO P.IVA & REGOLE BUSSOLA
+  // TAB 2: 🎯 PILOTAGGIO STRATEGICO (HUMAN-IN-THE-LOOP + PLANCIA DI COMANDO)
   // ===========================================================================
   Widget _buildTabPilotaggioERegole(WalletProvider provider) {
     final bool isPro = provider.isProUser;
-    final double targetAnnuo = provider.fatturatoStimato;
-    final double totalePilotato = provider.totaleFatturatoPilotato;
-    final double differenza = totalePilotato - targetAnnuo;
+    final double targetAnnuoPivaLordo = provider.fatturatoStimato;
+
+    // ⚡ RECUPERO MATRICE CENTRALIZZATA DAL PROVIDER
+    final List<Map<String, dynamic>> matriceMesi = provider.calcolaMatriceProiezioneAnnuale();
+
+    // 1. Dichiariamo prima i totali parziali della matrice
+    final double totalePivaNettaAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['entrataPivaNetta'] as double));
+    final double totaleStipendioAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['entrataStipendio'] as double));
+    final double totaleSpeseAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['speseMese'] as double));
+
+    // 2. Dichiariamo i totali derivati (esatti senza doppi conteggi)
+    final double totaleNettoAnnuo = totalePivaNettaAnnuo + totaleStipendioAnnuo;
+    final double totaleRisparmioAnnuo = totaleNettoAnnuo - totaleSpeseAnnuo;
+
+    final double totaleGiaFissatoManualmenteLordo = provider.pilotaggioFatturatoMesi.values.fold(0.0, (sum, v) => sum + v) +
+        provider.pilotaggioStipendioMesi.values.fold(0.0, (sum, v) => sum + v);
+
+    final double totaleEntratePerBarra = (totalePivaNettaAnnuo + totaleStipendioAnnuo) > 0 ? (totalePivaNettaAnnuo + totaleStipendioAnnuo) : 1.0;
+    final int flexPiva = ((totalePivaNettaAnnuo / totaleEntratePerBarra) * 100).round().clamp(1, 100);
+    final int flexStipendio = (100 - flexPiva).clamp(0, 99);
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 📊 PILOTAGGIO FATTURATO ANNUALE
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF18181B),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white12),
+          // 📊 KPI HERO CARD MINIMALE: NETTO & RISPARMIO CON POPUP SU TAP SINGOLO
+          GestureDetector(
+            onTap: () => _mostraPopupDettaglioSintesi(
+              context,
+              provider,
+              targetAnnuoPivaLordo,
+              totalePivaNettaAnnuo,
+              totaleStipendioAnnuo,
+              totaleSpeseAnnuo,
+              totaleNettoAnnuo,
+              totaleRisparmioAnnuo,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF18181B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('NETTO REALE ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        const SizedBox(height: 3),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _formattaInt(totaleNettoAnnuo),
+                            style: TextStyle(color: greenProfit, fontSize: 18, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 28,
+                    width: 1,
+                    color: Colors.white10,
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('RISPARMIO ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        const SizedBox(height: 3),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _formattaInt(totaleRisparmioAnnuo),
+                            style: TextStyle(
+                              color: totaleRisparmioAnnuo >= 0 ? purpleZen : const Color(0xFFEF4444),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.info_outline_rounded, color: Colors.white38, size: 16),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 🤖 SMART AI INSIGHT BANNER CON PULSANTE RESET
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: oceanCyan.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: oceanCyan.withOpacity(0.25)),
+            ),
+            child: Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('PREVISIONE vs TARGET ANNUO', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                    Text(
-                      'Target: ${_formattaInt(targetAnnuo)}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                Icon(Icons.psychology_rounded, color: oceanCyan, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    totaleGiaFissatoManualmenteLordo > 0
+                        ? 'I tuoi interventi manuali hanno la priorità. L\'AI ricalcola il residuo sui mesi liberi.'
+                        : 'Algoritmo AI attivo: Ripartizione dinamica P.IVA sui mesi ON con tasse e stipendi calcolati.',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_formattaInt(totalePilotato), style: TextStyle(color: greenProfit, fontSize: 20, fontWeight: FontWeight.w900)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (differenza >= 0 ? greenProfit : const Color(0xFFEF4444)).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        differenza >= 0 ? '+${_formattaInt(differenza)} sopra target' : '${_formattaInt(differenza)} sotto target',
-                        style: TextStyle(color: differenza >= 0 ? greenProfit : const Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    // Chiama il reset ufficiale sul Provider
+                    provider.resetPilotaggio();
+                    AppNotifications.mostraInAlto(context, 'Reset AI effettuato: Algoritmo ripristinato! 🎯');
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: oceanCyan.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: oceanCyan.withOpacity(0.5)),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(Icons.refresh_rounded, color: oceanCyan, size: 12),
+                        const SizedBox(width: 4),
+                        Text('Reset AI', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
-          const Text('STIMA FATTURATO MESE PER MESE (€)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+          const SizedBox(height: 18),
+          const Text('PIANIFICAZIONE MESE PER MESE (NETTO (€))', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
           const SizedBox(height: 8),
 
-          // GRIGLIA MESI PILOTAGGIO
+          // 🗓️ GRIGLIA 12 MESI INTERATTIVA CON BADGE E ANOMALIE
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              childAspectRatio: 2.2,
+              childAspectRatio: 1.55,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
             ),
             itemCount: 12,
             itemBuilder: (context, index) {
-              final int meseIdx = index + 1;
-              final String nomeMese = _nomiMesiBrevi[index];
-              final double stimaCorrente = provider.pilotaggioFatturatoMesi[meseIdx] ?? 0.0;
+              final m = matriceMesi[index];
+              final Color coloreStato = m['coloreStato'] as Color;
+              final bool isCorrente = m['isCorrente'] as bool;
+              final bool isPassato = m['isPassato'] as bool;
+              final bool isMeseOFF = !(m['isMeseON'] as bool);
+              final bool haAnomalia = m['haAnomalia'] as bool;
+              final bool isManual = m['isManualOverride'] as bool;
+
+              final Color coloreDot = isPassato ? Colors.grey : (isCorrente ? oceanCyan : coloreStato);
 
               return InkWell(
                 onTap: () {
                   if (!isPro) {
                     _mostraModalPRO(context);
                   } else {
-                    _mostraDialogModificaMese(provider, meseIdx, nomeMese, stimaCorrente);
+                    _mostraPlanciaComandoMese(context, provider, m);
                   }
                 },
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: stimaCorrente > 0 ? oceanCyan.withOpacity(0.3) : Colors.white12),
+                    color: isCorrente 
+                        ? oceanCyan.withOpacity(0.12) 
+                        : (isMeseOFF ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.04)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isCorrente 
+                          ? oceanCyan 
+                          : (isPassato ? greenProfit.withOpacity(0.4) : Colors.white10),
+                      width: isCorrente ? 1.5 : 1.0,
+                    ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(nomeMese, style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(color: coloreDot, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(m['nomeMese'] as String, style: TextStyle(color: isCorrente ? oceanCyan : Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          if (haAnomalia)
+                            Icon(Icons.warning_amber_rounded, color: goldAccent, size: 12)
+                          else if (isMeseOFF)
+                            const Text('🏖️', style: TextStyle(fontSize: 8))
+                          else if (isManual)
+                            Icon(Icons.edit_rounded, color: oceanCyan, size: 10)
+                          else if (isPassato)
+                            const Text('🔒', style: TextStyle(fontSize: 8))
+                          else
+                            Icon(Icons.auto_awesome_rounded, color: purpleZen, size: 10),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       FittedBox(
                         child: Text(
-                          _formattaInt(stimaCorrente),
-                          style: TextStyle(color: stimaCorrente > 0 ? Colors.white : Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
+                          _formattaInt(m['entrataTotaleNetta'] as double),
+                          style: TextStyle(
+                            color: isMeseOFF ? Colors.white24 : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (isMeseOFF && provider.isPartitaIVA)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1.0),
+                          child: Text(
+                            '🏖️ da Cuscinetto',
+                            style: TextStyle(color: purpleZen, fontSize: 8, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      const SizedBox(height: 2),
+                      // ✅ ORA LEGGE IL BILANCIO NETTO REALE DALLA MATRICE
+                      FittedBox(
+                        child: Text(
+                          'Risparmio: ${_formattaInt((m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0))}',
+                          style: TextStyle(
+                            color: ((m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0)) >= 0 ? greenProfit : const Color(0xFFEF4444),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -592,11 +748,11 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             },
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           const Text('PARAMETRIZZAZIONE BUSSOLA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
           const SizedBox(height: 8),
 
-          // REGOLATORE PERCENTUALI 50/30/20
+          // 🎛️ REGOLATORE BUSSOLA 50/30/20
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -623,6 +779,520 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  // 🎛️ PLANCIA DI COMANDO DEL MESE (GRAFICA PULITA E UNIFORMATA)
+  void _mostraPlanciaComandoMese(BuildContext context, WalletProvider provider, Map<String, dynamic> m) {
+    final int meseIdx = m['meseIdx'] as int;
+    final String nomeMese = m['nomeMese'] as String;
+    final bool isPassato = m['isPassato'] as bool;
+    final bool isMeseOFF = m['isMeseOFF'] as bool? ?? false;
+    final bool isManualPiva = m['isManualOverride'] as bool;
+    final bool isManualStipendio = provider.pilotaggioStipendioMesi.containsKey(meseIdx) && provider.pilotaggioStipendioMesi[meseIdx]! > 0;
+    final bool haAnomalia = m['haAnomalia'] as bool;
+
+    final double stipendioTarget = m['entrataStipendio'] as double? ?? 0.0;
+    final double pivaLordaTarget = m['entrataPivaLorda'] as double? ?? 0.0;
+    final double pivaNettaTarget = m['entrataPivaNetta'] as double? ?? 0.0;
+    final double spesePianificateTotali = m['speseMese'] as double? ?? 0.0;
+    final double quotaCuscinetto = m['quotaCuscinetto'] as double? ?? 0.0;
+
+    final bool isCorrente = m['isCorrente'] as bool? ?? false;
+    final int annoCorrente = DateTime.now().year;
+
+    // 🎯 CALCOLO REALTIME PER IL MESE CORRENTE
+    double stipendioReale = 0.0;
+    double pivaLordaReale = 0.0;
+    double speseRealiSostenute = 0.0;
+
+    if (isCorrente) {
+      stipendioReale = provider.transactions.where((tx) => tx.isIncome && tx.date.year == annoCorrente && tx.date.month == meseIdx && (tx.category == 'Stipendio' || tx.category == 'Pensione' || tx.title.toLowerCase().contains('stipendio'))).fold(0.0, (sum, tx) => sum + tx.amount);
+
+      final lordoFatture = provider.fattureIncassate.where((f) {
+        final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+        return dataStr.contains('$annoCorrente') && (dataStr.contains('/$meseIdx/') || dataStr.contains('-0$meseIdx-') || dataStr.contains('-$meseIdx-'));
+      }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
+
+      final lordoTx = provider.transactions.where((tx) => tx.isIncome && tx.date.year == annoCorrente && tx.date.month == meseIdx && (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'))).fold(0.0, (sum, tx) => sum + tx.amount);
+      
+      pivaLordaReale = lordoFatture > lordoTx ? lordoFatture : lordoTx;
+
+      speseRealiSostenute = provider.transactions.where((tx) => !tx.isIncome && tx.date.year == annoCorrente && tx.date.month == meseIdx && tx.category != 'Giroconto' && !tx.title.toLowerCase().contains('giroconto')).fold(0.0, (sum, tx) => sum + tx.amount);
+    }
+
+    final double pivaNettaReale = pivaLordaReale * (1 - provider.aliquotaFiscaleReale);
+
+    final double entratePureTarget = isMeseOFF ? stipendioTarget : (stipendioTarget + pivaNettaTarget);
+    final double entratePureReali = isMeseOFF ? stipendioReale : (stipendioReale + pivaNettaReale);
+
+    // 🛡️ ANTI-DUPLICAZIONE SPESE: Sostenute Reali + Pianificate Rimanenti
+    final double spesePianificateRimanenti = (spesePianificateTotali - speseRealiSostenute).clamp(0.0, double.infinity);
+    final double speseTotaliProiettateMese = isCorrente ? (speseRealiSostenute + spesePianificateRimanenti) : spesePianificateTotali;
+
+    // Risparmio netto effettivo
+    final double risparmioNettoMese = isMeseOFF
+        ? ((isCorrente ? stipendioReale : stipendioTarget) + quotaCuscinetto - speseTotaliProiettateMese)
+        : ((isCorrente ? entratePureReali : entratePureTarget) - quotaCuscinetto - speseTotaliProiettateMese);
+
+    // 🔒 GESTIONE ESATTA DEL SEGNO PER EVITARE DOPPIO -
+    final String strRisparmioNetto = risparmioNettoMese < 0
+        ? '- ${_formattaInt(risparmioNettoMese.abs())}'
+        : _formattaInt(risparmioNettoMese);
+
+    final TextEditingController overridePivaCtrl = TextEditingController(
+      text: pivaLordaTarget > 0 ? pivaLordaTarget.toStringAsFixed(0) : '',
+    );
+
+    final TextEditingController overrideStipendioCtrl = TextEditingController(
+      text: stipendioTarget > 0 ? stipendioTarget.toStringAsFixed(0) : '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
+        icon: isPassato ? Icons.history_rounded : Icons.tune_rounded,
+        iconColor: oceanCyan,
+        titolo: 'Plancia Mese: $nomeMese',
+        testoAnnulla: '',
+        testoConferma: isPassato ? null : 'Salva & Ricalcola AI',
+        onConferma: isPassato ? null : () {
+          final nuovoValoreLordoPiva = double.tryParse(overridePivaCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+          final nuovoValoreNettoStipendio = double.tryParse(overrideStipendioCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+
+          provider.impostaFatturatoMese(meseIdx, nuovoValoreLordoPiva);
+          provider.impostaStipendioMese(meseIdx, nuovoValoreNettoStipendio);
+
+          AppNotifications.mostraInAlto(context, 'Stime per $nomeMese aggiornate. Algoritmo ricalibrato! 🎯');
+          Navigator.pop(ctx);
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 🏷️ BADGE ORIGINE DATO
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isPassato 
+                    ? greenProfit.withOpacity(0.15) 
+                    : ((isManualPiva || isManualStipendio) ? oceanCyan.withOpacity(0.15) : purpleZen.withOpacity(0.15)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isPassato 
+                    ? '🔒 Consolidato Reale' 
+                    : ((isManualPiva || isManualStipendio) ? '✏️ Fissato da te (Override)' : '🤖 Pilotato da AI'),
+                style: TextStyle(
+                  color: isPassato ? greenProfit : ((isManualPiva || isManualStipendio) ? oceanCyan : purpleZen),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            if (haAnomalia) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: goldAccent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: goldAccent.withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: goldAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Suggerimento AI: L\'importo inserito è molto sotto la media necessaria per raggiungere il Target Annuo.',
+                        style: TextStyle(color: goldAccent, fontSize: 10, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 14),
+
+            // 💵 COMPOSIZIONE ENTRATE
+            const Text('COMPOSIZIONE ENTRATE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+            const SizedBox(height: 6),
+
+            if (isCorrente) ...[
+              // 🔴 BLOCCO REAL TIME & TARGET (MESE CORRENTE)
+              if (provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Stipendio / Pensione (Netto):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text('${_formattaInt(stipendioReale)} / ${_formattaInt(stipendioTarget)}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+              if (provider.isPartitaIVA && !isMeseOFF) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Fatturato P.IVA (Lordo):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text('${_formattaInt(pivaLordaReale)} / ${_formattaInt(pivaLordaTarget)}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Fatturato P.IVA (Netto post-tasse):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text('${_formattaInt(pivaNettaReale)} / ${_formattaInt(pivaNettaTarget)}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: greenProfit.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: greenProfit.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('TOTALE ENTRATE NETTE (Real / Target):', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    Text(
+                      '${_formattaInt(entratePureReali)} / ${_formattaInt(entratePureTarget)}',
+                      style: TextStyle(color: greenProfit, fontSize: 13, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // 🔮 BLOCCO PREVISIONE / CONSOLIDATO (MESI FUTURI O PASSATI)
+              if (provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Stipendio / Pensione (Netto):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text(_formattaInt(stipendioTarget), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+              if (provider.isPartitaIVA && !isMeseOFF) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Fatturato P.IVA (Lordo):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text(_formattaInt(pivaLordaTarget), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Fatturato P.IVA (Netto post-tasse):', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text(_formattaInt(pivaNettaTarget), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: greenProfit.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: greenProfit.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('TOTALE ENTRATE NETTE:', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text(
+                      _formattaInt(entratePureTarget),
+                      style: TextStyle(color: greenProfit, fontSize: 15, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white10, height: 1),
+            const SizedBox(height: 12),
+
+            // 📉 BILANCIO & BUSSOLA BUDGET
+            const Text('BILANCIO & BUSSOLA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+            const SizedBox(height: 6),
+
+            if (isCorrente) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Uscite Reali Sostenute:', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  Text('- ${_formattaInt(speseRealiSostenute.abs())}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Spese Pianificate Rimanenti:', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  Text('- ${_formattaInt(spesePianificateRimanenti.abs())}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Uscite / Spese Pianificate:', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  Text('- ${_formattaInt(spesePianificateTotali.abs())}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ],
+
+            // 🏖️ CUSCINETTO FERIE SOTTO IL BILANCIO
+            if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
+              const SizedBox(height: 4),
+              if (isMeseOFF) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Integrazione Cuscinetto Ferie:', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text('+ ${_formattaInt(quotaCuscinetto.abs())}', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ] else if (quotaCuscinetto > 0) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Accantonamento Cuscinetto Ferie:', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text('- ${_formattaInt(quotaCuscinetto.abs())}', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ],
+
+            const SizedBox(height: 8),
+
+            // 🛡️ RISPARMIO NETTO MESE
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: (risparmioNettoMese >= 0 ? greenProfit : const Color(0xFFEF4444)).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: (risparmioNettoMese >= 0 ? greenProfit : const Color(0xFFEF4444)).withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Risparmio Netto Mese:', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text(
+                    strRisparmioNetto,
+                    style: TextStyle(
+                      color: risparmioNettoMese >= 0 ? greenProfit : const Color(0xFFEF4444),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (!isPassato) ...[
+              if (provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0) ...[
+                const SizedBox(height: 14),
+                Text('MODIFICA MANUALE STIPENDIO / PENSIONE (NETTO)', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: overrideStipendioCtrl,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.4),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    suffixText: '€ Netti',
+                    suffixStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ),
+              ],
+              if (provider.isPartitaIVA) ...[
+                const SizedBox(height: 10),
+                Text('MODIFICA MANUALE FATTURATO P.IVA (LORDO)', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: overridePivaCtrl,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.4),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    suffixText: '€ Lordi',
+                    suffixStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostraPopupDettaglioSintesi(
+    BuildContext context,
+    WalletProvider provider,
+    double targetAnnuoPivaLordo,
+    double totalePivaNettaAnnuo,
+    double totaleStipendioAnnuo,
+    double totaleSpeseAnnuo,
+    double totaleNettoAnnuo,
+    double totaleRisparmioAnnuo,
+  ) {
+    HapticFeedback.mediumImpact();
+
+    final bool haStipendioOPensione = provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0;
+    final double targetStipendioNettoAnnuo = haStipendioOPensione
+        ? (provider.entrataExtraMensile * (provider.hasDipendente ? 13 : 12))
+        : 0.0;
+    final double aliquotaTasse = provider.aliquotaFiscaleReale;
+    final double stimaPivaLordaAnnuo = (aliquotaTasse < 1.0)
+        ? (totalePivaNettaAnnuo / (1 - aliquotaTasse))
+        : 0.0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF1C1C21),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: oceanCyan.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.analytics_rounded, color: oceanCyan, size: 28),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Center(
+                child: Text(
+                  'Dettaglio Sintesi Annuale',
+                  style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 🎯 TARGET ANNUALE (OBIETTIVI) - VALORI IN GRIGIO
+              const Text(
+                'TARGET ANNUALE (OBIETTIVI)',
+                style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+              ),
+              const SizedBox(height: 6),
+              if (provider.isPartitaIVA)
+                _buildRigaDettaglioPopup('Target Fatturato P.IVA (Lordo):', _formattaInt(targetAnnuoPivaLordo), Colors.white70),
+              if (haStipendioOPensione && targetStipendioNettoAnnuo > 0) ...[
+                const SizedBox(height: 4),
+                _buildRigaDettaglioPopup('Target Stipendio / Pensione (Netto):', _formattaInt(targetStipendioNettoAnnuo), Colors.white70),
+              ],
+
+              const SizedBox(height: 14),
+
+              // 📈 PREVISIONE ANNUALE (PROIEZIONI) - VALORI IN VERDE E PURPLE
+              const Text(
+                'PREVISIONE ANNUALE (PROIEZIONI)',
+                style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+              ),
+              const SizedBox(height: 6),
+              if (provider.isPartitaIVA) ...[
+                _buildRigaDettaglioPopup('Previsione P.IVA (Lordo):', _formattaInt(stimaPivaLordaAnnuo), greenProfit),
+                const SizedBox(height: 4),
+                _buildRigaDettaglioPopup('Previsione P.IVA (Netto):', _formattaInt(totalePivaNettaAnnuo), greenProfit),
+                const SizedBox(height: 4),
+              ],
+              if (haStipendioOPensione && totaleStipendioAnnuo > 0) ...[
+                _buildRigaDettaglioPopup('Previsione Stipendio / Pensione (Netto):', _formattaInt(totaleStipendioAnnuo), greenProfit),
+                const SizedBox(height: 4),
+              ],
+              if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
+                _buildRigaDettaglioPopup(
+                  'Fondo Cuscinetto Mesi OFF (${12 - provider.mesiAttivi} mesi):',
+                  // ✅ CALCOLO ESATTO DEL FABBISOGNO ANNUO MASSIMO
+                  '${_formattaInt((provider.nettoTargetMensile - provider.entrataExtraMensile).clamp(0.0, double.infinity) * (12 - provider.mesiAttivi))} (Bilanciato)',
+                  purpleZen,
+                ),
+                const SizedBox(height: 4),
+              ],
+
+              const Divider(color: Colors.white10, height: 18),
+
+              // 💰 SINTESI RISPARMIO E BILANCIO
+              _buildRigaDettaglioPopup('TOTALE ENTRATE NETTE:', _formattaInt(totaleNettoAnnuo), greenProfit, isBold: true),
+              const SizedBox(height: 6),
+              _buildRigaDettaglioPopup('Uscite / Spese Pianificate:', '- ${_formattaInt(totaleSpeseAnnuo)}', const Color(0xFFEF4444)),
+              const Divider(color: Colors.white10, height: 18),
+              _buildRigaDettaglioPopup('RISPARMIO NETTO ANNUO:', _formattaInt(totaleRisparmioAnnuo), totaleRisparmioAnnuo >= 0 ? purpleZen : const Color(0xFFEF4444), isBold: true),
+
+              const SizedBox(height: 20),
+
+              // 🔘 BOTTONE "HO CAPITO" FULL-WIDTH
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Ho Capito', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRigaDettaglioPopup(String etichetta, String valore, Color coloreValore, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          etichetta,
+          style: TextStyle(
+            color: isBold ? Colors.white : Colors.white70,
+            fontSize: isBold ? 12 : 11,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          valore,
+          style: TextStyle(
+            color: coloreValore,
+            fontSize: isBold ? 13 : 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 

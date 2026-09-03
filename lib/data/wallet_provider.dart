@@ -568,6 +568,254 @@ class WalletProvider with ChangeNotifier {
   }
   // ===========================================================================
 
+/// 📊 MOTORE PROIETTIVO STRATEGICO 12 MESI (CENTRALIZZATO NEL PROVIDER)
+  /// Genera la matrice dei 12 mesi combinando Consolidato Passato (🔒), Mesi OFF (🏖️)
+  /// e Ricalibrazione Adattiva YTG sui Mesi Futuri basata sul SURPLUS.
+  List<Map<String, dynamic>> calcolaMatriceProiezioneAnnuale({int? annoSelezionato}) {
+    final int anno = annoSelezionato ?? DateTime.now().year;
+    final DateTime ora = DateTime.now();
+    final double aliquotaTasse = aliquotaFiscaleReale;
+
+    final List<String> nomiMesi = [
+      'GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU',
+      'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
+    ];
+
+    // 1. Calcolo del già realizzato nei mesi passati dell'anno
+    double lordoIncassatoRealePassato = 0.0;
+
+    for (int m = 1; m <= 12; m++) {
+      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+
+      if (isPassato) {
+        final lordoFatture = _fattureIncassate.where((f) {
+          final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+          return dataStr.contains('$anno') && (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+        }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
+
+        final lordoTx = _transactions.where((tx) {
+          return tx.isIncome &&
+              tx.date.year == anno &&
+              tx.date.month == m &&
+              (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+        lordoIncassatoRealePassato += (lordoFatture > lordoTx ? lordoFatture : lordoTx);
+      }
+    }
+
+    // 2. Calcolo del Target Residuo YTG (Year-To-Go) da spalmare sui mesi futuri ON
+    final double lordoResiduoYTG = (_fatturatoStimatoAnnuo - lordoIncassatoRealePassato).clamp(0.0, double.infinity);
+
+    int mesiFuturiOnLiberi = 0;
+    double lordoForzatoManualmente = 0.0;
+
+    for (int m = 1; m <= 12; m++) {
+      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      final bool isMeseON = _mesiAttiviState.length >= m ? _mesiAttiviState[m - 1] : true;
+      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
+
+      if (!isPassato && isMeseON) {
+        if (isManualPiva) {
+          lordoForzatoManualmente += _pilotaggioFatturatoMesi[m]!;
+        } else {
+          mesiFuturiOnLiberi++;
+        }
+      }
+    }
+
+    final double lordoDaRipartire = (lordoResiduoYTG - lordoForzatoManualmente).clamp(0.0, double.infinity);
+    final double stimaLordaMensileStandard = mesiFuturiOnLiberi > 0
+        ? (lordoDaRipartire / mesiFuturiOnLiberi)
+        : 0.0;
+
+    // --- 3. LOGICA ADATTIVA CUSCINETTO (ANALISI SURPLUS ON VS DEFICIT OFF) ---
+    double totaleDeficitMesiOffFuturi = 0.0;
+    double totaleSurplusMesiOnFuturi = 0.0;
+
+    for (int m = 1; m <= 12; m++) {
+      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      final bool isMeseOFF = _mesiAttiviState.length >= m ? !_mesiAttiviState[m - 1] : false;
+      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
+      final bool isManualStipendio = _pilotaggioStipendioMesi.containsKey(m) && _pilotaggioStipendioMesi[m]! > 0;
+
+      if (!isPassato && isPartitaIVA) {
+        double stip = 0.0;
+        if (isManualStipendio) {
+          stip = _pilotaggioStipendioMesi[m]!;
+        } else if (_entrataExtraMensile > 0) {
+          stip = _entrataExtraMensile;
+          if (_numeroMensilitaExtra == 13 && m == 12) stip += _entrataExtraMensile;
+          if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) stip += _entrataExtraMensile;
+        }
+
+        if (isMeseOFF) {
+          final double deficit = (_nettoTargetMensile - stip).clamp(0.0, double.infinity);
+          totaleDeficitMesiOffFuturi += deficit;
+        } else {
+          double pivaLorda = isManualPiva ? _pilotaggioFatturatoMesi[m]! : stimaLordaMensileStandard;
+          double pivaNetta = pivaLorda * (1 - aliquotaTasse);
+          double totaleNettoPrimaCuscinetto = pivaNetta + stip;
+          double surplus = (totaleNettoPrimaCuscinetto - _nettoTargetMensile).clamp(0.0, double.infinity);
+          totaleSurplusMesiOnFuturi += surplus;
+        }
+      }
+    }
+
+    _calcolaStatoCuscinetto();
+    final double saldoCuscinettoAttuale = cuscinettoResiduo;
+    final double fabbisognoResiduoCuscinetto = (totaleDeficitMesiOffFuturi - saldoCuscinettoAttuale).clamp(0.0, double.infinity);
+
+    final double pesoSurplus = (totaleSurplusMesiOnFuturi > 0 && fabbisognoResiduoCuscinetto > 0)
+        ? (fabbisognoResiduoCuscinetto / totaleSurplusMesiOnFuturi).clamp(0.0, 1.0)
+        : 0.0;
+
+    final double fondoRaccoglibileTotale = saldoCuscinettoAttuale + (totaleSurplusMesiOnFuturi * pesoSurplus);
+    final double copertaCortaRatio = (totaleDeficitMesiOffFuturi > 0)
+        ? (fondoRaccoglibileTotale / totaleDeficitMesiOffFuturi).clamp(0.0, 1.0)
+        : 1.0;
+
+    final List<Map<String, dynamic>> matrice = [];
+
+    // 4. Compilazione dinamica della matrice 12 mesi
+    for (int m = 1; m <= 12; m++) {
+      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      final bool isMeseOFF = _mesiAttiviState.length >= m ? !_mesiAttiviState[m - 1] : false;
+      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
+      final bool isManualStipendio = _pilotaggioStipendioMesi.containsKey(m) && _pilotaggioStipendioMesi[m]! > 0;
+
+      // --- A. STIPENDIO / PENSIONE ---
+      double entrataStipendio = 0.0;
+      if (isPassato) {
+        entrataStipendio = _transactions.where((tx) {
+          return tx.isIncome &&
+              tx.date.year == anno &&
+              tx.date.month == m &&
+              (tx.category == 'Stipendio' ||
+                  tx.category == 'Pensione' ||
+                  tx.title.toLowerCase().contains('stipendio'));
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+      } else if (isManualStipendio) {
+        entrataStipendio = _pilotaggioStipendioMesi[m]!;
+      } else if (_entrataExtraMensile > 0) {
+        entrataStipendio = _entrataExtraMensile;
+        if (_numeroMensilitaExtra == 13 && m == 12) entrataStipendio += _entrataExtraMensile;
+        if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) entrataStipendio += _entrataExtraMensile;
+      }
+
+      // --- B. FATTURATO P.IVA ---
+      double entrataPivaLorda = 0.0;
+      double entrataPivaNetta = 0.0;
+
+      if (isPassato) {
+        final lordoFatture = _fattureIncassate.where((f) {
+          final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+          return dataStr.contains('$anno') && (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+        }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
+
+        final lordoTx = _transactions.where((tx) {
+          return tx.isIncome &&
+              tx.date.year == anno &&
+              tx.date.month == m &&
+              (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+        entrataPivaLorda = lordoFatture > lordoTx ? lordoFatture : lordoTx;
+        entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
+      } else if (isMeseOFF) {
+        entrataPivaLorda = 0.0;
+        entrataPivaNetta = 0.0;
+      } else if (isManualPiva) {
+        entrataPivaLorda = _pilotaggioFatturatoMesi[m]!;
+        entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
+      } else if (isPartitaIVA) {
+        entrataPivaLorda = stimaLordaMensileStandard;
+        entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
+      }
+
+      // --- C. SPESE MESE ---
+      double speseMese = 0.0;
+      if (isPassato) {
+        speseMese = _transactions.where((tx) {
+          return !tx.isIncome &&
+              tx.date.year == anno &&
+              tx.date.month == m &&
+              tx.category != 'Giroconto' &&
+              !tx.title.toLowerCase().contains('giroconto');
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+      } else {
+        speseMese = vociPianificate.fold(0.0, (sum, v) {
+          final double p = (v['previsto'] as num?)?.toDouble() ?? 0.0;
+          return sum + p;
+        });
+      }
+
+      // --- D. CALCOLO ADATTIVO CUSCINETTO FERIE ---
+      double quotaCuscinetto = 0.0;
+      double erogazioneCuscinetto = 0.0;
+
+      if (!isPassato && isPartitaIVA) {
+        if (isMeseOFF) {
+          final double deficitNominale = (_nettoTargetMensile - entrataStipendio).clamp(0.0, double.infinity);
+          erogazioneCuscinetto = deficitNominale * copertaCortaRatio;
+          quotaCuscinetto = erogazioneCuscinetto;
+        } else {
+          final double surplusMese = (entrataPivaNetta + entrataStipendio - _nettoTargetMensile).clamp(0.0, double.infinity);
+          quotaCuscinetto = surplusMese * pesoSurplus;
+        }
+      }
+
+      final double entrataTotaleNetta = isMeseOFF
+          ? (entrataStipendio + erogazioneCuscinetto)
+          : (entrataPivaNetta + entrataStipendio);
+
+      final double bilancioNetto = isMeseOFF
+          ? (entrataTotaleNetta - speseMese)
+          : (entrataTotaleNetta - quotaCuscinetto - speseMese);
+
+      final bool haAnomalia = isPartitaIVA &&
+          !isPassato &&
+          !isMeseOFF &&
+          _mesiAttiviIncasso > 0 &&
+          (entrataPivaLorda < (_fatturatoStimatoAnnuo / _mesiAttiviIncasso) * 0.4);
+
+      final bool isCorrente = (anno == ora.year && m == ora.month);
+      final double targetMensileNetto = (_fatturatoStimatoAnnuo * (1 - aliquotaTasse) / 12) + _entrataExtraMensile;
+
+      Color coloreStato = const Color(0xFF10B981);
+      if (entrataTotaleNetta < targetMensileNetto * 0.90) {
+        coloreStato = const Color(0xFFEF4444);
+      } else if (entrataTotaleNetta < targetMensileNetto) {
+        coloreStato = const Color(0xFFFBBF24);
+      }
+
+      matrice.add({
+        'meseIdx': m,
+        'nomeMese': nomiMesi[m - 1],
+        'isPassato': isPassato,
+        'isCorrente': isCorrente,
+        'isMeseOFF': isMeseOFF,
+        'isMeseON': !isMeseOFF,
+        'isManualOverride': isManualPiva || isManualStipendio,
+        'isManualPiva': isManualPiva,
+        'isManualStipendio': isManualStipendio,
+        'haAnomalia': haAnomalia,
+        'entrataStipendio': entrataStipendio,
+        'entrataPivaLorda': entrataPivaLorda,
+        'entrataPivaNetta': entrataPivaNetta,
+        'erogazioneCuscinetto': erogazioneCuscinetto,
+        'quotaCuscinetto': quotaCuscinetto,
+        'entrataTotaleNetta': entrataTotaleNetta,
+        'speseMese': speseMese,
+        'bilancioNetto': bilancioNetto,
+        'coloreStato': coloreStato,
+        'copertaCorta': copertaCortaRatio < 1.0,
+      });
+    }
+
+    return matrice;
+  }
+
   Map<String, dynamic> calcolaVerdettoFiscale({
     double? fatturatoCustom,
     double? nettoTargetCustom,
@@ -721,16 +969,34 @@ class WalletProvider with ChangeNotifier {
   double get percentSvago => _percentSvago;
   double get percentRisparmio => _percentRisparmio;
 
-  // 📊 PILOTAGGIO FATTURATO P.IVA MESE PER MESE (12 MESI)
-  Map<int, double> _pilotaggioFatturatoMesi = {
-    1: 3000.0, 2: 3000.0, 3: 3500.0, 4: 3500.0, 5: 4000.0, 6: 4000.0,
-    7: 3500.0, 8: 0.0, 9: 4500.0, 10: 4500.0, 11: 0.0, 12: 0.0,
-  };
+  // 📊 PILOTAGGIO FATTURATO P.IVA & STIPENDIO MESE PER MESE (12 MESI)
+  // Inizializzato vuoto: si riempie solo se l'utente forza un valore a mano.
+  Map<int, double> _pilotaggioFatturatoMesi = {};
+  Map<int, double> _pilotaggioStipendioMesi = {};
+
+  // 🧹 AZZERAMENTO COMPLETO OVERRIDE PILOTAGGIO
+  void resetPilotaggio() {
+    _pilotaggioFatturatoMesi.clear();
+    _pilotaggioStipendioMesi.clear();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
 
   Map<int, double> get pilotaggioFatturatoMesi => Map.unmodifiable(_pilotaggioFatturatoMesi);
+  Map<int, double> get pilotaggioStipendioMesi => Map.unmodifiable(_pilotaggioStipendioMesi);
 
   double get totaleFatturatoPilotato =>
       _pilotaggioFatturatoMesi.values.fold(0.0, (sum, val) => sum + val);
+
+  void impostaStipendioMese(int mese, double importo) {
+    if (importo <= 0) {
+      _pilotaggioStipendioMesi.remove(mese);
+    } else {
+      _pilotaggioStipendioMesi[mese] = importo;
+    }
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
 
   // 🔒 Lista Reale per utenti PRO (Inizia VUOTA)
   List<Map<String, dynamic>> _vociPianificateReali = [];
@@ -1386,6 +1652,12 @@ class WalletProvider with ChangeNotifier {
         _pilotaggioFatturatoMesi = decoded.map((k, v) => MapEntry(int.parse(k), (v as num).toDouble()));
       }
 
+      final pilotaggioStipendioStr = prefs.getString('pilotaggioStipendioMesi');
+      if (pilotaggioStipendioStr != null) {
+        final Map<String, dynamic> decoded = jsonDecode(pilotaggioStipendioStr);
+        _pilotaggioStipendioMesi = decoded.map((k, v) => MapEntry(int.parse(k), (v as num).toDouble()));
+      }
+
       _aggiornaTasseVirtuali();
       _calcolaStatoCuscinetto();
       sincronizzaRicorrenzeScadute(); // 👈 Converti le rate scadute in reali
@@ -1440,6 +1712,7 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('percentSvago', _percentSvago);
       await prefs.setDouble('percentRisparmio', _percentRisparmio);
       await prefs.setString('pilotaggioFatturatoMesi', jsonEncode(_pilotaggioFatturatoMesi.map((k, v) => MapEntry(k.toString(), v))));
+      await prefs.setString('pilotaggioStipendioMesi', jsonEncode(_pilotaggioStipendioMesi.map((k, v) => MapEntry(k.toString(), v))));
 
       await _salvaDatiSuCloud();
     } catch (e) {
