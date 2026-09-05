@@ -557,7 +557,212 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 1️⃣ ELIMINA SOLO QUESTO MESE
+              // 1️⃣ SELEZIONE ULTIMO MESE DI VALIDITÀ (PUNTUALE)
+              AppActionCard(
+                icon: Icons.calendar_view_month_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Scegli ultimo mese di validità...',
+                subtitle: 'Seleziona solo il mese: la regola si fermerà dal mese successivo.',
+                onTap: () {
+                  int annoSelezionato = DateTime.now().year;
+                  final provider = context.read<WalletProvider>();
+                  final rootId = RecurrenceManager.getRootId(id);
+                  final txMatches = provider.transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
+
+                  DateTime? inizio = txMatches.isNotEmpty ? (txMatches.first.dataInizio ?? txMatches.first.date) : null;
+                  DateTime? fine = txMatches.isNotEmpty ? txMatches.first.dataFineRicorrenza : null;
+                  String freqStr = txMatches.isNotEmpty ? (txMatches.first.frequenza ?? 'Ogni mese').toLowerCase() : 'ogni mese';
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Ultimo Mese Attivo', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato--),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato++),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomiMesiBrevi = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+                              final nomeMese = nomiMesiBrevi[index];
+
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              bool isSpesaPresente = true;
+                              if (inizio != null) {
+                                final startMese = DateTime(inizio.year, inizio.month, 1);
+                                if (primoGiornoMese.isBefore(startMese)) {
+                                  isSpesaPresente = false;
+                                } else {
+                                  final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                  if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('annuale') && diffMesi % 12 != 0) {
+                                    isSpesaPresente = false;
+                                  }
+                                }
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              return InkWell(
+                                onTap: () {
+                                  final limiteData = DateTime(annoSelezionato, meseIdx + 1, 0, 23, 59, 59);
+
+                                  // 🛡️ 1. Mese selezionato antecedente all'inizio -> ELIMINAZIONE TOTALE
+                                  if (inizio != null && limiteData.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    _mostraAlertConfermaEliminazioneTotale(context, rootId, desc, () {
+                                      setState(() {});
+                                    });
+                                    return;
+                                  }
+
+                                  // 🛡️ 2. Mese passato -> Storno e riaccredito
+                                  final now = DateTime.now();
+                                  final bool tagliaStoricoGiaPagato = limiteData.isBefore(now);
+
+                                  if (tagliaStoricoGiaPagato) {
+                                    Navigator.pop(dialogCtx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctxTaglio) => AlertDialog(
+                                        backgroundColor: const Color(0xFF18181B),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22),
+                                            SizedBox(width: 8),
+                                            Text('Storno Movimenti Passati', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        content: Text(
+                                          'Impostando la fine a $nomeMese $annoSelezionato, i pagamenti registrati dopo questa data verranno cancellati e i relativi soldi saranno RIACCREDITATI sul tuo conto.\n\nVuoi procedere?',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctxTaglio),
+                                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFF59E0B),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                            onPressed: () {
+                                              provider.stopRecurrenceFromDate(rootId, limiteData);
+                                              Navigator.pop(ctxTaglio);
+                                              Navigator.pop(ctx);
+                                              setState(() {});
+                                              AppNotifications.mostraInAlto(
+                                                context,
+                                                'Regola "$desc" fermata a $nomeMese $annoSelezionato. Saldi e storico aggiornati!',
+                                                type: NotificationType.warning,
+                                              );
+                                            },
+                                            child: const Text('SÌ, STORNA E FERMA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    // 🛡️ 3. Mese futuro -> Fermata normale
+                                    provider.stopRecurrenceFromDate(rootId, limiteData);
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    setState(() {});
+                                    AppNotifications.mostraInAlto(
+                                      context,
+                                      'Regola "$desc" valida fino a $nomeMese $annoSelezionato!',
+                                      type: NotificationType.warning,
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSpesaPresente
+                                        ? const Color(0xFF38BDF8).withOpacity(0.2)
+                                        : Colors.white.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSpesaPresente
+                                          ? const Color(0xFF38BDF8)
+                                          : Colors.white10,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (isSpesaPresente) ...[
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 10),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        nomeMese,
+                                        style: TextStyle(
+                                          color: isSpesaPresente ? Colors.white : Colors.white38,
+                                          fontSize: 11,
+                                          fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // 2️⃣ ELIMINA SOLO QUESTO MESE
               AppActionCard(
                 icon: Icons.event_busy_rounded,
                 iconColor: const Color(0xFF38BDF8),
@@ -643,7 +848,209 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 1️⃣ SALTA SOLO QUESTO MESE
+              // 1️⃣ SELEZIONE ULTIMO MESE DI VALIDITÀ (PUNTUALE)
+              AppActionCard(
+                icon: Icons.calendar_view_month_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Scegli ultimo mese di validità...',
+                subtitle: 'Seleziona solo il mese: la regola si fermerà dal mese successivo.',
+                onTap: () {
+                  int annoSelezionato = DateTime.now().year;
+                  final provider = Provider.of<WalletProvider>(context, listen: false);
+                  final rootId = RecurrenceManager.getRootId(parentId);
+                  final txMatches = provider.transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
+
+                  DateTime? inizio = txMatches.isNotEmpty ? (txMatches.first.dataInizio ?? txMatches.first.date) : null;
+                  DateTime? fine = txMatches.isNotEmpty ? txMatches.first.dataFineRicorrenza : null;
+                  String freqStr = txMatches.isNotEmpty ? (txMatches.first.frequenza ?? 'Ogni mese').toLowerCase() : 'ogni mese';
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Ultimo Mese Attivo', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato--),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato++),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomiMesiBrevi = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+                              final nomeMese = nomiMesiBrevi[index];
+
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              bool isSpesaPresente = true;
+                              if (inizio != null) {
+                                final startMese = DateTime(inizio.year, inizio.month, 1);
+                                if (primoGiornoMese.isBefore(startMese)) {
+                                  isSpesaPresente = false;
+                                } else {
+                                  final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                  if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('annuale') && diffMesi % 12 != 0) {
+                                    isSpesaPresente = false;
+                                  }
+                                }
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              return InkWell(
+                                onTap: () {
+                                  final limiteData = DateTime(annoSelezionato, meseIdx + 1, 0, 23, 59, 59);
+
+                                  if (inizio != null && limiteData.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    _mostraAlertConfermaEliminazioneTotale(context, rootId, desc, () {
+                                      setState(() {});
+                                    });
+                                    return;
+                                  }
+
+                                  final now = DateTime.now();
+                                  final bool tagliaStoricoGiaPagato = limiteData.isBefore(now);
+
+                                  if (tagliaStoricoGiaPagato) {
+                                    Navigator.pop(dialogCtx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctxTaglio) => AlertDialog(
+                                        backgroundColor: const Color(0xFF18181B),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22),
+                                            SizedBox(width: 8),
+                                            Text('Storno Movimenti Passati', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        content: Text(
+                                          'Impostando la fine a $nomeMese $annoSelezionato, i pagamenti registrati dopo questa data verranno cancellati e i relativi soldi saranno RIACCREDITATI sul tuo conto.\n\nVuoi procedere?',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctxTaglio),
+                                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFF59E0B),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                            onPressed: () {
+                                              provider.stopRecurrenceFromDate(rootId, limiteData);
+                                              Navigator.pop(ctxTaglio);
+                                              Navigator.pop(ctx);
+                                              setState(() {});
+                                              AppNotifications.mostraInAlto(
+                                                context,
+                                                'Regola "$desc" fermata a $nomeMese $annoSelezionato. Saldi e storico aggiornati!',
+                                                type: NotificationType.warning,
+                                              );
+                                            },
+                                            child: const Text('SÌ, STORNA E FERMA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    provider.stopRecurrenceFromDate(rootId, limiteData);
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    setState(() {});
+                                    AppNotifications.mostraInAlto(
+                                      context,
+                                      'Regola "$desc" valida fino a $nomeMese $annoSelezionato!',
+                                      type: NotificationType.warning,
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSpesaPresente
+                                        ? const Color(0xFF38BDF8).withOpacity(0.2)
+                                        : Colors.white.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSpesaPresente
+                                          ? const Color(0xFF38BDF8)
+                                          : Colors.white10,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (isSpesaPresente) ...[
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 10),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        nomeMese,
+                                        style: TextStyle(
+                                          color: isSpesaPresente ? Colors.white : Colors.white38,
+                                          fontSize: 11,
+                                          fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // 2️⃣ SALTA SOLO QUESTO MESE
               AppActionCard(
                 icon: Icons.event_busy_rounded,
                 iconColor: const Color(0xFF38BDF8),

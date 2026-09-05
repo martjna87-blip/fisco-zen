@@ -2365,20 +2365,21 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               const Divider(color: Colors.white10, height: 1),
               const SizedBox(height: 12),
 
-              // 2️⃣ ELIMINA DEFINITIVAMENTE
+              // 2️⃣ ELIMINA DEFINITIVAMENTE DALL'ELENCO (SENZA TOCCARE I SALDI)
               AppActionCard(
                 icon: Icons.delete_forever_rounded,
                 iconColor: const Color(0xFFEF4444),
                 title: 'Elimina definitivamente dallo storico',
-                subtitle: 'Rimuove del tutto la traccia di questa regola terminata. Irreversibile.',
+                subtitle: 'Rimuove la scheda dall\'elenco mantenendo intatto lo storico dei pagamenti e dei saldi.',
                 isDanger: true,
                 onTap: () {
-                  provider.deleteTransaction(id);
-                  provider.rimuoviSpesaPianificata(id);
+                  // 🎯 Nasconde la regola dall'elenco 2.4 senza stornare denari né cancellare i movimenti passati
+                  provider.archiviaRicorrenza(id);
+                  
                   Navigator.pop(ctx);
                   AppNotifications.mostraInAlto(
                     context,
-                    'Regola "$nome" eliminata definitivamente dallo storico',
+                    'Regola "$nome" rimossa dall\'elenco',
                     type: NotificationType.error,
                   );
                 },
