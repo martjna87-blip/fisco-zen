@@ -11,9 +11,10 @@ class ScanResult {
   final String? ragioneSociale;
   final DateTime? data;
   final String? categoriaSuggerita;
-  final String? bussolaSuggerita; // 🎯 Nuova voce per la Bussola
+  final String? bussolaSuggerita;
   final bool isFattura;
   final String? piva;
+  final String? numeroFattura; // ✨ Campo aggiunto per il numero di fattura
   final String metodoUsato;
 
   ScanResult({
@@ -24,6 +25,7 @@ class ScanResult {
     this.bussolaSuggerita,
     this.isFattura = false,
     this.piva,
+    this.numeroFattura, // ✨ Inizializzato nel costruttore
     required this.metodoUsato,
   });
 }
@@ -68,15 +70,23 @@ Regole:
 - "bussola": UNA ESATTA tra ["50% Spese Fisse", "30% Spese Variabili", "20% Risparmio"]. Per ristoranti, bar e svago usa "30% Spese Variabili"; per supermercato, affitto o bollette usa "50% Spese Fisse".
 '''
           : '''
-Analizza questa FATTURA ed estrai questo JSON esatto:
+Sei un esperto contabile italiano. Analizza la FATTURA nell'immagine ed estrai questo JSON esatto:
 {
   "importo": 450.00,
-  "merchant": "Ragione Sociale",
+  "numero_fattura": "12/A",
+  "merchant": "Nome Ragione Sociale Cliente",
   "piva": "12345678901",
   "date": "YYYY-MM-DD",
-  "category": "Acquisti",
-  "bussola": "30% Spese Variabili"
+  "category": "P.IVA",
+  "bussola": "50% Spese Fisse"
 }
+
+REGOLE TASSATIVE DI ESTRAZIONE FISCALE:
+1. "merchant": Identifica il DESTINATARIO / CLIENTE (Cessionario / Committente, solitamente preceduto da "Spett.le", "Cliente", "Destinatario" o posizionato a destra/in basso). IGNORA tassativamente l'Emittente / Fornitore (Cedente / Prestatore, chi emette la fattura in alto a sinistra).
+2. "piva": Partita IVA o Codice Fiscale del CLIENTE / DESTINATARIO (Cessionario / Committente).
+3. "numero_fattura": Cerca nel documento diciture come "Fattura N.", "Fattura numero", "Doc. N.", "N° Fattura", "Numero Documento" ed estrai la stringa/codice alfanumerico completo (es. "101", "FATT-2026/01", "12/A", "01/2026").
+4. "importo": Cerca "Totale Documento", "Totale da Pagare", "Totale Fattura" ed estrai il valore numerico lordo con punto decimale.
+5. "date": Data di emissione del documento in formato YYYY-MM-DD.
 ''';
 
       final payload = {
@@ -111,7 +121,6 @@ Analizza questa FATTURA ed estrai questo JSON esatto:
 
       final Map<String, dynamic> resData = jsonDecode(response.body);
 
-      // Gestione trasparenti degli errori restituibili da Google o Cloudflare
       if (response.statusCode != 200 || resData.containsKey('error')) {
         final errObj = resData['error'];
         String errorMsg = "Errore HTTP (${response.statusCode})";
@@ -139,15 +148,16 @@ Analizza questa FATTURA ed estrai questo JSON esatto:
       final Map<String, dynamic> data = jsonDecode(cleanJson);
 
       return ScanResult(
-  importo: double.tryParse(data['importo']?.toString() ?? ''),
-  ragioneSociale: data['merchant'] as String?,
-  piva: data['piva'] as String?,
-  data: data['date'] != null ? DateTime.tryParse(data['date'].toString()) : null,
-  categoriaSuggerita: data['category'] as String?,
-  bussolaSuggerita: data['bussola'] as String?, // 🎯 Ritorna la bussola estratta
-  isFattura: tipo == TipoDocumentoScan.fattura,
-  metodoUsato: 'AI_VISION',
-);
+        importo: double.tryParse(data['importo']?.toString() ?? ''),
+        ragioneSociale: data['merchant'] as String?,
+        piva: data['piva'] as String?,
+        numeroFattura: data['numero_fattura']?.toString(), // ✨ Mappato correttamente
+        data: data['date'] != null ? DateTime.tryParse(data['date'].toString()) : null,
+        categoriaSuggerita: data['category'] as String?,
+        bussolaSuggerita: data['bussola'] as String?,
+        isFattura: tipo == TipoDocumentoScan.fattura,
+        metodoUsato: 'AI_VISION',
+      );
     } catch (e) {
       print('❌ Errore Scansione AI: $e');
       rethrow;

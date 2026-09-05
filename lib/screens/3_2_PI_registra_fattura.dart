@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/document_scanner_service.dart';
 import '../widgets_shared/app_image_picker.dart';
 import '../data/ateco_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ItalianCurrencyFormatter extends TextInputFormatter {
   @override
@@ -233,6 +234,47 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
   }
 
   Future<void> _avviaScansioneFattura() async {
+    // 🛡️ 1. Controllo Consenso Privacy OCR (GDPR)
+    final prefs = await SharedPreferences.getInstance();
+    final bool giaAccettato = prefs.getBool('consenso_ocr_accettato') ?? false;
+
+    if (!giaAccettato) {
+      final bool? consenso = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.privacy_tip_rounded, color: Color(0xFF2DD4BF), size: 22),
+              SizedBox(width: 8),
+              Text('Elaborazione AI Fatture', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'I dati della fattura (importo, cliente, P.IVA) verranno analizzati temporaneamente tramite intelligenza artificiale al solo scopo di compilare i campi del gestionale. Le immagini non vengono salvate né utilizzate per addestrare modelli.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2DD4BF)),
+              onPressed: () async {
+                await prefs.setBool('consenso_ocr_accettato', true);
+                if (ctx.mounted) Navigator.pop(ctx, true);
+              },
+              child: const Text('Accetto', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (consenso != true) return;
+    }
+
     try {
       final XFile? image = await AppImagePickerSheet.mostra(
         context,
@@ -254,6 +296,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       final result = await DocumentScannerService.scanDocument(
         imagePath: image.path,
         wallet: walletProvider,
+        tipo: TipoDocumentoScan.fattura,
       );
 
       setState(() {
@@ -269,6 +312,10 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         if (result.data != null) {
           _dataSelezionata = result.data!;
         }
+        if (result.numeroFattura != null && result.numeroFattura!.isNotEmpty) {
+          _numeroController.text = result.numeroFattura!;
+          _isNumeroSuggerito = false;
+        }
         _isAnalyzing = false;
       });
 
@@ -276,6 +323,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         AppNotifications.mostraInAlto(
           context,
           '🤖 Fattura e dati fiscali estratti con AI Vision!',
+          type: NotificationType.success,
         );
       }
     } catch (e) {

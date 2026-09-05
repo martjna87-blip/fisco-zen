@@ -13,6 +13,7 @@ import '0_2_tax_profile.dart';
 import '../widgets_shared/app_image_picker.dart';
 import '../widgets_shared/app_notifications.dart';
 import '../widgets_shared/fluid_wave_painter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -81,7 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Eliminare l\'account?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
-          'Questa azione è irreversibile. Tutti i tuoi dati salvati verranno cancellati definitivamente.',
+          'Questa azione è irreversibile. Tutti i tuoi dati salvati e le fatture verranno cancellati definitivamente.',
           style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
         actions: [
@@ -105,9 +106,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
+          final String uid = user.uid;
+
+          // 1. Elimina il documento e i dati dell'utente da Firestore Database
+          await FirebaseFirestore.instance.collection('utenti').doc(uid).delete();
+
+          // 2. Elimina l'utente da Firebase Auth
           await user.delete();
         }
+
+        // 3. Azzera il Wallet e fa il logout
+        final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+        await walletProvider.resetTuttiIDati();
         await authProvider.signOut();
+
         if (context.mounted) {
           Navigator.pushAndRemoveUntil(
             context,
@@ -458,6 +470,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ], coloreCard),
 
                   const SizedBox(height: 36),
+
+                  // 🛡️ BOX DISCLAIMER LEGALE FISCALE
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: Colors.white38, size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Fisco-Zen è uno strumento software di supporto al tracciamento finanziario personale. I calcoli delle imposte e dei contributi hanno valore puramente indicativo e non sostituiscono il parere di un consulente fiscale o commercialista iscritto all\'albo.',
+                            style: TextStyle(color: Colors.white38, fontSize: 10, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
 
                   SizedBox(
                     width: double.infinity,

@@ -17,6 +17,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'data/ateco_database.dart';
 import 'data/ateco_uploader.dart';
 import 'widgets_shared/app_lock_wrapper.dart'; // 🛡️ Import Wrapper Blocco Schermo
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +70,9 @@ class FiscOnApp extends StatelessWidget {
         return MaterialApp(
           title: 'FiscON',
           debugShowCheckedModeBanner: false,
+          navigatorObservers: [
+            FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
+          ],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

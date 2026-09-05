@@ -96,13 +96,11 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
         final DateTime dtMese = DateTime(anno, meseNum);
         final bool isPassato = (anno < ora.year) || (anno == ora.year && meseNum <= ora.month);
 
-        // 1. Transazioni reali registrate nel mese
         final txMese = wallet.transactions.where((t) => t.date.year == anno && t.date.month == meseNum);
 
         final double incassatoMese = txMese.where((t) => t.isIncome).fold(0.0, (s, t) => s + t.amount);
         final double spesoMese = txMese.where((t) => !t.isIncome).fold(0.0, (s, t) => s + t.amount);
 
-        // 2. Budget Obiettivo recuperato dalla Pianificazione Spese / Movimenti Previsti
         final previstiMese = wallet.getMovimentiPrevisti(dtMese);
         final double budgetObiettivoMese = previstiMese.where((t) => !t.isIncome).fold(0.0, (s, t) => s + t.amount);
 
@@ -259,456 +257,475 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     final currentAnno = anniInUso[_selectedYearIndex.clamp(0, anniInUso.length - 1)];
     final List<Map<String, dynamic>> storicoMesiInUso = List<Map<String, dynamic>>.from(currentAnno['storicoMesi']);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! > 250) {
+    // ✨ Calcolo altezza massima (88% dello schermo)
+    final double maxHeight = MediaQuery.of(context).size.height * 0.88;
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (scrollInfo is OverscrollNotification && scrollInfo.overscroll < -6) {
           Navigator.pop(context);
+          return true;
         }
+        if (scrollInfo is ScrollUpdateNotification && scrollInfo.metrics.pixels < -30) {
+          Navigator.pop(context);
+          return true;
+        }
+        return false;
       },
       child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight), // 🎯 Fissa l'altezza massima
         decoration: const BoxDecoration(
           color: Color(0xFF0A0A0C),
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ➖ BARRETTA TRASCINAMENTO
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(top: 12, bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            
-            // TITOLO
-            const Center(
-              child: Text(
-                'Panoramica Annuale',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 🌟 BANNER SOLO PER UTENTI NON PRO
-            if (!isUserPro) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
-                child: InkWell(
-                  onTap: () => _apriUpgradePro(context),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFF59E0B).withOpacity(0.2),
-                          const Color(0xFF2DD4BF).withOpacity(0.15),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF59E0B), size: 18),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Anteprima Demo PRO • Tocca per attivare con i tuoi dati reali',
-                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFF59E0B), size: 12),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-
-            // 1. CAROSELLO HERO CARD
-            SizedBox(
-              height: 410,
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: anniInUso.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _selectedYearIndex = index;
-                  });
+              // ➖ BARRETTA TRASCINAMENTO & HEADER CON GESTURE
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragEnd: (details) {
+                  if (details.primaryVelocity != null && details.primaryVelocity! > 100) {
+                    Navigator.pop(context);
+                  }
                 },
-                itemBuilder: (context, index) {
-                  final item = anniInUso[index];
-                  final bool isSelected = index == _selectedYearIndex;
-
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: EdgeInsets.symmetric(horizontal: 8, vertical: isSelected ? 0 : 14),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      image: DecorationImage(
-                        image: NetworkImage(item['bgImage']),
-                        fit: BoxFit.cover,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.25),
-                            Colors.black.withOpacity(0.85),
-                          ],
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const SizedBox(height: 6),
-
-                          Column(
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  _formattaValuta(item['risparmioNetto']),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text('Risparmio Netto Accumulato', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: Text(
-                                  'Anno ${item['anno']}',
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          GestureDetector(
-                            onTap: () {
-                              if (!isUserPro) {
-                                _apriUpgradePro(context);
-                              } else {
-                                _mostraReportAnalitico(item);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1C1C21).withOpacity(0.88),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withOpacity(0.12)),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.1),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 18),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text(
-                                                    'Incassato', 
-                                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    '+${_formattaValuta(item['incassato'])}', 
-                                                    style: const TextStyle(color: Colors.white54, fontSize: 11),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '-${_formattaValuta(item['speso'])}',
-                                        style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                  const Divider(color: Colors.white12, height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        isUserPro ? 'Vedi dettagli dell\'anno' : '🔒 Mostra i tuoi dati reali',
-                                        style: TextStyle(
-                                          color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Icon(
-                                        Icons.arrow_forward_ios_rounded,
-                                        color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
-                                        size: 11,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 🚀 PULSANTE DI UPGRADE PRO (VISIBILE SOLO SE NON È PRO)
-            if (!isUserPro) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _apriUpgradePro(context),
-                    icon: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 20),
-                    label: const Text(
-                      'Passa a PRO per Calcoli Reali',
-                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2DD4BF),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-
-            // 2. GRAFICO DEL BUDGET OBIETTIVO
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141417),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Uscite Totali dell\'Anno', 
-                            style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 14, bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const SizedBox(width: 6),
-                        Row(
-                          children: [
-                            _buildLegendaItem('Reale', const Color(0xFF2DD4BF)),
-                            const SizedBox(width: 8),
-                            _buildLegendaItem('Budget', Colors.white38),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formattaValuta(currentAnno['speso']),
-                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: const [
-                        Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2DD4BF), size: 16),
-                        SizedBox(width: 6),
-                        Text('Analisi uscite calcolata 🎉', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    SizedBox(
-                      height: 110,
-                      width: double.infinity,
-                      child: CustomPaint(
-                        painter: _FuturisticTrendPainter(datiMesi: storicoMesiInUso),
                       ),
                     ),
+                    const Center(
+                      child: Text(
+                        'Panoramica Annuale',
+                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 24),
-
-            // 3. STORICO MESI
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Text(
-                'STORICO MESE PER MESE (${currentAnno['anno']})',
-                style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              itemCount: storicoMesiInUso.length,
-              itemBuilder: (context, index) {
-                final m = storicoMesiInUso[index];
-                final bool isPassato = m['isPassato'] == true;
-                final double delta = (m['budget'] as double) - (m['speso'] as double);
-                final bool isVirtuoso = delta >= 0;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141417),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.06)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isPassato
-                              ? (isVirtuoso ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEF4444).withOpacity(0.12))
-                              : Colors.white.withOpacity(0.05),
-                          shape: BoxShape.circle,
+              // 🌟 BANNER SOLO PER UTENTI NON PRO
+              if (!isUserPro) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+                  child: InkWell(
+                    onTap: () => _apriUpgradePro(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFF59E0B).withOpacity(0.2),
+                            const Color(0xFF2DD4BF).withOpacity(0.15),
+                          ],
                         ),
-                        child: Icon(
-                          isPassato
-                              ? (isVirtuoso ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded)
-                              : Icons.schedule_rounded,
-                          color: isPassato
-                              ? (isVirtuoso ? const Color(0xFF10B981) : const Color(0xFFEF4444))
-                              : Colors.white38,
-                          size: 18,
-                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF59E0B), size: 18),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Anteprima Demo PRO • Tocca per attivare con i tuoi dati reali',
+                              style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFF59E0B), size: 12),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+
+              // 1. CAROSELLO HERO CARD
+              SizedBox(
+                height: 410,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: anniInUso.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _selectedYearIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final item = anniInUso[index];
+                    final bool isSelected = index == _selectedYearIndex;
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: isSelected ? 0 : 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        image: DecorationImage(
+                          image: NetworkImage(item['bgImage']),
+                          fit: BoxFit.cover,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.25),
+                              Colors.black.withOpacity(0.85),
+                            ],
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
+                            const SizedBox(height: 6),
+
+                            Column(
                               children: [
-                                Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                if (!isPassato) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white10,
-                                      borderRadius: BorderRadius.circular(6),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _formattaValuta(item['risparmioNetto']),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
                                     ),
-                                    child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold)),
                                   ),
-                                ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text('Risparmio Netto Accumulato', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: Text(
+                                    'Anno ${item['anno']}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              isPassato
-                                  ? 'In: +${_formattaValuta(m['incassato'])} • Out: -${_formattaValuta(m['speso'])}'
-                                  : 'Budget Stimato: ${_formattaValuta(m['budget'])}',
-                              style: const TextStyle(color: Colors.white38, fontSize: 10),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+
+                            GestureDetector(
+                              onTap: () {
+                                if (!isUserPro) {
+                                  _apriUpgradePro(context);
+                                } else {
+                                  _mostraReportAnalitico(item);
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1C1C21).withOpacity(0.88),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 18),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      'Incassato', 
+                                                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      '+${_formattaValuta(item['incassato'])}', 
+                                                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '-${_formattaValuta(item['speso'])}',
+                                          style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    const Divider(color: Colors.white12, height: 16),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          isUserPro ? 'Vedi dettagli dell\'anno' : '🔒 Mostra i tuoi dati reali',
+                                          style: TextStyle(
+                                            color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          color: isUserPro ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                                          size: 11,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 🚀 PULSANTE DI UPGRADE PRO (VISIBILE SOLO SE NON È PRO)
+              if (!isUserPro) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _apriUpgradePro(context),
+                      icon: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 20),
+                      label: const Text(
+                        'Passa a PRO per Calcoli Reali',
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2DD4BF),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // 2. GRAFICO DEL BUDGET OBIETTIVO
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141417),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Uscite Totali dell\'Anno', 
+                              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Row(
+                            children: [
+                              _buildLegendaItem('Reale', const Color(0xFF2DD4BF)),
+                              const SizedBox(width: 8),
+                              _buildLegendaItem('Budget', Colors.white38),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       Text(
-                        isPassato
-                            ? '${isVirtuoso ? '+' : ''}${_formattaValuta(delta)}'
-                            : _formattaValuta(m['speso']),
-                        style: TextStyle(
-                          color: isPassato
-                              ? (isVirtuoso ? const Color(0xFF2DD4BF) : const Color(0xFFEF4444))
-                              : Colors.white54,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        _formattaValuta(currentAnno['speso']),
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: const [
+                          Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2DD4BF), size: 16),
+                          SizedBox(width: 6),
+                          Text('Analisi uscite calcolata 🎉', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      SizedBox(
+                        height: 110,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _FuturisticTrendPainter(datiMesi: storicoMesiInUso),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
 
-            const SizedBox(height: 30),
-          ],
+              const SizedBox(height: 24),
+
+              // 3. STORICO MESI
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Text(
+                  'STORICO MESE PER MESE (${currentAnno['anno']})',
+                  style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                itemCount: storicoMesiInUso.length,
+                itemBuilder: (context, index) {
+                  final m = storicoMesiInUso[index];
+                  final bool isPassato = m['isPassato'] == true;
+                  final double delta = (m['budget'] as double) - (m['speso'] as double);
+                  final bool isVirtuoso = delta >= 0;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141417),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isPassato
+                                ? (isVirtuoso ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEF4444).withOpacity(0.12))
+                                : Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isPassato
+                                ? (isVirtuoso ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded)
+                                : Icons.schedule_rounded,
+                            color: isPassato
+                                ? (isVirtuoso ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+                                : Colors.white38,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  if (!isPassato) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white10,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isPassato
+                                    ? 'In: +${_formattaValuta(m['incassato'])} • Out: -${_formattaValuta(m['speso'])}'
+                                    : 'Budget Stimato: ${_formattaValuta(m['budget'])}',
+                                style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isPassato
+                              ? '${isVirtuoso ? '+' : ''}${_formattaValuta(delta)}'
+                              : _formattaValuta(m['speso']),
+                          style: TextStyle(
+                            color: isPassato
+                                ? (isVirtuoso ? const Color(0xFF2DD4BF) : const Color(0xFFEF4444))
+                                : Colors.white54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildLegendaItem(String label, Color color) {
     return Row(
