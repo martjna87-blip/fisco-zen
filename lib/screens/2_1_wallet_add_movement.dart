@@ -762,43 +762,218 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
               const SizedBox(height: 10),
 
-              // 2️⃣ ELIMINA SOLO QUESTO MESE
+              // 2️⃣ SOSPENSIONE MULTIPLA (SALTA MESI SPECIFICI)
               AppActionCard(
-                icon: Icons.event_busy_rounded,
-                iconColor: const Color(0xFF38BDF8),
-                title: 'Elimina solo per questo mese',
-                subtitle: 'Cancella la singola registrazione. La spesa tornerà regolarmente il mese prossimo.',
-                onTap: () {
-                  final provider = context.read<WalletProvider>();
-                  final txMatches = provider.transactions.where((t) => t.id == id).toList();
-                  final DateTime dataRata = txMatches.isNotEmpty ? txMatches.first.date : DateTime.now();
-
-                  provider.eliminaSoloQuestoMese(id, dataRata);
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  AppNotifications.mostraInAlto(context, 'Movimento eliminato solo per questo mese 🎉');
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // 2️⃣ ELIMINA QUESTO E I FUTURI
-              AppActionCard(
-                icon: Icons.block_rounded,
+                icon: Icons.rule_rounded,
                 iconColor: const Color(0xFFF59E0B),
-                title: 'Elimina questo e i futuri',
-                subtitle: 'Rimborsa questo mese e blocca la spesa per il futuro. Lo storico passato è salvo.',
+                title: 'Sospendi mesi specifici...',
+                subtitle: 'Seleziona quali mesi vuoi saltare. La regola rimarrà attiva per gli altri.',
                 onTap: () {
+                  int annoSelezionato = DateTime.now().year;
+                  Set<int> mesiDaSaltare = {};
                   final provider = context.read<WalletProvider>();
-                  final txMatches = provider.transactions.where((t) => t.id == id).toList();
-                  final DateTime dataRata = txMatches.isNotEmpty ? txMatches.first.date : DateTime.now();
+                  final rootId = RecurrenceManager.getRootId(id);
+                  final txMatches = provider.transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
 
-                  provider.eliminaQuestoEFuturi(id, dataRata);
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Spesa interrotta da questo mese in poi! Storico passato salvato.',
-                    type: NotificationType.warning,
+                  DateTime? inizio = txMatches.isNotEmpty ? (txMatches.first.dataInizio ?? txMatches.first.date) : null;
+                  DateTime? fine = txMatches.isNotEmpty ? txMatches.first.dataFineRicorrenza : null;
+                  String freqStr = txMatches.isNotEmpty ? (txMatches.first.frequenza ?? 'Ogni mese').toLowerCase() : 'ogni mese';
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Salta Mesi', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato--; mesiDaSaltare.clear(); }),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato++; mesiDaSaltare.clear(); }),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomiMesiBrevi = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+                              final nomeMese = nomiMesiBrevi[index];
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              bool isSpesaPresente = true;
+                              if (inizio != null && primoGiornoMese.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                isSpesaPresente = false;
+                              } else if (inizio != null) {
+                                final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('annuale') && diffMesi % 12 != 0) isSpesaPresente = false;
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              // 🔍 CONTROLLO SE IL MESE È GIÀ STATO CANCELLATO IN PASSATO
+                              final targetMonth = DateTime(annoSelezionato, meseIdx, 1);
+                              final hasRealTx = provider.transactions.any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId &&
+                                  t.date.year == annoSelezionato &&
+                                  t.date.month == meseIdx);
+                              final hasPrevisto = provider.getMovimentiPrevisti(targetMonth).any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId);
+
+                              final bool isGiaCancellato = isSpesaPresente && !hasRealTx && !hasPrevisto;
+                              final bool isSelezionatoOra = mesiDaSaltare.contains(meseIdx);
+
+                              // 🎨 STILI VISIVI
+                              Color coloreSfondo = Colors.white.withOpacity(0.03);
+                              Color coloreBordo = Colors.white10;
+                              Color coloreTesto = Colors.white38;
+                              IconData? iconaStato;
+                              Color? coloreIcona;
+
+                              if (isSpesaPresente) {
+                                if (isGiaCancellato) {
+                                  // 🔴 GIÀ CANCELLATO PRECEDENTEMENTE
+                                  coloreSfondo = const Color(0xFFEF4444).withOpacity(0.18);
+                                  coloreBordo = const Color(0xFFEF4444).withOpacity(0.6);
+                                  coloreTesto = const Color(0xFFEF4444);
+                                  iconaStato = Icons.block_rounded;
+                                  coloreIcona = const Color(0xFFEF4444);
+                                } else if (isSelezionatoOra) {
+                                  // 🔵 SELEZIONATO ORA PER CANCELLARE (BLU)
+                                  coloreSfondo = const Color(0xFF38BDF8).withOpacity(0.25);
+                                  coloreBordo = const Color(0xFF38BDF8);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_rounded;
+                                  coloreIcona = const Color(0xFF38BDF8);
+                                } else {
+                                  // 🟡 MESE ATTIVO REGOLARE
+                                  coloreSfondo = const Color(0xFFF59E0B).withOpacity(0.15);
+                                  coloreBordo = const Color(0xFFF59E0B).withOpacity(0.4);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_outline_rounded;
+                                  coloreIcona = const Color(0xFFF59E0B);
+                                }
+                              }
+
+                              return InkWell(
+                                onTap: (isSpesaPresente && !isGiaCancellato) ? () {
+                                  setPickerState(() {
+                                    if (isSelezionatoOra) {
+                                      mesiDaSaltare.remove(meseIdx);
+                                    } else {
+                                      mesiDaSaltare.add(meseIdx);
+                                    }
+                                  });
+                                } : null,
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    color: coloreSfondo,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: coloreBordo),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          if (iconaStato != null) ...[
+                                            Icon(iconaStato, color: coloreIcona, size: 10),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(
+                                            nomeMese,
+                                            style: TextStyle(
+                                              color: coloreTesto,
+                                              fontSize: 11,
+                                              fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                              decoration: (isSelezionatoOra || isGiaCancellato) ? TextDecoration.lineThrough : null,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (isGiaCancellato)
+                                        const Text(
+                                          'Cancellato',
+                                          style: TextStyle(color: Color(0xFFEF4444), fontSize: 7, fontWeight: FontWeight.bold),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                          if (mesiDaSaltare.isNotEmpty)
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                for (int m in mesiDaSaltare) {
+                                  final dataSospensione = DateTime(annoSelezionato, m, 1);
+                                  
+                                  final txGiaGenerata = provider.transactions.where((t) => 
+                                      RecurrenceManager.getRootId(t.id) == rootId && 
+                                      t.date.year == annoSelezionato && 
+                                      t.date.month == m &&
+                                      !t.id.startsWith('rule_') && !t.id.startsWith('prev_')
+                                  ).toList();
+
+                                  if (txGiaGenerata.isNotEmpty) {
+                                    provider.eliminaSoloQuestoMese(txGiaGenerata.first.id, dataSospensione);
+                                  } else {
+                                    provider.eliminaSoloQuestoMese(rootId, dataSospensione);
+                                  }
+                                }
+                                
+                                Navigator.pop(dialogCtx);
+                                Navigator.pop(ctx);
+                                setState(() {});
+                                AppNotifications.mostraInAlto(
+                                  context,
+                                  'Regola "$desc" sospesa per i mesi selezionati!',
+                                  type: NotificationType.warning,
+                                );
+                              },
+                              child: Text('CONFERMA (${mesiDaSaltare.length})', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                            ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
@@ -1050,44 +1225,218 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
               ),
               const SizedBox(height: 10),
 
-              // 2️⃣ SALTA SOLO QUESTO MESE
+              // 2️⃣ SOSPENSIONE MULTIPLA (SALTA MESI SPECIFICI)
               AppActionCard(
-                icon: Icons.event_busy_rounded,
-                iconColor: const Color(0xFF38BDF8),
-                title: 'Salta solo questo mese',
-                subtitle: 'Cancella la previsione di questo mese. La regola si riattiva dal mese prossimo.',
-                onTap: () {
-                  final provider = Provider.of<WalletProvider>(context, listen: false);
-                  provider.eliminaSoloQuestoMese(predictionId, meseRiferimento);
-
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Previsione saltata solo per questo mese',
-                    type: NotificationType.warning,
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // 2️⃣ ELIMINA QUESTO E I FUTURI
-              AppActionCard(
-                icon: Icons.block_rounded,
+                icon: Icons.rule_rounded,
                 iconColor: const Color(0xFFF59E0B),
-                title: 'Elimina questo e i futuri',
-                subtitle: 'Ferma la regola da questo mese in poi. Lo storico passato è salvo.',
+                title: 'Sospendi mesi specifici...',
+                subtitle: 'Seleziona quali mesi vuoi saltare. La regola rimarrà attiva per gli altri.',
                 onTap: () {
+                  int annoSelezionato = DateTime.now().year;
+                  Set<int> mesiDaSaltare = {};
                   final provider = Provider.of<WalletProvider>(context, listen: false);
-                  provider.eliminaQuestoEFuturi(predictionId, meseRiferimento);
-                  
-                  Navigator.pop(ctx);
-                  setState(() {});
+                  final rootId = RecurrenceManager.getRootId(parentId);
+                  final txMatches = provider.transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
 
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Ricorrenza disdetta per il futuro! Storico passato salvato.',
-                    type: NotificationType.warning,
+                  DateTime? inizio = txMatches.isNotEmpty ? (txMatches.first.dataInizio ?? txMatches.first.date) : null;
+                  DateTime? fine = txMatches.isNotEmpty ? txMatches.first.dataFineRicorrenza : null;
+                  String freqStr = txMatches.isNotEmpty ? (txMatches.first.frequenza ?? 'Ogni mese').toLowerCase() : 'ogni mese';
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Salta Mesi', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato--; mesiDaSaltare.clear(); }),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato++; mesiDaSaltare.clear(); }),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomiMesiBrevi = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+                              final nomeMese = nomiMesiBrevi[index];
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              bool isSpesaPresente = true;
+                              if (inizio != null && primoGiornoMese.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                isSpesaPresente = false;
+                              } else if (inizio != null) {
+                                final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('annuale') && diffMesi % 12 != 0) isSpesaPresente = false;
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              // 🔍 CONTROLLO SE IL MESE È GIÀ STATO CANCELLATO IN PASSATO
+                              final targetMonth = DateTime(annoSelezionato, meseIdx, 1);
+                              final hasRealTx = provider.transactions.any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId &&
+                                  t.date.year == annoSelezionato &&
+                                  t.date.month == meseIdx);
+                              final hasPrevisto = provider.getMovimentiPrevisti(targetMonth).any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId);
+
+                              final bool isGiaCancellato = isSpesaPresente && !hasRealTx && !hasPrevisto;
+                              final bool isSelezionatoOra = mesiDaSaltare.contains(meseIdx);
+
+                              // 🎨 STILI VISIVI
+                              Color coloreSfondo = Colors.white.withOpacity(0.03);
+                              Color coloreBordo = Colors.white10;
+                              Color coloreTesto = Colors.white38;
+                              IconData? iconaStato;
+                              Color? coloreIcona;
+
+                              if (isSpesaPresente) {
+                                if (isGiaCancellato) {
+                                  // 🔴 GIÀ CANCELLATO PRECEDENTEMENTE
+                                  coloreSfondo = const Color(0xFFEF4444).withOpacity(0.18);
+                                  coloreBordo = const Color(0xFFEF4444).withOpacity(0.6);
+                                  coloreTesto = const Color(0xFFEF4444);
+                                  iconaStato = Icons.block_rounded;
+                                  coloreIcona = const Color(0xFFEF4444);
+                                } else if (isSelezionatoOra) {
+                                  // 🔵 SELEZIONATO ORA PER CANCELLARE (BLU)
+                                  coloreSfondo = const Color(0xFF38BDF8).withOpacity(0.25);
+                                  coloreBordo = const Color(0xFF38BDF8);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_rounded;
+                                  coloreIcona = const Color(0xFF38BDF8);
+                                } else {
+                                  // 🟡 MESE ATTIVO REGOLARE
+                                  coloreSfondo = const Color(0xFFF59E0B).withOpacity(0.15);
+                                  coloreBordo = const Color(0xFFF59E0B).withOpacity(0.4);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_outline_rounded;
+                                  coloreIcona = const Color(0xFFF59E0B);
+                                }
+                              }
+
+                              return InkWell(
+                                onTap: (isSpesaPresente && !isGiaCancellato) ? () {
+                                  setPickerState(() {
+                                    if (isSelezionatoOra) {
+                                      mesiDaSaltare.remove(meseIdx);
+                                    } else {
+                                      mesiDaSaltare.add(meseIdx);
+                                    }
+                                  });
+                                } : null,
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    color: coloreSfondo,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: coloreBordo),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          if (iconaStato != null) ...[
+                                            Icon(iconaStato, color: coloreIcona, size: 10),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(
+                                            nomeMese,
+                                            style: TextStyle(
+                                              color: coloreTesto,
+                                              fontSize: 11,
+                                              fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                              decoration: (isSelezionatoOra || isGiaCancellato) ? TextDecoration.lineThrough : null,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (isGiaCancellato)
+                                        const Text(
+                                          'Cancellato',
+                                          style: TextStyle(color: Color(0xFFEF4444), fontSize: 7, fontWeight: FontWeight.bold),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                          if (mesiDaSaltare.isNotEmpty)
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                for (int m in mesiDaSaltare) {
+                                  final dataSospensione = DateTime(annoSelezionato, m, 1);
+                                  
+                                  final txGiaGenerata = provider.transactions.where((t) => 
+                                      RecurrenceManager.getRootId(t.id) == rootId && 
+                                      t.date.year == annoSelezionato && 
+                                      t.date.month == m &&
+                                      !t.id.startsWith('rule_') && !t.id.startsWith('prev_')
+                                  ).toList();
+
+                                  if (txGiaGenerata.isNotEmpty) {
+                                    provider.eliminaSoloQuestoMese(txGiaGenerata.first.id, dataSospensione);
+                                  } else {
+                                    provider.eliminaSoloQuestoMese(predictionId, dataSospensione);
+                                  }
+                                }
+                                
+                                Navigator.pop(dialogCtx);
+                                Navigator.pop(ctx);
+                                setState(() {});
+                                AppNotifications.mostraInAlto(
+                                  context,
+                                  'Regola "$desc" sospesa per i mesi selezionati!',
+                                  type: NotificationType.warning,
+                                );
+                              },
+                              child: Text('CONFERMA (${mesiDaSaltare.length})', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                            ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
