@@ -47,7 +47,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   bool _isBussolaEspansa = false;
   bool _isTargetEspanso = false;
-  DateTime _dataFiltroRipartizione = DateTime(2026, 8);
+  DateTime _dataFiltroRipartizione = DateTime.now();
   bool _isVistaAnnuale = false;
 
   final List<String> _nomiMesiBrevi = [
@@ -772,30 +772,82 @@ class _WalletScreenState extends State<WalletScreen> {
     
     final bool isTasseCoperte = residuoTasseDaCoprire <= 0.01;
 
-    final txsFiltrate = movimenti.where((tx) {
-      if (tx.isIncome) return false;
-      if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
-
-      if (_isVistaAnnuale) {
-        return tx.date.year == _dataFiltroRipartizione.year;
-      } else {
-        return tx.date.year == _dataFiltroRipartizione.year &&
-               tx.date.month == _dataFiltroRipartizione.month;
-      }
-    }).toList();
+    final bool isMeseCorrenteBuild = _dataFiltroRipartizione.year == DateTime.now().year && _dataFiltroRipartizione.month == DateTime.now().month;
+    final bool isMesePassatoBuild = _dataFiltroRipartizione.year < DateTime.now().year || (_dataFiltroRipartizione.year == DateTime.now().year && _dataFiltroRipartizione.month < DateTime.now().month);
+    final bool isMeseFuturoBuild = !isMeseCorrenteBuild && !isMesePassatoBuild;
 
     double spesoRealeBisogni = 0;
     double spesoRealeSvago = 0;
     double spesoRealeRisparmio = 0;
 
-    for (var tx in txsFiltrate) {
-      final bussola = walletProvider.ottieniBussolaSemplificata(tx);
-      if (bussola == 'Svago') {
-        spesoRealeSvago += tx.amount;
-      } else if (bussola == 'Risparmi') {
-        spesoRealeRisparmio += tx.amount;
-      } else {
-        spesoRealeBisogni += tx.amount;
+    if (isMeseFuturoBuild && !_isVistaAnnuale) {
+      // 🔮 MESI FUTURI: Mappa in modo sicuro le voci pianificate tramite ottieniBussolaSemplificata
+      final int meseFuturoIdx = _dataFiltroRipartizione.month;
+      final int annoFuturo = _dataFiltroRipartizione.year;
+
+      for (var v in walletProvider.vociPianificate) {
+        final String tipoMov = (v['tipoMovimento'] ?? 'uscita').toString();
+        if (tipoMov == 'entrata' || tipoMov == 'giroconto') continue;
+
+        // 🛡️ Filtro Data Fine Ricorrenza
+        if (v['dataFineRicorrenza'] != null) {
+          final DateTime? fine = v['dataFineRicorrenza'] is DateTime
+              ? v['dataFineRicorrenza'] as DateTime
+              : DateTime.tryParse(v['dataFineRicorrenza'].toString());
+          if (fine != null) {
+            final DateTime primoGiornoMese = DateTime(annoFuturo, meseFuturoIdx, 1);
+            final DateTime primoGiornoFine = DateTime(fine.year, fine.month, 1);
+            if (primoGiornoMese.isAfter(primoGiornoFine)) continue;
+          }
+        }
+
+        final double importoVal = (v['previsto'] as num?)?.toDouble() ?? 0.0;
+        final String catNome = (v['sottocategoria'] ?? v['categoria'] ?? '').toString();
+
+        // Genera una transazione temporanea per sfruttare la mappatura centralizzata
+        final txTemp = TransactionModel(
+          id: 'temp_calc',
+          title: (v['nome'] ?? '').toString(),
+          subtitle: '',
+          amount: importoVal,
+          isIncome: false,
+          category: catNome,
+          date: DateTime(annoFuturo, meseFuturoIdx, 1),
+        );
+
+        final String bussolaDestinazione = walletProvider.ottieniBussolaSemplificata(txTemp);
+
+        if (bussolaDestinazione == 'Svago') {
+          spesoRealeSvago += importoVal;
+        } else if (bussolaDestinazione == 'Risparmi') {
+          spesoRealeRisparmio += importoVal;
+        } else {
+          spesoRealeBisogni += importoVal;
+        }
+      }
+    } else {
+      // 🔴 PASSATO E CORRENTE: Calcolo consuntivo reale puro dalle transazioni
+      final txsFiltrate = movimenti.where((tx) {
+        if (tx.isIncome) return false;
+        if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
+
+        if (_isVistaAnnuale) {
+          return tx.date.year == _dataFiltroRipartizione.year;
+        } else {
+          return tx.date.year == _dataFiltroRipartizione.year &&
+                 tx.date.month == _dataFiltroRipartizione.month;
+        }
+      }).toList();
+
+      for (var tx in txsFiltrate) {
+        final bussola = walletProvider.ottieniBussolaSemplificata(tx);
+        if (bussola == 'Svago') {
+          spesoRealeSvago += tx.amount;
+        } else if (bussola == 'Risparmi') {
+          spesoRealeRisparmio += tx.amount;
+        } else {
+          spesoRealeBisogni += tx.amount;
+        }
       }
     }
 
@@ -1692,10 +1744,8 @@ class _WalletScreenState extends State<WalletScreen> {
         final double quotaCuscinettoAI = (meseMatrice['quotaCuscinetto'] as double? ?? 0.0);
 
         if (isMeseOFFRow) {
-          // Mese OFF: Il cuscinetto viene Erogato (Ingresso), l'entrata totale netta include già l'integrazione
           entrateUso = entrataNettaAI;
         } else {
-          // Mese ON: Il cuscinetto viene Accantonato (Uscita), va sottratto dalla base spendibile
           entrateUso = (entrataNettaAI - quotaCuscinettoAI).clamp(0.0, double.infinity);
         }
 
@@ -1703,18 +1753,65 @@ class _WalletScreenState extends State<WalletScreen> {
         tSvago = entrateUso * percSvago;
         tRisparmio = entrateUso * percRisparmio;
 
-        // Le spese future mostrano l'impegno delle ricorrenze pianificate
-        bisogniUso = walletProvider.vociPianificate
-            .where((v) => (v['categoria'] ?? '').toString().contains('Bisogni'))
-            .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+        // Reset accumulatori per evitare il raddoppio rispetto al mese corrente
+        bisogniUso = 0.0;
+        svagoUso = 0.0;
 
-        svagoUso = walletProvider.vociPianificate
-            .where((v) => (v['categoria'] ?? '').toString().contains('Svago'))
-            .fold(0.0, (sum, v) => sum + ((v['previsto'] as num?)?.toDouble() ?? 0.0));
+        final int meseFuturoIdx = _dataFiltroRipartizione.month;
+        final int annoFuturo = _dataFiltroRipartizione.year;
+        final Set<String> chiaviSpeseProcessate = {};
+
+        for (var v in walletProvider.vociPianificate) {
+          final String tipoMov = (v['tipoMovimento'] ?? 'uscita').toString();
+          if (tipoMov == 'entrata' || tipoMov == 'giroconto') continue;
+
+          final double importoVal = (v['previsto'] as num?)?.toDouble() ?? 0.0;
+          final String nomeSpesa = (v['nome'] ?? '').toString().toLowerCase().trim();
+
+          // 🛡️ CHIAVE UNICA DEDUPLICAZIONE
+          final String chiaveUnica = '${nomeSpesa}_${importoVal.toStringAsFixed(2)}';
+          if (chiaviSpeseProcessate.contains(chiaveUnica)) continue;
+
+          // 🛡️ Filtro Data Fine Ricorrenza
+          if (v['dataFineRicorrenza'] != null) {
+            final DateTime? fine = v['dataFineRicorrenza'] is DateTime
+                ? v['dataFineRicorrenza'] as DateTime
+                : DateTime.tryParse(v['dataFineRicorrenza'].toString());
+            if (fine != null) {
+              final DateTime primoGiornoMese = DateTime(annoFuturo, meseFuturoIdx, 1);
+              final DateTime primoGiornoFine = DateTime(fine.year, fine.month, 1);
+              if (primoGiornoMese.isAfter(primoGiornoFine)) continue;
+            }
+          }
+
+          final String catNome = (v['sottocategoria'] ?? v['categoria'] ?? '').toString();
+
+          final txTemp = TransactionModel(
+            id: 'temp_calc',
+            title: (v['nome'] ?? '').toString(),
+            subtitle: '',
+            amount: importoVal,
+            isIncome: false,
+            category: catNome,
+            date: DateTime(annoFuturo, meseFuturoIdx, 1),
+          );
+
+          final String bussolaDestinazione = walletProvider.ottieniBussolaSemplificata(txTemp);
+
+          if (bussolaDestinazione == 'Svago') {
+            svagoUso += importoVal;
+          } else if (bussolaDestinazione == 'Risparmi') {
+            // Risparmi non incrementano Bisogni o Svago
+          } else {
+            bisogniUso += importoVal;
+          }
+
+          chiaviSpeseProcessate.add(chiaveUnica);
+        }
 
         calcoloRisparmioMese = entrateUso - bisogniUso - svagoUso;
-
-      } else {
+      }
+      else {
         // 🔴 CORRENTE & 🔒 PASSATO: 100% Reale da Transazioni Registrate ad oggi
         final double incassatoPivaReale = walletProvider.transactions.where((tx) {
           return tx.isIncome &&

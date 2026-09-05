@@ -746,6 +746,22 @@ class WalletProvider with ChangeNotifier {
       } else {
         speseMese = vociPianificate.fold(0.0, (sum, v) {
           final double p = (v['previsto'] as num?)?.toDouble() ?? 0.0;
+
+          // 🛡️ CONTROLLO SCADENZA SULLE VOCI PIANIFICATE FUTURE
+          if (v['dataFineRicorrenza'] != null) {
+            final DateTime? dataFine = v['dataFineRicorrenza'] is DateTime
+                ? v['dataFineRicorrenza'] as DateTime
+                : DateTime.tryParse(v['dataFineRicorrenza'].toString());
+
+            if (dataFine != null) {
+              final DateTime inizioMeseFuturo = DateTime(anno, m, 1);
+              final DateTime inizioMeseFine = DateTime(dataFine.year, dataFine.month, 1);
+              if (inizioMeseFuturo.isAfter(inizioMeseFine)) {
+                return sum; // Ignora la spesa perché il mese è successivo alla fine
+              }
+            }
+          }
+
           return sum + p;
         });
       }
@@ -1297,6 +1313,15 @@ class WalletProvider with ChangeNotifier {
           int giornoEffettivo = giornoPrevisto > maxGiorniMese ? maxGiorniMese : giornoPrevisto;
 
           DateTime dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoEffettivo);
+
+          // 🛡️ CONTROLLO RIGIDO SCADENZA: Esclude la rata se il mese supera la data di fine
+          if (tx.dataFineRicorrenza != null) {
+            final DateTime inizioMeseRiferimento = DateTime(meseRiferimento.year, meseRiferimento.month, 1);
+            final DateTime inizioMeseFine = DateTime(tx.dataFineRicorrenza!.year, tx.dataFineRicorrenza!.month, 1);
+            if (inizioMeseRiferimento.isAfter(inizioMeseFine)) {
+              continue;
+            }
+          }
 
           if (_superaDataFine(dataVirtuale, tx.dataFineRicorrenza)) continue;
 
@@ -2225,46 +2250,58 @@ class WalletProvider with ChangeNotifier {
     }
   }
 
-  void stopRecurrenceFromDate(String id, DateTime meseRiferimento) {
+  void stopRecurrenceFromDate(String id, DateTime limiteData) {
     final rootId = RecurrenceManager.getRootId(id);
 
+    // 1. Imposta la data di fine esatta (ultimo secondo del mese scelto)
+    final DateTime dataFine = limiteData.day > 1 
+        ? limiteData 
+        : DateTime(limiteData.year, limiteData.month + 1, 0, 23, 59, 59);
+
+    // 2. Aggiorna la regola madre nel registro transazioni
     final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId && !t.id.startsWith('rec_real_'));
     if (idx != -1) {
       final tx = _transactions[idx];
-      DateTime dataInizio = tx.dataInizio ?? tx.date;
-
-      if (meseRiferimento.year < dataInizio.year || 
-         (meseRiferimento.year == dataInizio.year && meseRiferimento.month <= dataInizio.month)) {
-        stopRecurrence(rootId);
-      } else {
-        final dataFine = DateTime(meseRiferimento.year, meseRiferimento.month, 1).subtract(const Duration(days: 1));
-
-        _transactions[idx] = TransactionModel(
-          id: tx.id,
-          title: tx.title,
-          subtitle: tx.subtitle,
-          amount: tx.amount,
-          isIncome: tx.isIncome,
-          category: tx.category,
-          date: tx.date,
-          accountId: tx.accountId,
-          isRecurrent: true,
-          frequenza: tx.frequenza,
-          giornoRicorrenza: tx.giornoRicorrenza,
-          dataInizio: tx.dataInizio,
-          dataFineRicorrenza: dataFine,
-          isArchived: tx.isArchived,
-        );
-
-        final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
-        if (pIdx != -1) {
-          _vociPianificateReali[pIdx]['dataFineRicorrenza'] = dataFine.toIso8601String();
-        }
-
-        _salvaDatiInLocalStorage();
-        notifyListeners();
-      }
+      _transactions[idx] = TransactionModel(
+        id: tx.id,
+        title: tx.title,
+        subtitle: tx.subtitle,
+        amount: tx.amount,
+        isIncome: tx.isIncome,
+        category: tx.category,
+        date: tx.date,
+        accountId: tx.accountId,
+        isRecurrent: true,
+        frequenza: tx.frequenza,
+        giornoRicorrenza: tx.giornoRicorrenza,
+        dataInizio: tx.dataInizio,
+        dataFineRicorrenza: dataFine,
+        isArchived: tx.isArchived,
+      );
     }
+
+    // 3. Aggiorna la voce pianificata in 2.4
+    final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+    if (pIdx != -1) {
+      _vociPianificateReali[pIdx]['dataFineRicorrenza'] = dataFine.toIso8601String();
+    }
+
+    // 🎯 4. STORNO E CANCELLAZIONE: Trova tutti i movimenti reali di questa serie successivi alla data di fine
+    final movimentiDaStornare = _transactions.where((t) {
+      final bool eDellaSerie = RecurrenceManager.getRootId(t.id) == rootId;
+      final bool eSuccessivo = t.date.isAfter(dataFine);
+      return eDellaSerie && eSuccessivo;
+    }).toList();
+
+    for (var tx in movimentiDaStornare) {
+      _stornaSaldoConto(tx); // Riaccredita il denaro sul conto (es. Agosto e Settembre)
+      _transactions.removeWhere((t) => t.id == tx.id); // Rimuove la transazione dallo storico
+    }
+
+    _aggiornaTasseVirtuali();
+    _calcolaStatoCuscinetto();
+    _salvaDatiInLocalStorage();
+    notifyListeners();
   }
 
   void skipPrediction(String parentId, DateTime meseRiferimento) {

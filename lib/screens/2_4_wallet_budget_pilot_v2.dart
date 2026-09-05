@@ -336,7 +336,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // 🎨 CARD SINGOLA RICORRENZA CON SEGNALAZIONE DEMO INTELLIGENTE
   Widget _buildCardRicorrenza(
     BuildContext context,
     WalletProvider provider,
@@ -372,106 +371,143 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       iconaMov = Icons.swap_horiz_rounded;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isTerminata ? Colors.white.withOpacity(0.01) : Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isTerminata ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.08)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Dismissible(
+      key: Key('dismiss_ricorrenza_${voce['id']}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.85),
           borderRadius: BorderRadius.circular(14),
-          onTap: () {
-            if (!isPro) {
-              _mostraModalPRO(context);
-              return;
-            }
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              'Gestisci',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (!isPro) {
+          _mostraModalPRO(context);
+          return false;
+        }
 
-            if (isTerminata) {
-              _mostraGestioneTerminata(context, provider, voce);
-            } else {
-              _mostraGestioneEliminazioneRicorrenza(context, provider, voce);
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Opacity(
-              opacity: isTerminata ? 0.45 : 1.0,
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: coloreIcona.withOpacity(0.15),
-                      shape: BoxShape.circle,
+        if (isTerminata) {
+          _mostraGestioneTerminata(context, provider, voce);
+        } else {
+          _mostraGestioneEliminazioneRicorrenza(context, provider, voce);
+        }
+        return false;
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isTerminata ? Colors.white.withOpacity(0.01) : Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isTerminata ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.08)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              if (!isPro) {
+                _mostraModalPRO(context);
+                return;
+              }
+
+              if (isTerminata) {
+                _mostraGestioneTerminata(context, provider, voce);
+              } else {
+                _mostraFormRegolaAvanzata(provider, voceEsistente: voce);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Opacity(
+                opacity: isTerminata ? 0.45 : 1.0,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: coloreIcona.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(iconaMov, color: coloreIcona, size: 16),
                     ),
-                    child: Icon(iconaMov, color: coloreIcona, size: 16),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                nome,
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            if (isTerminata)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white10,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.white24),
-                                ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
                                 child: Text(
-                                  'Terminata ${dataFine != null ? "${dataFine.day.toString().padLeft(2, '0')}/${dataFine.month.toString().padLeft(2, '0')}" : ""}',
-                                  style: const TextStyle(color: Colors.white60, fontSize: 8, fontWeight: FontWeight.bold),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isPro ? greenProfit.withOpacity(0.15) : oceanCyan.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: isPro ? greenProfit.withOpacity(0.3) : oceanCyan.withOpacity(0.4)),
-                                ),
-                                child: Text(
-                                  isPro ? 'Attiva' : 'Simulata',
-                                  style: TextStyle(color: isPro ? greenProfit : oceanCyan, fontSize: 8, fontWeight: FontWeight.bold),
+                                  nome,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$cat • $freq (gg $giorno)',
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                        ),
-                      ],
+                              const SizedBox(width: 8),
+                              if (isTerminata)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: Text(
+                                    'Terminata ${dataFine != null ? "${dataFine.day.toString().padLeft(2, '0')}/${dataFine.month.toString().padLeft(2, '0')}" : ""}',
+                                    style: const TextStyle(color: Colors.white60, fontSize: 8, fontWeight: FontWeight.bold),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isPro ? greenProfit.withOpacity(0.15) : oceanCyan.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: isPro ? greenProfit.withOpacity(0.3) : oceanCyan.withOpacity(0.4)),
+                                  ),
+                                  child: Text(
+                                    isPro ? 'Attiva' : 'Simulata',
+                                    style: TextStyle(color: isPro ? greenProfit : oceanCyan, fontSize: 8, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$cat • $freq (gg $giorno)',
+                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    tipoMov == 'uscita' ? '- ${_formattaValuta(importo)}' : '+ ${_formattaValuta(importo)}',
-                    style: TextStyle(color: coloreIcona, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    isPro ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
-                    color: isPro ? Colors.white24 : oceanCyan.withOpacity(0.7),
-                    size: 16,
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      tipoMov == 'uscita' ? '- ${_formattaValuta(importo)}' : '+ ${_formattaValuta(importo)}',
+                      style: TextStyle(color: coloreIcona, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      isPro ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
+                      color: isPro ? Colors.white24 : oceanCyan.withOpacity(0.7),
+                      size: 16,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2176,10 +2212,74 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     ],
                   ),
                 ),
+
+                if (isEdit) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        foregroundColor: const Color(0xFFEF4444),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.event_busy_rounded, size: 16),
+                      label: const Text('Opzioni Eliminazione / Interruzione', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _mostraGestioneEliminazioneRicorrenza(context, provider, voceEsistente);
+                      },
+                    ),
+                  ),
+                ],
               ],
             ),
           );
         },
+      ),
+    );
+  }
+  void _mostraAlertEliminazioneTotale(BuildContext context, WalletProvider provider, String id, String nome) {
+    showDialog(
+      context: context,
+      builder: (ctxAlert) => AlertDialog(
+        backgroundColor: const Color(0xFF18181B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 8),
+            Text('⚠️ ELIMINAZIONE TOTALE', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Sei sicuro di voler eliminare TUTTI i movimenti di "$nome"?\n\n🚨 Verrà cancellato anche lo STORICO PASSATO e i saldi dei conti verranno riaccreditati. L\'operazione è irreversibile.',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctxAlert),
+            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              provider.rimuoviSpesaPianificata(id);
+              provider.deleteTransaction(id);
+              Navigator.pop(ctxAlert);
+              AppNotifications.mostraInAlto(
+                context,
+                'Intera serie di "$nome" eliminata e saldi riaccreditati!',
+                type: NotificationType.error,
+              );
+            },
+            child: const Text('SÌ, ELIMINA TUTTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+        ],
       ),
     );
   }
@@ -2325,68 +2425,214 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               ),
               const SizedBox(height: 16),
 
+              // 1️⃣ POPUP CUSTOM SOLO MESI CON INDICAZIONE VISIVA DI PRESENZA SPESA
               AppActionCard(
-                icon: Icons.event_busy_rounded,
+                icon: Icons.calendar_view_month_rounded,
                 iconColor: const Color(0xFF38BDF8),
-                title: 'Elimina / Salta solo questo mese',
-                subtitle: 'Cancella la registrazione di questo mese. La ricorrenza rimarrà attiva per i mesi futuri.',
+                title: 'Scegli ultimo mese di validità...',
+                subtitle: 'Seleziona solo il mese: la regola si fermerà dal mese successivo.',
                 onTap: () {
-                  if (isTransaction) {
-                    provider.deleteButKeepRecurrence(id);
-                  } else {
-                    provider.skipPrediction(id, DateTime.now());
-                  }
-                  Navigator.pop(ctx);
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Ricorrenza per "$nome" saltata questo mese',
-                    type: NotificationType.warning,
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
+                  int annoSelezionato = DateTime.now().year;
 
-              AppActionCard(
-                icon: Icons.block_rounded,
-                iconColor: const Color(0xFFF59E0B),
-                title: 'Interrompi da questo mese in poi',
-                subtitle: 'Ferma i pagamenti futuri ma conserva intatto lo storico dei mesi passati.',
-                onTap: () {
-                  provider.stopRecurrenceFromDate(id, DateTime.now());
-                  if (!isTransaction) {
-                    provider.rimuoviSpesaPianificata(id);
+                  // Recupera le date di inizio e fine dell'evento
+                  DateTime? inizio;
+                  if (voce['dataInizio'] != null) {
+                    inizio = voce['dataInizio'] is DateTime
+                        ? voce['dataInizio']
+                        : DateTime.tryParse(voce['dataInizio'].toString());
                   }
-                  Navigator.pop(ctx);
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Ricorrenza "$nome" disdetta da questo mese in poi!',
-                    type: NotificationType.warning,
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
 
-              AppActionCard(
-                icon: Icons.edit_calendar_rounded,
-                iconColor: const Color(0xFFC084FC),
-                title: 'Scegli mese di termine...',
-                subtitle: 'Imposta una data specifica entro cui fermare la regola.',
-                onTap: () async {
-                  final picked = await AppDatePicker.selezionaData(
-                    context,
-                    dataIniziale: DateTime.now(),
-                  );
-                  if (picked != null) {
-                    provider.stopRecurrenceFromDate(id, picked);
-                    if (context.mounted) {
-                      Navigator.pop(ctx);
-                      AppNotifications.mostraInAlto(
-                        context,
-                        'Ricorrenza "$nome" disdetta dal ${picked.month}/${picked.year}!',
-                        type: NotificationType.warning,
-                      );
-                    }
+                  DateTime? fine;
+                  if (voce['dataFineRicorrenza'] != null) {
+                    fine = voce['dataFineRicorrenza'] is DateTime
+                        ? voce['dataFineRicorrenza']
+                        : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
                   }
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Ultimo Mese Attivo', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato--),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF38BDF8)),
+                                  onPressed: () => setPickerState(() => annoSelezionato++),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomeMese = _nomiMesiBrevi[index];
+
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              // 🔍 VERIFICA SE LA SPESA È ATTIVA E CADE IN QUESTO MESE IN BASE ALLA FREQUENZA
+                              bool isSpesaPresente = true;
+                              if (inizio != null) {
+                                final startMese = DateTime(inizio.year, inizio.month, 1);
+                                if (primoGiornoMese.isBefore(startMese)) {
+                                  isSpesaPresente = false;
+                                } else {
+                                  final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                  final freqStr = (voce['frequenza'] ?? 'Ogni mese').toString().toLowerCase();
+
+                                  if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) {
+                                    isSpesaPresente = false;
+                                  } else if (freqStr.contains('annuale') && diffMesi % 12 != 0) {
+                                    isSpesaPresente = false;
+                                  }
+                                }
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              return InkWell(
+                                onTap: () {
+                                  final limiteData = DateTime(annoSelezionato, meseIdx + 1, 0, 23, 59, 59);
+
+                                  // 🛡️ CHECK 1: SE IL MESE È ANTECEDENTE ALL'INIZIO -> ELIMINAZIONE TOTALE
+                                  if (inizio != null && limiteData.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    _mostraAlertEliminazioneTotale(context, provider, id, nome);
+                                    return;
+                                  }
+
+                                  // 🛡️ CHECK 2: TERMINE SU MESI GIÀ CONTABILIZZATI O ANTECEDENTI A OGGI
+                                  final now = DateTime.now();
+                                  final bool tagliaStoricoGiaPagato = limiteData.isBefore(now);
+
+                                  if (tagliaStoricoGiaPagato) {
+                                    Navigator.pop(dialogCtx);
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctxTaglio) => AlertDialog(
+                                        backgroundColor: const Color(0xFF18181B),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.history_rounded, color: Color(0xFFF59E0B), size: 22),
+                                            SizedBox(width: 8),
+                                            Text('Storno Movimenti Passati', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        content: Text(
+                                          'Impostando la fine a $nomeMese $annoSelezionato, i pagamenti registrati dopo questa data verranno cancellati e i relativi soldi saranno RIACCREDITATI sul tuo conto.\n\nVuoi procedere?',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctxTaglio),
+                                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFF59E0B),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                            onPressed: () {
+                                              // 🎯 Chiamata unica al Provider per aggiornare la data di fine e ricalcolare i saldi
+                                              provider.stopRecurrenceFromDate(id, limiteData);
+                                              
+                                              Navigator.pop(ctxTaglio);
+                                              Navigator.pop(ctx);
+                                              AppNotifications.mostraInAlto(
+                                                context,
+                                                'Regola "$nome" fermata a $nomeMese $annoSelezionato. Saldi e storico aggiornati!',
+                                                type: NotificationType.warning,
+                                              );
+                                            },
+                                            child: const Text('SÌ, STORNA E FERMA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    provider.stopRecurrenceFromDate(id, limiteData);
+                                    Navigator.pop(dialogCtx);
+                                    Navigator.pop(ctx);
+                                    AppNotifications.mostraInAlto(
+                                      context,
+                                      'Regola "$nome" valida fino a $nomeMese $annoSelezionato!',
+                                      type: NotificationType.warning,
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSpesaPresente 
+                                        ? const Color(0xFF38BDF8).withOpacity(0.2) 
+                                        : Colors.white.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSpesaPresente 
+                                          ? const Color(0xFF38BDF8) 
+                                          : Colors.white10,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (isSpesaPresente) ...[
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 10),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        nomeMese,
+                                        style: TextStyle(
+                                          color: isSpesaPresente ? Colors.white : Colors.white38,
+                                          fontSize: 11,
+                                          fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 14),
