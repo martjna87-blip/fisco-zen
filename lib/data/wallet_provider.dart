@@ -144,8 +144,14 @@ class TransactionModel {
 }
 
 class WalletProvider with ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String? get _userId => FirebaseAuth.instance.currentUser?.uid;
+  final FirebaseFirestore _firestore;
+  String? get _userId {
+  try {
+    return FirebaseAuth.instance.currentUser?.uid;
+  } catch (_) {
+    return null;
+  }
+}
   final Map<String, String> _mappaSottocategoriaABussola = {
     'Casa/Affitto': 'Bisogni',
     'Mutuo': 'Bisogni',
@@ -1253,7 +1259,8 @@ class WalletProvider with ChangeNotifier {
     return '1';
   }
 
-  WalletProvider() {
+  WalletProvider({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance {
     _caricaDatiDaLocalStorage();
   }
 

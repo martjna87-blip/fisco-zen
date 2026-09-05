@@ -15,6 +15,7 @@ import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_action_card.dart';
 import '../data/recurrence_manager.dart';
 import '0_1_pro_upgrade.dart';
+import '../widgets_shared/app_gestione_ricorrenza_popup.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isPiva;
@@ -359,50 +360,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  void _mostraAlertConfermaEliminazioneTotale(BuildContext context, String id, String desc) {
-    showDialog(
-      context: context,
-      builder: (ctxAlert) => AlertDialog(
-        backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 22),
-            SizedBox(width: 8),
-            Text('⚠️ ELIMINAZIONE TOTALE', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          'Sei sicuro di voler eliminare TUTTI i movimenti di "$desc"?\n\n🚨 Verrà cancellato anche lo STORICO PASSATO nei mesi precedenti. L\'operazione è irreversibile.',
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctxAlert),
-            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              context.read<WalletProvider>().deleteTransaction(id);
-              Navigator.pop(ctxAlert);
-              setState(() {});
-              AppNotifications.mostraInAlto(
-                context,
-                'Intera serie di "$desc" eliminata (compreso lo storico passato)',
-                type: NotificationType.error,
-              );
-            },
-            child: const Text('SÌ, ELIMINA TUTTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _gestisciEliminazioneMovimento(BuildContext context, dynamic tx) {
     final String catLower = (tx.category ?? '').toString().toLowerCase();
     final String titleLower = (tx.title ?? '').toString().toLowerCase();
@@ -439,7 +396,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final bool isRecurrent = tx.isRecurrent ?? false;
     final provider = context.read<WalletProvider>();
 
-    // 🔒 GUARDRAIL DEMO/FREE: SE L'UTENTE NON È PRO APRE IL PAYWALL
     if (isRecurrent && !provider.isProUser) {
       AppBottomSheet.mostra(
         context: context,
@@ -450,7 +406,6 @@ class _WalletScreenState extends State<WalletScreen> {
 
     final String desc = tx.title ?? 'Movimento';
     final String id = tx.id as String;
-    final DateTime date = tx.date as DateTime;
 
     if (!isRecurrent) {
       showDialog(
@@ -493,79 +448,11 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
-    // 🎯 MODALE RICORRENZA IDENTICA A 2.1 CON APPACTIONCARD
-    showDialog(
-      context: context,
-      builder: (ctx) => AppSecondaryPopup(
-        backgroundColor: const Color(0xFF18181B),
-        icon: Icons.event_repeat_rounded,
-        iconColor: const Color(0xFF38BDF8),
-        titolo: 'Gestisci Ricorrenza',
-        testoAnnulla: 'Chiudi',
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Scegli come modificare la spesa/entrata per "$desc":',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-
-              // 1️⃣ ELIMINA SOLO QUESTO MESE
-              AppActionCard(
-                icon: Icons.event_busy_rounded,
-                iconColor: const Color(0xFF38BDF8),
-                title: 'Elimina solo per questo mese',
-                subtitle: 'Cancella la singola registrazione. La spesa tornerà regolarmente il mese prossimo.',
-                onTap: () {
-                  provider.eliminaSoloQuestoMese(id, date);
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  AppNotifications.mostraInAlto(context, 'Movimento eliminato solo per questo mese 🎉');
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // 2️⃣ ELIMINA QUESTO E I FUTURI
-              AppActionCard(
-                icon: Icons.block_rounded,
-                iconColor: const Color(0xFFF59E0B),
-                title: 'Elimina questo e i futuri',
-                subtitle: 'Rimborsa questo mese e blocca la spesa per il futuro. Lo storico passato è salvo.',
-                onTap: () {
-                  provider.eliminaQuestoEFuturi(id, date);
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  AppNotifications.mostraInAlto(
-                    context,
-                    'Spesa interrotta da questo mese in poi! Storico passato salvato.',
-                    type: NotificationType.warning,
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              const Divider(color: Colors.white10, height: 1),
-              const SizedBox(height: 14),
-
-              // 3️⃣ ELIMINA L'INTERA SERIE
-              AppActionCard(
-                icon: Icons.delete_forever_rounded,
-                iconColor: const Color(0xFFEF4444),
-                title: 'Elimina l\'intera serie',
-                subtitle: 'Cancella la regola e lo storico passato nei mesi precedenti. Irreversibile.',
-                isDanger: true,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  final rootId = RecurrenceManager.getRootId(id);
-                  _mostraAlertConfermaEliminazioneTotale(context, rootId, desc);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    AppGestioneRicorrenzaPopup.mostra(
+      context,
+      id: id,
+      titolo: desc,
+      onConcluso: () => setState(() {}),
     );
   }
 

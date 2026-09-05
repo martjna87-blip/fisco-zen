@@ -259,28 +259,35 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     final currentAnno = anniInUso[_selectedYearIndex.clamp(0, anniInUso.length - 1)];
     final List<Map<String, dynamic>> storicoMesiInUso = List<Map<String, dynamic>>.from(currentAnno['storicoMesi']);
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0A0A0C),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ➖ BARRETTA TRASCINAMENTO
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(top: 12, bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 250) {
+          Navigator.pop(context);
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0A0A0C),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ➖ BARRETTA TRASCINAMENTO
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
             
             // TITOLO
             const Center(
@@ -699,8 +706,9 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLegendaItem(String label, Color color) {
     return Row(
