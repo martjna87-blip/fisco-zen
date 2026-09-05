@@ -10,6 +10,7 @@ import '0_1_pro_upgrade.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_action_card.dart';
 import '../screens/0_1_pro_upgrade.dart';
+import '../data/recurrence_manager.dart';
 
 class PianoSpesaSheet extends StatefulWidget {
   const PianoSpesaSheet({super.key});
@@ -2405,6 +2406,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 
     final String id = voce['id'].toString();
     final String nome = voce['nome'] ?? 'Ricorrenza';
+    final String rootId = RecurrenceManager.getRootId(id);
 
     showDialog(
       context: context,
@@ -2631,7 +2633,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               ),
               const SizedBox(height: 10),
 
-              // 2️⃣ SOSPENSIONE MULTIPLA (SALTA MESI SPECIFICI)
+              // 2️⃣ SOSPENSIONE MULTIPLA (SALTA MESI SPECIFICI) CON INDICATORE CANCELLATI
               AppActionCard(
                 icon: Icons.rule_rounded,
                 iconColor: const Color(0xFFF59E0B),
@@ -2692,12 +2694,13 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                               final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
                               final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
 
+                              final String freqStr = (voce['frequenza'] ?? 'Ogni mese').toString().toLowerCase();
+
                               bool isSpesaPresente = true;
                               if (inizio != null && primoGiornoMese.isBefore(DateTime(inizio.year, inizio.month, 1))) {
                                 isSpesaPresente = false;
                               } else if (inizio != null) {
                                 final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
-                                final freqStr = (voce['frequenza'] ?? 'Ogni mese').toString().toLowerCase();
                                 if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) isSpesaPresente = false;
                                 else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) isSpesaPresente = false;
                                 else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) isSpesaPresente = false;
@@ -2707,12 +2710,54 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                 isSpesaPresente = false;
                               }
 
-                              final isSaltato = mesiDaSaltare.contains(meseIdx);
+                              // 🔍 CONTROLLO SE IL MESE È GIÀ STATO CANCELLATO IN PASSATO
+                              final targetMonth = DateTime(annoSelezionato, meseIdx, 1);
+                              final hasRealTx = provider.transactions.any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId &&
+                                  t.date.year == annoSelezionato &&
+                                  t.date.month == meseIdx);
+                              final hasPrevisto = provider.getMovimentiPrevisti(targetMonth).any((t) =>
+                                  RecurrenceManager.getRootId(t.id) == rootId);
+
+                              final bool isGiaCancellato = isSpesaPresente && !hasRealTx && !hasPrevisto;
+                              final bool isSelezionatoOra = mesiDaSaltare.contains(meseIdx);
+
+                              // 🎨 STILI VISIVI
+                              Color coloreSfondo = Colors.white.withOpacity(0.03);
+                              Color coloreBordo = Colors.white10;
+                              Color coloreTesto = Colors.white38;
+                              IconData? iconaStato;
+                              Color? coloreIcona;
+
+                              if (isSpesaPresente) {
+                                if (isGiaCancellato) {
+                                  // 🔴 GIÀ CANCELLATO PRECEDENTEMENTE
+                                  coloreSfondo = const Color(0xFFEF4444).withOpacity(0.18);
+                                  coloreBordo = const Color(0xFFEF4444).withOpacity(0.6);
+                                  coloreTesto = const Color(0xFFEF4444);
+                                  iconaStato = Icons.block_rounded;
+                                  coloreIcona = const Color(0xFFEF4444);
+                                } else if (isSelezionatoOra) {
+                                  // 🔵 SELEZIONATO ORA PER CANCELLARE (BLU)
+                                  coloreSfondo = const Color(0xFF38BDF8).withOpacity(0.25);
+                                  coloreBordo = const Color(0xFF38BDF8);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_rounded;
+                                  coloreIcona = const Color(0xFF38BDF8);
+                                } else {
+                                  // 🟡 MESE ATTIVO REGOLARE
+                                  coloreSfondo = const Color(0xFFF59E0B).withOpacity(0.15);
+                                  coloreBordo = const Color(0xFFF59E0B).withOpacity(0.4);
+                                  coloreTesto = Colors.white;
+                                  iconaStato = Icons.check_circle_outline_rounded;
+                                  coloreIcona = const Color(0xFFF59E0B);
+                                }
+                              }
 
                               return InkWell(
-                                onTap: isSpesaPresente ? () {
+                                onTap: (isSpesaPresente && !isGiaCancellato) ? () {
                                   setPickerState(() {
-                                    if (isSaltato) {
+                                    if (isSelezionatoOra) {
                                       mesiDaSaltare.remove(meseIdx);
                                     } else {
                                       mesiDaSaltare.add(meseIdx);
@@ -2723,38 +2768,36 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   decoration: BoxDecoration(
-                                    color: isSpesaPresente 
-                                        ? (isSaltato ? const Color(0xFFEF4444).withOpacity(0.2) : const Color(0xFFF59E0B).withOpacity(0.2)) 
-                                        : Colors.white.withOpacity(0.03),
+                                    color: coloreSfondo,
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: isSpesaPresente 
-                                          ? (isSaltato ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)) 
-                                          : Colors.white10,
-                                    ),
+                                    border: Border.all(color: coloreBordo),
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      if (isSpesaPresente) ...[
-                                        Icon(
-                                          isSaltato ? Icons.block_rounded : Icons.check_circle_rounded, 
-                                          color: isSaltato ? const Color(0xFFEF4444) : const Color(0xFFF59E0B), 
-                                          size: 10
-                                        ),
-                                        const SizedBox(width: 4),
-                                      ],
-                                      Text(
-                                        nomeMese,
-                                        style: TextStyle(
-                                          color: isSpesaPresente 
-                                              ? (isSaltato ? const Color(0xFFEF4444) : Colors.white) 
-                                              : Colors.white38,
-                                          fontSize: 11,
-                                          fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
-                                          decoration: isSaltato ? TextDecoration.lineThrough : null,
-                                        ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          if (iconaStato != null) ...[
+                                            Icon(iconaStato, color: coloreIcona, size: 10),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(
+                                            nomeMese,
+                                            style: TextStyle(
+                                              color: coloreTesto,
+                                              fontSize: 11,
+                                              fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                              decoration: (isSelezionatoOra || isGiaCancellato) ? TextDecoration.lineThrough : null,
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                      if (isGiaCancellato)
+                                        const Text(
+                                          'Cancellato',
+                                          style: TextStyle(color: Color(0xFFEF4444), fontSize: 7, fontWeight: FontWeight.bold),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -2778,7 +2821,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                   final dataSospensione = DateTime(annoSelezionato, m, 1);
                                   
                                   final txGiaGenerata = provider.transactions.where((t) => 
-                                      (t.id == id || t.id.contains(id)) && 
+                                      RecurrenceManager.getRootId(t.id) == rootId && 
                                       t.date.year == annoSelezionato && 
                                       t.date.month == m &&
                                       !t.id.startsWith('rule_') && !t.id.startsWith('prev_')
@@ -2787,7 +2830,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                   if (txGiaGenerata.isNotEmpty) {
                                     provider.eliminaSoloQuestoMese(txGiaGenerata.first.id, dataSospensione);
                                   } else {
-                                    provider.eliminaSoloQuestoMese(id, dataSospensione);
+                                    provider.eliminaSoloQuestoMese(rootId, dataSospensione);
                                   }
                                 }
                                 
