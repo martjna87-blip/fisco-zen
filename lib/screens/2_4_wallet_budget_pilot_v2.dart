@@ -2405,7 +2405,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 
     final String id = voce['id'].toString();
     final String nome = voce['nome'] ?? 'Ricorrenza';
-    final bool isTransaction = voce['isTransaction'] == true;
 
     showDialog(
       context: context,
@@ -2426,7 +2425,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               ),
               const SizedBox(height: 16),
 
-              // 1️⃣ POPUP CUSTOM SOLO MESI CON INDICAZIONE VISIVA DI PRESENZA SPESA
+              // 1️⃣ POPUP SELEZIONE ULTIMO MESE DI VALIDITÀ
               AppActionCard(
                 icon: Icons.calendar_view_month_rounded,
                 iconColor: const Color(0xFF38BDF8),
@@ -2435,7 +2434,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                 onTap: () {
                   int annoSelezionato = DateTime.now().year;
 
-                  // Recupera le date di inizio e fine dell'evento
                   DateTime? inizio;
                   if (voce['dataInizio'] != null) {
                     inizio = voce['dataInizio'] is DateTime
@@ -2493,7 +2491,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                               final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
                               final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
 
-                              // 🔍 VERIFICA SE LA SPESA È ATTIVA E CADE IN QUESTO MESE IN BASE ALLA FREQUENZA
                               bool isSpesaPresente = true;
                               if (inizio != null) {
                                 final startMese = DateTime(inizio.year, inizio.month, 1);
@@ -2522,7 +2519,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                 onTap: () {
                                   final limiteData = DateTime(annoSelezionato, meseIdx + 1, 0, 23, 59, 59);
 
-                                  // 🛡️ CHECK 1: SE IL MESE È ANTECEDENTE ALL'INIZIO -> ELIMINAZIONE TOTALE
                                   if (inizio != null && limiteData.isBefore(DateTime(inizio.year, inizio.month, 1))) {
                                     Navigator.pop(dialogCtx);
                                     Navigator.pop(ctx);
@@ -2530,7 +2526,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                     return;
                                   }
 
-                                  // 🛡️ CHECK 2: TERMINE SU MESI GIÀ CONTABILIZZATI O ANTECEDENTI A OGGI
                                   final now = DateTime.now();
                                   final bool tagliaStoricoGiaPagato = limiteData.isBefore(now);
 
@@ -2563,9 +2558,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
                                             onPressed: () {
-                                              // 🎯 Chiamata unica al Provider per aggiornare la data di fine e ricalcolare i saldi
                                               provider.stopRecurrenceFromDate(id, limiteData);
-                                              
                                               Navigator.pop(ctxTaglio);
                                               Navigator.pop(ctx);
                                               AppNotifications.mostraInAlto(
@@ -2636,10 +2629,189 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                   );
                 },
               ),
+              const SizedBox(height: 10),
+
+              // 2️⃣ SOSPENSIONE MULTIPLA (SALTA MESI SPECIFICI)
+              AppActionCard(
+                icon: Icons.rule_rounded,
+                iconColor: const Color(0xFFF59E0B),
+                title: 'Sospendi mesi specifici...',
+                subtitle: 'Seleziona quali mesi vuoi saltare. La regola rimarrà attiva per gli altri.',
+                onTap: () {
+                  int annoSelezionato = DateTime.now().year;
+                  Set<int> mesiDaSaltare = {};
+
+                  DateTime? inizio;
+                  if (voce['dataInizio'] != null) {
+                    inizio = voce['dataInizio'] is DateTime ? voce['dataInizio'] : DateTime.tryParse(voce['dataInizio'].toString());
+                  }
+                  DateTime? fine;
+                  if (voce['dataFineRicorrenza'] != null) {
+                    fine = voce['dataFineRicorrenza'] is DateTime ? voce['dataFineRicorrenza'] : DateTime.tryParse(voce['dataFineRicorrenza'].toString());
+                  }
+
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => StatefulBuilder(
+                      builder: (context, setPickerState) => AlertDialog(
+                        backgroundColor: const Color(0xFF18181B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Salta Mesi', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato--; mesiDaSaltare.clear(); }),
+                                ),
+                                Text('$annoSelezionato', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFFF59E0B)),
+                                  onPressed: () => setPickerState(() { annoSelezionato++; mesiDaSaltare.clear(); }),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        content: SizedBox(
+                          width: 300,
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            itemCount: 12,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              childAspectRatio: 1.8,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemBuilder: (context, index) {
+                              final meseIdx = index + 1;
+                              final nomeMese = _nomiMesiBrevi[index];
+                              final primoGiornoMese = DateTime(annoSelezionato, meseIdx, 1);
+                              final ultimoGiornoMese = DateTime(annoSelezionato, meseIdx + 1, 0);
+
+                              bool isSpesaPresente = true;
+                              if (inizio != null && primoGiornoMese.isBefore(DateTime(inizio.year, inizio.month, 1))) {
+                                isSpesaPresente = false;
+                              } else if (inizio != null) {
+                                final diffMesi = (annoSelezionato - inizio.year) * 12 + (meseIdx - inizio.month);
+                                final freqStr = (voce['frequenza'] ?? 'Ogni mese').toString().toLowerCase();
+                                if (freqStr.contains('2 mesi') && diffMesi % 2 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('trimestrale') && diffMesi % 3 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('semestrale') && diffMesi % 6 != 0) isSpesaPresente = false;
+                                else if (freqStr.contains('annuale') && diffMesi % 12 != 0) isSpesaPresente = false;
+                              }
+                              if (fine != null && ultimoGiornoMese.isAfter(fine)) {
+                                isSpesaPresente = false;
+                              }
+
+                              final isSaltato = mesiDaSaltare.contains(meseIdx);
+
+                              return InkWell(
+                                onTap: isSpesaPresente ? () {
+                                  setPickerState(() {
+                                    if (isSaltato) {
+                                      mesiDaSaltare.remove(meseIdx);
+                                    } else {
+                                      mesiDaSaltare.add(meseIdx);
+                                    }
+                                  });
+                                } : null,
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    color: isSpesaPresente 
+                                        ? (isSaltato ? const Color(0xFFEF4444).withOpacity(0.2) : const Color(0xFFF59E0B).withOpacity(0.2)) 
+                                        : Colors.white.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSpesaPresente 
+                                          ? (isSaltato ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)) 
+                                          : Colors.white10,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (isSpesaPresente) ...[
+                                        Icon(
+                                          isSaltato ? Icons.block_rounded : Icons.check_circle_rounded, 
+                                          color: isSaltato ? const Color(0xFFEF4444) : const Color(0xFFF59E0B), 
+                                          size: 10
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        nomeMese,
+                                        style: TextStyle(
+                                          color: isSpesaPresente 
+                                              ? (isSaltato ? const Color(0xFFEF4444) : Colors.white) 
+                                              : Colors.white38,
+                                          fontSize: 11,
+                                          fontWeight: isSpesaPresente ? FontWeight.bold : FontWeight.normal,
+                                          decoration: isSaltato ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+                          ),
+                          if (mesiDaSaltare.isNotEmpty)
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                for (int m in mesiDaSaltare) {
+                                  final dataSospensione = DateTime(annoSelezionato, m, 1);
+                                  
+                                  final txGiaGenerata = provider.transactions.where((t) => 
+                                      (t.id == id || t.id.contains(id)) && 
+                                      t.date.year == annoSelezionato && 
+                                      t.date.month == m &&
+                                      !t.id.startsWith('rule_') && !t.id.startsWith('prev_')
+                                  ).toList();
+
+                                  if (txGiaGenerata.isNotEmpty) {
+                                    provider.eliminaSoloQuestoMese(txGiaGenerata.first.id, dataSospensione);
+                                  } else {
+                                    provider.eliminaSoloQuestoMese(id, dataSospensione);
+                                  }
+                                }
+                                
+                                Navigator.pop(dialogCtx);
+                                Navigator.pop(ctx);
+                                AppNotifications.mostraInAlto(
+                                  context,
+                                  'Regola "$nome" sospesa per i mesi selezionati!',
+                                  type: NotificationType.warning,
+                                );
+                              },
+                              child: Text('CONFERMA (${mesiDaSaltare.length})', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 14),
               const Divider(color: Colors.white10, height: 1),
               const SizedBox(height: 14),
 
+              // 3️⃣ ELIMINA L'INTERA SERIE
               AppActionCard(
                 icon: Icons.delete_forever_rounded,
                 iconColor: const Color(0xFFEF4444),
