@@ -1496,7 +1496,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isOver ? '🚀 Ritmo Fatturato Superiore' : '⚠️ Forte Scostamento Ritmo',
+                    isOver ? '🚀 Ritmo Fatturato Superiore' : 'Forte Scostamento Ritmo',
                     style: TextStyle(color: coloreBanner, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -1548,13 +1548,29 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _mostraModalRicalibrazioneTarget(BuildContext context, WalletProvider walletProvider, bool isOver) {
-    const bool simulaStoricoAnnoScorso = true; 
-    const double fatturatoAnnoScorsoFinoAdOggi = 22000.0;
-    const double fatturatoAnnoScorsoRestante = 38000.0;
+    final DateTime ora = DateTime.now();
+    final int annoScorso = ora.year - 1;
+
+    // 🎯 1. CALCOLO REALE DELLO STORICO ANNO PRECEDENTE (DA TRANSAZIONI REALI)
+    final double lordoAnnoScorsoMesiPassati = walletProvider.transactions.where((tx) {
+      final catLower = tx.category.toLowerCase();
+      final titleLower = tx.title.toLowerCase();
+      final isPiva = catLower.contains('p.iva') || catLower.contains('fattura') || titleLower.contains('incasso');
+      return tx.isIncome && tx.date.year == annoScorso && tx.date.month <= ora.month && isPiva;
+    }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+    final double lordoAnnoScorsoMesiRestanti = walletProvider.transactions.where((tx) {
+      final catLower = tx.category.toLowerCase();
+      final titleLower = tx.title.toLowerCase();
+      final isPiva = catLower.contains('p.iva') || catLower.contains('fattura') || titleLower.contains('incasso');
+      return tx.isIncome && tx.date.year == annoScorso && tx.date.month > ora.month && isPiva;
+    }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+    final bool haStoricoRealeAnnoScorso = (lordoAnnoScorsoMesiPassati + lordoAnnoScorsoMesiRestanti) > 0;
 
     final double fatturatoMancanteYTG = (walletProvider.fatturatoStimato - walletProvider.fatturatoTotale).clamp(0.0, double.infinity);
 
-    final int meseCorrente = DateTime.now().month;
+    final int meseCorrente = ora.month;
     int mesiRimanentiOn = 0;
     for (int i = meseCorrente - 1; i < 12; i++) {
       if (walletProvider.mesiAttiviState.length > i && walletProvider.mesiAttiviState[i]) {
@@ -1586,7 +1602,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       children: [
                         Icon(
                           isOver ? Icons.auto_graph_rounded : Icons.tune_rounded,
-                          color: isOver ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                          color: const Color(0xFF38BDF8),
                           size: 22,
                         ),
                         const SizedBox(width: 10),
@@ -1632,7 +1648,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             children: [
                               const Text('REALIZZATO AD OGGI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
-                              Text(_formattaInt(walletProvider.fatturatoTotale), style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)),
+                              Text(_formattaInt(walletProvider.fatturatoTotale), style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ],
@@ -1643,7 +1659,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Fatturato da realizzare (YTG):', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                          Text('Residuo da fatturare:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
                           Text(_formattaInt(fatturatoMancanteYTG), style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
@@ -1659,7 +1675,8 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
 
-                if (simulaStoricoAnnoScorso) ...[
+                // 🎯 2. STORICO MOSTRATO SOLO SE PRESENTE NEL DATABASE
+                if (haStoricoRealeAnnoScorso) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -1671,27 +1688,27 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.history_rounded, color: Color(0xFF38BDF8), size: 14),
-                            SizedBox(width: 6),
-                            Text('STORICO ANNO SCORSO (2025)', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                            const Icon(Icons.history_rounded, color: Color(0xFF38BDF8), size: 14),
+                            const SizedBox(width: 6),
+                            Text('STORICO ANNO SCORSO ($annoScorso)', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Fatturato Gen - Ago 2025:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                            Text(_formattaInt(fatturatoAnnoScorsoFinoAdOggi), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text('Fatturato fino a ${_nomiMesiBrevi[ora.month - 1]} $annoScorso:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                            Text(_formattaInt(lordoAnnoScorsoMesiPassati), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Fatturato Set - Dic 2025:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                            Text(_formattaInt(fatturatoAnnoScorsoRestante), style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text('Fatturato da ${_nomiMesiBrevi[ora.month == 12 ? 11 : ora.month]} a DIC $annoScorso:', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                            Text(_formattaInt(lordoAnnoScorsoMesiRestanti), style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
@@ -1700,8 +1717,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
 
                 const SizedBox(height: 16),
-                const Text('NUOVO TARGET FATTURATO ANNUO (€)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                const Text('NUOVO TARGET FATTURATO ANNUO (€)', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
                 const SizedBox(height: 6),
+                
+                // 🎯 3. CELLA INPUT EVIDENZIATA ED EDITABILE
                 TextField(
                   controller: targetCtrl,
                   keyboardType: TextInputType.number,
@@ -1709,24 +1728,35 @@ class _WalletScreenState extends State<WalletScreen> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.black.withOpacity(0.4),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    prefixIcon: const Icon(Icons.edit_outlined, color: Color(0xFF38BDF8), size: 18),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 1.2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     suffixText: '€ / Anno',
                     suffixStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ),
                 const SizedBox(height: 20),
+                
+                // 🎯 4. BOTTONE SALVA CON COLORE CYAN UNIFORMATO AL RESTO DELL'APP
                 SizedBox(
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isOver ? const Color(0xFF2DD4BF) : const Color(0xFFF59E0B),
+                      backgroundColor: const Color(0xFF38BDF8),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () {
-                      final double nuovoTarget = double.tryParse(targetCtrl.text.replaceAll('.', '')) ?? walletProvider.fatturatoStimato;
+                      final double nuovoTarget = double.tryParse(targetCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? walletProvider.fatturatoStimato;
                       
                       walletProvider.salvaProfiloFiscale(
                         codiceAteco: walletProvider.codiceAteco,
@@ -1748,7 +1778,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         'Target Annuo aggiornato a ${_formattaInt(nuovoTarget)}! 🎯',
                       );
                     },
-                    child: const Text('Salva Nuovo Target', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: const Text('Salva Nuovo Target', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                   ),
                 ),
               ],

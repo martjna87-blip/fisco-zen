@@ -660,21 +660,86 @@ class WalletProvider with ChangeNotifier {
     final DateTime ora = DateTime.now();
     final double aliquotaTasse = aliquotaFiscaleReale;
 
+    final Map<int, double> pivaAnnoMap = _pilotaggioFatturatoMesi[anno] ?? {};
+    final Map<int, double> stipAnnoMap = _pilotaggioStipendioMesi[anno] ?? {};
+
     final List<String> nomiMesi = [
       'GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU',
       'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
     ];
 
-    // 1. Calcolo del già realizzato nei mesi passati dell'anno
-    double lordoIncassatoRealePassato = 0.0;
+    // 📊 1. CALCOLO CURVA IBRIDA PONDERATA YTD (ANNO DI RIFERIMENTO STORICO)
+    final int annoRiferimentoStorico = anno <= ora.year ? (ora.year - 1) : ora.year;
+    final Map<int, double> pesiCurvaIbrida = {};
+    double sommaValoriRiferimento = 0.0;
+    int mesiYtdCompletati = 0;
 
     for (int m = 1; m <= 12; m++) {
-      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      double valoreMesePiva = 0.0;
+      final bool isMesePassatoOReale = (annoRiferimentoStorico < ora.year) ||
+          (annoRiferimentoStorico == ora.year && m < ora.month);
 
+      if (isMesePassatoOReale) {
+        final lordoFatture = _fattureIncassate.where((f) {
+          final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+          return _estraiAnnoDaData(dataStr) == annoRiferimentoStorico &&
+              (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+        }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
+
+        final lordoTx = _transactions.where((tx) {
+          return tx.isIncome &&
+              tx.date.year == annoRiferimentoStorico &&
+              tx.date.month == m &&
+              (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+        }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+        valoreMesePiva = lordoFatture > lordoTx ? lordoFatture : lordoTx;
+        if (valoreMesePiva > 0) mesiYtdCompletati++;
+      } else {
+        valoreMesePiva = (_pilotaggioFatturatoMesi[annoRiferimentoStorico] ?? {})[m] ?? 0.0;
+      }
+
+      pesiCurvaIbrida[m] = valoreMesePiva;
+      sommaValoriRiferimento += valoreMesePiva;
+    }
+
+    // 🛡️ DAMPING FACTOR: Smorzamento dinamico in base alla maturità dei dati YTD
+    final double alphaDamping = (mesiYtdCompletati >= 3)
+        ? 1.0
+        : (mesiYtdCompletati == 2 ? 0.6 : (mesiYtdCompletati == 1 ? 0.3 : 0.0));
+
+    int conteggioMesiOn = 0;
+    for (int m = 1; m <= 12; m++) {
+      final bool isMeseON = _mesiAttiviState.length >= m ? _mesiAttiviState[m - 1] : true;
+      if (isMeseON) conteggioMesiOn++;
+    }
+    if (conteggioMesiOn == 0) conteggioMesiOn = 12;
+
+    final double pesoNeutralePiatto = 1.0 / conteggioMesiOn;
+    final Map<int, double> pesiNormalizzati = {};
+
+    for (int m = 1; m <= 12; m++) {
+      final bool isMeseON = _mesiAttiviState.length >= m ? _mesiAttiviState[m - 1] : true;
+      if (isMeseON) {
+        double pesoRealeYtd = (sommaValoriRiferimento > 0)
+            ? (pesiCurvaIbrida[m]! / sommaValoriRiferimento)
+            : pesoNeutralePiatto;
+
+        pesiNormalizzati[m] = (alphaDamping * pesoRealeYtd) + ((1.0 - alphaDamping) * pesoNeutralePiatto);
+      } else {
+        pesiNormalizzati[m] = 0.0;
+      }
+    }
+
+    // 🔒 2. CALCOLO CONSOLIDATO PASSATO DELL'ANNO SELEZIONATO
+    double lordoIncassatoRealePassato = 0.0;
+    for (int m = 1; m <= 12; m++) {
+      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
       if (isPassato) {
         final lordoFatture = _fattureIncassate.where((f) {
           final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
-          return dataStr.contains('$anno') && (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+          return _estraiAnnoDaData(dataStr) == anno &&
+                 (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
         }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
 
         final lordoTx = _transactions.where((tx) {
@@ -688,56 +753,30 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    // 2. Calcolo del Target Residuo YTG (Year-To-Go) da spalmare sui mesi futuri ON
     final double lordoResiduoYTG = (_fatturatoStimatoAnnuo - lordoIncassatoRealePassato).clamp(0.0, double.infinity);
 
-    int mesiFuturiOnLiberi = 0;
-    double lordoForzatoManualmente = 0.0;
-
-    for (int m = 1; m <= 12; m++) {
-      final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
-      final bool isMeseON = _mesiAttiviState.length >= m ? _mesiAttiviState[m - 1] : true;
-      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
-
-      if (!isPassato && isMeseON) {
-        if (isManualPiva) {
-          lordoForzatoManualmente += _pilotaggioFatturatoMesi[m]!;
-        } else {
-          mesiFuturiOnLiberi++;
-        }
-      }
-    }
-
-    final double lordoDaRipartire = (lordoResiduoYTG - lordoForzatoManualmente).clamp(0.0, double.infinity);
-    final double stimaLordaMensileStandard = mesiFuturiOnLiberi > 0
-        ? (lordoDaRipartire / mesiFuturiOnLiberi)
-        : 0.0;
-
-    // --- 3. LOGICA ADATTIVA CUSCINETTO (ANALISI SURPLUS ON VS DEFICIT OFF) ---
+    // 3. CALCOLO CUSCINETTO FERIE SUI MESI FUTURI
     double totaleDeficitMesiOffFuturi = 0.0;
     double totaleSurplusMesiOnFuturi = 0.0;
 
     for (int m = 1; m <= 12; m++) {
       final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      final Map<int, double> pivaAnnoMap = _pilotaggioFatturatoMesi[anno] ?? {};
+      final Map<int, double> stipAnnoMap = _pilotaggioStipendioMesi[anno] ?? {};
       final bool isMeseOFF = _mesiAttiviState.length >= m ? !_mesiAttiviState[m - 1] : false;
-      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
-      final bool isManualStipendio = _pilotaggioStipendioMesi.containsKey(m) && _pilotaggioStipendioMesi[m]! > 0;
+      final bool isManualPiva = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
+      final bool isManualStipendio = stipAnnoMap.containsKey(m) && stipAnnoMap[m]! > 0;
 
       if (!isPassato && isPartitaIVA) {
-        double stip = 0.0;
-        if (isManualStipendio) {
-          stip = _pilotaggioStipendioMesi[m]!;
-        } else if (_entrataExtraMensile > 0) {
-          stip = _entrataExtraMensile;
-          if (_numeroMensilitaExtra == 13 && m == 12) stip += _entrataExtraMensile;
-          if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) stip += _entrataExtraMensile;
-        }
+        double stip = isManualStipendio ? stipAnnoMap[m]! : (_entrataExtraMensile > 0 ? _entrataExtraMensile : 0.0);
+        if (_numeroMensilitaExtra == 13 && m == 12) stip += _entrataExtraMensile;
+        if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) stip += _entrataExtraMensile;
 
         if (isMeseOFF) {
           final double deficit = (_nettoTargetMensile - stip).clamp(0.0, double.infinity);
           totaleDeficitMesiOffFuturi += deficit;
         } else {
-          double pivaLorda = isManualPiva ? _pilotaggioFatturatoMesi[m]! : stimaLordaMensileStandard;
+          double pivaLorda = isManualPiva ? pivaAnnoMap[m]! : (lordoResiduoYTG * pesiNormalizzati[m]!);
           double pivaNetta = pivaLorda * (1 - aliquotaTasse);
           double totaleNettoPrimaCuscinetto = pivaNetta + stip;
           double surplus = (totaleNettoPrimaCuscinetto - _nettoTargetMensile).clamp(0.0, double.infinity);
@@ -761,40 +800,40 @@ class WalletProvider with ChangeNotifier {
 
     final List<Map<String, dynamic>> matrice = [];
 
-    // 4. Compilazione dinamica della matrice 12 mesi
+    // 4. COMPILAZIONE DELLA MATRICE FINALE 12 MESI
     for (int m = 1; m <= 12; m++) {
       final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
+      final bool isCorrente = (anno == ora.year && m == ora.month);
       final bool isMeseOFF = _mesiAttiviState.length >= m ? !_mesiAttiviState[m - 1] : false;
-      final bool isManualPiva = _pilotaggioFatturatoMesi.containsKey(m) && _pilotaggioFatturatoMesi[m]! > 0;
-      final bool isManualStipendio = _pilotaggioStipendioMesi.containsKey(m) && _pilotaggioStipendioMesi[m]! > 0;
+      final bool isManualPiva = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
+      final bool isManualStipendio = stipAnnoMap.containsKey(m) && stipAnnoMap[m]! > 0;
 
-      // --- A. STIPENDIO / PENSIONE ---
+      // STIPENDIO / PENSIONE
       double entrataStipendio = 0.0;
       if (isPassato) {
         entrataStipendio = _transactions.where((tx) {
           return tx.isIncome &&
               tx.date.year == anno &&
               tx.date.month == m &&
-              (tx.category == 'Stipendio' ||
-                  tx.category == 'Pensione' ||
-                  tx.title.toLowerCase().contains('stipendio'));
+              (tx.category == 'Stipendio' || tx.category == 'Pensione' || tx.title.toLowerCase().contains('stipendio'));
         }).fold(0.0, (sum, tx) => sum + tx.amount);
       } else if (isManualStipendio) {
-        entrataStipendio = _pilotaggioStipendioMesi[m]!;
+        entrataStipendio = stipAnnoMap[m]!;
       } else if (_entrataExtraMensile > 0) {
         entrataStipendio = _entrataExtraMensile;
         if (_numeroMensilitaExtra == 13 && m == 12) entrataStipendio += _entrataExtraMensile;
         if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) entrataStipendio += _entrataExtraMensile;
       }
 
-      // --- B. FATTURATO P.IVA ---
+      // FATTURATO P.IVA
       double entrataPivaLorda = 0.0;
       double entrataPivaNetta = 0.0;
 
       if (isPassato) {
         final lordoFatture = _fattureIncassate.where((f) {
           final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
-          return dataStr.contains('$anno') && (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+          return _estraiAnnoDaData(dataStr) == anno &&
+                 (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
         }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
 
         final lordoTx = _transactions.where((tx) {
@@ -810,14 +849,26 @@ class WalletProvider with ChangeNotifier {
         entrataPivaLorda = 0.0;
         entrataPivaNetta = 0.0;
       } else if (isManualPiva) {
-        entrataPivaLorda = _pilotaggioFatturatoMesi[m]!;
+        entrataPivaLorda = pivaAnnoMap[m]!;
         entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
       } else if (isPartitaIVA) {
-        entrataPivaLorda = stimaLordaMensileStandard;
+        final double stimaLordaCurva = lordoResiduoYTG * pesiNormalizzati[m]!;
+
+        if (isCorrente) {
+          final double incassatoRealeCorrente = _transactions.where((tx) {
+            return tx.isIncome && tx.date.year == anno && tx.date.month == m &&
+                (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+          }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+          entrataPivaLorda = incassatoRealeCorrente > stimaLordaCurva ? incassatoRealeCorrente : stimaLordaCurva;
+        } else {
+          entrataPivaLorda = stimaLordaCurva;
+        }
+
         entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
       }
 
-      // --- C. SPESE MESE ---
+      // SPESE
       double speseMese = 0.0;
       if (isPassato) {
         speseMese = _transactions.where((tx) {
@@ -831,7 +882,6 @@ class WalletProvider with ChangeNotifier {
         speseMese = vociPianificate.fold(0.0, (sum, v) {
           final double p = (v['previsto'] as num?)?.toDouble() ?? 0.0;
 
-          // 🛡️ CONTROLLO SCADENZA SULLE VOCI PIANIFICATE FUTURE
           if (v['dataFineRicorrenza'] != null) {
             final DateTime? dataFine = v['dataFineRicorrenza'] is DateTime
                 ? v['dataFineRicorrenza'] as DateTime
@@ -841,7 +891,7 @@ class WalletProvider with ChangeNotifier {
               final DateTime inizioMeseFuturo = DateTime(anno, m, 1);
               final DateTime inizioMeseFine = DateTime(dataFine.year, dataFine.month, 1);
               if (inizioMeseFuturo.isAfter(inizioMeseFine)) {
-                return sum; // Ignora la spesa perché il mese è successivo alla fine
+                return sum;
               }
             }
           }
@@ -850,7 +900,7 @@ class WalletProvider with ChangeNotifier {
         });
       }
 
-      // --- D. CALCOLO ADATTIVO CUSCINETTO FERIE ---
+      // CUSCINETTO FERIE
       double quotaCuscinetto = 0.0;
       double erogazioneCuscinetto = 0.0;
 
@@ -879,7 +929,6 @@ class WalletProvider with ChangeNotifier {
           _mesiAttiviIncasso > 0 &&
           (entrataPivaLorda < (_fatturatoStimatoAnnuo / _mesiAttiviIncasso) * 0.4);
 
-      final bool isCorrente = (anno == ora.year && m == ora.month);
       final double targetMensileNetto = (_fatturatoStimatoAnnuo * (1 - aliquotaTasse) / 12) + _entrataExtraMensile;
 
       Color coloreStato = const Color(0xFF10B981);
@@ -1084,12 +1133,18 @@ class WalletProvider with ChangeNotifier {
   double get percentSvago => _percentSvago;
   double get percentRisparmio => _percentRisparmio;
 
-  // 📊 PILOTAGGIO FATTURATO P.IVA & STIPENDIO MESE PER MESE (12 MESI)
-  // Inizializzato vuoto: si riempie solo se l'utente forza un valore a mano.
-  Map<int, double> _pilotaggioFatturatoMesi = {};
-  Map<int, double> _pilotaggioStipendioMesi = {};
+  // 📊 PILOTAGGIO FATTURATO P.IVA & STIPENDIO (MAPPA PER ANNO -> MESE -> IMPORTO)
+  Map<int, Map<int, double>> _pilotaggioFatturatoMesi = {};
+  Map<int, Map<int, double>> _pilotaggioStipendioMesi = {};
 
-  // 🧹 AZZERAMENTO COMPLETO OVERRIDE PILOTAGGIO
+  // 🧹 AZZERAMENTO OVERRIDE SELETTIVO PER SINGOLO ANNO
+  void resetPilotaggioAnno(int anno) {
+    _pilotaggioFatturatoMesi.remove(anno);
+    _pilotaggioStipendioMesi.remove(anno);
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
   void resetPilotaggio() {
     _pilotaggioFatturatoMesi.clear();
     _pilotaggioStipendioMesi.clear();
@@ -1097,17 +1152,25 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Map<int, double> get pilotaggioFatturatoMesi => Map.unmodifiable(_pilotaggioFatturatoMesi);
-  Map<int, double> get pilotaggioStipendioMesi => Map.unmodifiable(_pilotaggioStipendioMesi);
+  Map<int, Map<int, double>> get pilotaggioFatturatoMesi => Map.unmodifiable(_pilotaggioFatturatoMesi);
+  Map<int, Map<int, double>> get pilotaggioStipendioMesi => Map.unmodifiable(_pilotaggioStipendioMesi);
 
-  double get totaleFatturatoPilotato =>
-      _pilotaggioFatturatoMesi.values.fold(0.0, (sum, val) => sum + val);
+  Map<int, double> getPilotaggioFatturatoPerAnno(int anno) =>
+      Map.unmodifiable(_pilotaggioFatturatoMesi[anno] ?? {});
 
-  void impostaStipendioMese(int mese, double importo) {
+  Map<int, double> getPilotaggioStipendioPerAnno(int anno) =>
+      Map.unmodifiable(_pilotaggioStipendioMesi[anno] ?? {});
+
+  void impostaStipendioMese(int mese, double importo, {int? anno}) {
+    final int targetAnno = anno ?? DateTime.now().year;
+    _pilotaggioStipendioMesi.putIfAbsent(targetAnno, () => {});
     if (importo <= 0) {
-      _pilotaggioStipendioMesi.remove(mese);
+      _pilotaggioStipendioMesi[targetAnno]!.remove(mese);
+      if (_pilotaggioStipendioMesi[targetAnno]!.isEmpty) {
+        _pilotaggioStipendioMesi.remove(targetAnno);
+      }
     } else {
-      _pilotaggioStipendioMesi[mese] = importo;
+      _pilotaggioStipendioMesi[targetAnno]![mese] = importo;
     }
     _salvaDatiInLocalStorage();
     notifyListeners();
@@ -1286,8 +1349,17 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void impostaFatturatoMese(int mese, double importo) {
-    _pilotaggioFatturatoMesi[mese] = importo;
+  void impostaFatturatoMese(int mese, double importo, {int? anno}) {
+    final int targetAnno = anno ?? DateTime.now().year;
+    _pilotaggioFatturatoMesi.putIfAbsent(targetAnno, () => {});
+    if (importo <= 0) {
+      _pilotaggioFatturatoMesi[targetAnno]!.remove(mese);
+      if (_pilotaggioFatturatoMesi[targetAnno]!.isEmpty) {
+        _pilotaggioFatturatoMesi.remove(targetAnno);
+      }
+    } else {
+      _pilotaggioFatturatoMesi[targetAnno]![mese] = importo;
+    }
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -1773,14 +1845,36 @@ class WalletProvider with ChangeNotifier {
 
       final pilotaggioStr = prefs.getString('pilotaggioFatturatoMesi');
       if (pilotaggioStr != null) {
-        final Map<String, dynamic> decoded = jsonDecode(pilotaggioStr);
-        _pilotaggioFatturatoMesi = decoded.map((k, v) => MapEntry(int.parse(k), (v as num).toDouble()));
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(pilotaggioStr);
+          _pilotaggioFatturatoMesi = decoded.map((annoKey, mesiValue) {
+            if (mesiValue is Map) {
+              final Map<int, double> mesiDecoded = {};
+              mesiValue.forEach((mKey, val) {
+                mesiDecoded[int.parse(mKey.toString())] = (val as num).toDouble();
+              });
+              return MapEntry(int.parse(annoKey), mesiDecoded);
+            }
+            return MapEntry(DateTime.now().year, <int, double>{});
+          });
+        } catch (_) {}
       }
 
       final pilotaggioStipendioStr = prefs.getString('pilotaggioStipendioMesi');
       if (pilotaggioStipendioStr != null) {
-        final Map<String, dynamic> decoded = jsonDecode(pilotaggioStipendioStr);
-        _pilotaggioStipendioMesi = decoded.map((k, v) => MapEntry(int.parse(k), (v as num).toDouble()));
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(pilotaggioStipendioStr);
+          _pilotaggioStipendioMesi = decoded.map((annoKey, mesiValue) {
+            if (mesiValue is Map) {
+              final Map<int, double> mesiDecoded = {};
+              mesiValue.forEach((mKey, val) {
+                mesiDecoded[int.parse(mKey.toString())] = (val as num).toDouble();
+              });
+              return MapEntry(int.parse(annoKey), mesiDecoded);
+            }
+            return MapEntry(DateTime.now().year, <int, double>{});
+          });
+        } catch (_) {}
       }
 
       _aggiornaTasseVirtuali();
@@ -1836,8 +1930,18 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('percentBisogni', _percentBisogni);
       await prefs.setDouble('percentSvago', _percentSvago);
       await prefs.setDouble('percentRisparmio', _percentRisparmio);
-      await prefs.setString('pilotaggioFatturatoMesi', jsonEncode(_pilotaggioFatturatoMesi.map((k, v) => MapEntry(k.toString(), v))));
-      await prefs.setString('pilotaggioStipendioMesi', jsonEncode(_pilotaggioStipendioMesi.map((k, v) => MapEntry(k.toString(), v))));
+      await prefs.setString('pilotaggioFatturatoMesi', jsonEncode(
+        _pilotaggioFatturatoMesi.map((annoKey, mesiMap) => MapEntry(
+          annoKey.toString(),
+          mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
+        )),
+      ));
+      await prefs.setString('pilotaggioStipendioMesi', jsonEncode(
+        _pilotaggioStipendioMesi.map((annoKey, mesiMap) => MapEntry(
+          annoKey.toString(),
+          mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
+        )),
+      ));
 
       await _salvaDatiSuCloud();
     } catch (e) {

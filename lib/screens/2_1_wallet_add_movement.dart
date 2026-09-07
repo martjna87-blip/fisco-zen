@@ -1733,7 +1733,80 @@ Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (isSpesa) const SizedBox(height: 10),
+              if (isSpesa) ...[
+  Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      const Text(
+        'INSERIMENTO MANUALE',
+        style: TextStyle(
+          color: Colors.white70,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
+        ),
+      ),
+      InkWell(
+        onTap: _isAnalyzing
+            ? null
+            : () async {
+                final wallet = Provider.of<WalletProvider>(context, listen: false);
+                if (!wallet.canUseOCR) {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione Scontrini (OCR)')));
+                } else {
+                  await _avviaScansioneIntelligente();
+                }
+              },
+        borderRadius: BorderRadius.circular(10),
+        child: Consumer<WalletProvider>(
+          builder: (context, wallet, child) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: themeAccent.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: themeAccent.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isAnalyzing) ...[
+                    SizedBox(
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: themeAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('Analisi AI...', style: TextStyle(color: themeAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ] else ...[
+                    Icon(Icons.document_scanner_rounded, color: themeAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Scansiona OCR', style: TextStyle(color: themeAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                    if (!wallet.canUseOCR) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  ),
+  const SizedBox(height: 10),
+],
               
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -1784,52 +1857,7 @@ Expanded(
                         ),
                       ),
                     ),
-                    if (isSpesa)
-                      Positioned(
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: () {
-                            final wallet = Provider.of<WalletProvider>(context, listen: false);
-                            if (!wallet.canUseOCR) {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione Scontrini (OCR)')));
-                            } else {
-                              _avviaScansioneIntelligente();
-                            }
-                          },
-                          child: Consumer<WalletProvider>(
-                            builder: (context, wallet, child) {
-                              return Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 8, right: 8),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.08),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.document_scanner_rounded, color: Colors.white70, size: 20),
-                                  ),
-                                  if (!wallet.canUseOCR)
-                                    Positioned(
-                                      top: 0,
-                                      right: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF59E0B),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: const Color(0xFF18181B), width: 2),
-                                        ),
-                                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 12),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+                    
                   ],
                 ),
               ),

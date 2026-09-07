@@ -434,14 +434,16 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                   ),
                 ),
                 InkWell(
-                  onTap: () async {
-                    final wallet = Provider.of<WalletProvider>(context, listen: false);
-                    if (!wallet.canUseOCR) {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
-                    } else {
-                      await _avviaScansioneFattura(); // ✨ Corretto
-                    }
-                  },
+                  onTap: _isAnalyzing
+                      ? null
+                      : () async {
+                          final wallet = Provider.of<WalletProvider>(context, listen: false);
+                          if (!wallet.canUseOCR) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProUpgradeSheet(funzionalita: 'Scansione OCR')));
+                          } else {
+                            await _avviaScansioneFattura();
+                          }
+                        },
                   borderRadius: BorderRadius.circular(10),
                   child: Consumer<WalletProvider>(
                     builder: (context, wallet, child) {
@@ -455,19 +457,32 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.document_scanner_rounded, color: Color(0xFF2DD4BF), size: 14),
-                            const SizedBox(width: 6),
-                            const Text('Scansiona OCR', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
-                            if (!wallet.canUseOCR) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B),
-                                  borderRadius: BorderRadius.circular(5),
+                            if (_isAnalyzing) ...[
+                              const SizedBox(
+                                width: 13,
+                                height: 13,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF2DD4BF),
                                 ),
-                                child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
                               ),
+                              const SizedBox(width: 6),
+                              const Text('Analisi AI...', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                            ] else ...[
+                              const Icon(Icons.document_scanner_rounded, color: Color(0xFF2DD4BF), size: 14),
+                              const SizedBox(width: 6),
+                              const Text('Scansiona OCR', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 11, fontWeight: FontWeight.bold)),
+                              if (!wallet.canUseOCR) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
+                                ),
+                              ],
                             ],
                           ],
                         ),

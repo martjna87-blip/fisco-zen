@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../widgets_shared/app_popup_wrapper.dart';
+import 'package:provider/provider.dart';
+import '../data/wallet_provider.dart';
+import '../widgets_shared/app_bottom_sheet.dart';
+import '../data/ateco_database.dart';
 
 class TasseAccantonamentoSheet extends StatefulWidget {
   final String codiceAteco;
@@ -11,7 +14,7 @@ class TasseAccantonamentoSheet extends StatefulWidget {
   final double totaleFatturatoInSospeso;
   final List<Map<String, dynamic>>? fattureIncassate;
   final List<Map<String, dynamic>>? fattureDaIncassare;
-  final Function(String nuovoAteco, double nuovoCoeff) onAtecoCambiato;
+  final Function(String nuovoAteco, double nuovoCoeff)? onAtecoCambiato;
 
   const TasseAccantonamentoSheet({
     super.key,
@@ -23,7 +26,7 @@ class TasseAccantonamentoSheet extends StatefulWidget {
     this.totaleFatturatoInSospeso = 0.0,
     this.fattureIncassate,
     this.fattureDaIncassare,
-    required this.onAtecoCambiato,
+    this.onAtecoCambiato,
   });
 
   @override
@@ -31,304 +34,127 @@ class TasseAccantonamentoSheet extends StatefulWidget {
 }
 
 class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
-  bool _isModificaEspansa = false;
-  late String _atecoSelezionato;
-  late double _coeffSelezionato;
-  
-  final ScrollController _scrollController = ScrollController();
+  bool _isSospesoEspanso = false;
 
-  final List<Map<String, dynamic>> _listaAteco = [
-    {'codice': '74.10.21 - Consulenza & Digital', 'coeff': 0.78},
-    {'codice': '62.02.00 - Consulenza Software', 'coeff': 0.67},
-    {'codice': '70.22.09 - Consulenza Aziendale', 'coeff': 0.78},
-    {'codice': '47.91.10 - E-commerce / Commercio', 'coeff': 0.40},
-    {'codice': '96.02.01 - Servizi alla Persona', 'coeff': 0.67},
-    {'codice': '68.31.00 - Intermediazione Immobiliare', 'coeff': 0.86},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _atecoSelezionato = widget.codiceAteco;
-    _coeffSelezionato = widget.coefficienteRedditivita;
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  Map<String, double> _calcolaFiscalita(List<Map<String, dynamic>> listaFatture, double lordoFallback) {
-    if (listaFatture.isEmpty && lordoFallback > 0) {
-      final double imponibile = lordoFallback * _coeffSelezionato;
-      final double inpsY = imponibile * widget.aliquotaInps;
-      final double impostaY = imponibile * widget.aliquotaImposta;
-      final double saldoY = inpsY + impostaY;
-      final double accontiY1 = (inpsY * 0.80) + (impostaY * 1.00);
-      final double totaleTasse = saldoY + accontiY1;
-      return {
-        'lordo': lordoFallback,
-        'imponibile': imponibile,
-        'inpsY': inpsY,
-        'impostaY': impostaY,
-        'saldoY': saldoY,
-        'accontiY1': accontiY1,
-        'totaleTasse': totaleTasse,
-        'nettoSpendibile': lordoFallback - totaleTasse,
-      };
-    }
-
-    double imponibileTotale = 0.0;
-    double inpsYTotale = 0.0;
-    double impostaYTotale = 0.0;
-    double accontiTotali = 0.0;
-    double lordoTotale = 0.0;
-
-    for (var f in listaFatture) {
-      final double lordo = (f['importo'] as num?)?.toDouble() ?? 0.0;
-      final double coef = (f['coefAteco'] as num?)?.toDouble() ?? _coeffSelezionato;
-      
-      final double imponibile = lordo * coef;
-      final double inpsY = imponibile * widget.aliquotaInps;
-      final double impostaY = imponibile * widget.aliquotaImposta;
-
-      lordoTotale += lordo;
-      imponibileTotale += imponibile;
-      inpsYTotale += inpsY;
-      impostaYTotale += impostaY;
-      accontiTotali += ((inpsY * 0.80) + (impostaY * 1.00));
-    }
-
-    final double saldoTotale = inpsYTotale + impostaYTotale;
-    final double totaleTasse = saldoTotale + accontiTotali;
-
-    return {
-      'lordo': lordoTotale,
-      'imponibile': imponibileTotale,
-      'inpsY': inpsYTotale,
-      'impostaY': impostaYTotale,
-      'saldoY': saldoTotale,
-      'accontiY1': accontiTotali,
-      'totaleTasse': totaleTasse,
-      'nettoSpendibile': lordoTotale - totaleTasse,
-    };
-  }
-
-  void _toggleAtecoAccordion() {
-    setState(() {
-      _isModificaEspansa = !_isModificaEspansa;
-    });
-
-    if (_isModificaEspansa) {
-      Future.delayed(const Duration(milliseconds: 150), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-  }
-
-  void _mostraInfoTasse(BuildContext context, String titolo, String spiegazione) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141417),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withOpacity(0.12)),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                titolo,
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          spiegazione,
-          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ho capito', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+  String _formattaValuta(double importo) {
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
     );
+    return '$intPart,${parti[1]} €';
   }
 
   @override
   Widget build(BuildContext context) {
-    final fiscaliIncassato = _calcolaFiscalita(
-      widget.fattureIncassate ?? [], 
-      widget.totaleFatturatoIncassato,
-    );
-    final fiscaliSospeso = _calcolaFiscalita(
-      widget.fattureDaIncassare ?? [], 
-      widget.totaleFatturatoInSospeso,
-    );
+    final screenHeight = MediaQuery.of(context).size.height;
+    final walletProvider = Provider.of<WalletProvider>(context);
 
-    return AppPopupWrapper(
+    // ⚡ RECUPERO FATTURE DALL'ANNO FISCALE SELEZIONATO IN 3_5
+    final listaTutteIncassate = walletProvider.fattureIncassateAnnoCorrente;
+    final fattureInSospeso = walletProvider.fattureDaIncassareAnnoCorrente;
+
+    final int annoCorrente = walletProvider.annoFiscaleCorrente;
+    final int annoProssimo = annoCorrente + 1;
+
+    // 🎯 STESSO IDENTICO ALGORITMO DI CALCOLO DEL 3_5
+    double lordoTotale = 0.0;
+    double inpsYTotale = 0.0;
+    double impostaYTotale = 0.0;
+    double accontoInpsY1Totale = 0.0;
+    double accontoImpostaY1Totale = 0.0;
+
+    for (var f in listaTutteIncassate) {
+      final double lordo = (f['importo'] as num).toDouble();
+      final double coefFattura = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+      final double imponibile = lordo * coefFattura;
+
+      final double inpsY = imponibile * widget.aliquotaInps;
+      final double impostaY = imponibile * widget.aliquotaImposta;
+
+      final double accontoInpsY1 = inpsY * 0.80;
+      final double accontoImpostaY1 = impostaY * 1.00;
+
+      lordoTotale += lordo;
+      inpsYTotale += inpsY;
+      impostaYTotale += impostaY;
+      accontoInpsY1Totale += accontoInpsY1;
+      accontoImpostaY1Totale += accontoImpostaY1;
+    }
+
+    final double totaleTasseY = inpsYTotale + impostaYTotale;
+    final double totaleAccontiY1 = accontoInpsY1Totale + accontoImpostaY1Totale;
+    final double grandTotaleAccantonare = totaleTasseY + totaleAccontiY1;
+    final double nettoTotaleReale = lordoTotale - grandTotaleAccantonare;
+
+    // 🎯 CALCOLO FATTURE IN SOSPESO IDENTICO A 3_5
+    double lordoSospeso = 0.0;
+    double imponibileSospeso = 0.0;
+    double inpsSospeso = 0.0;
+    double impostaSospeso = 0.0;
+
+    for (var f in fattureInSospeso) {
+      final double importo = (f['importo'] as num?)?.toDouble() ?? 0.0;
+      final double coef = (f['coefAteco'] as num?)?.toDouble() ?? widget.coefficienteRedditivita;
+
+      final double imponibile = importo * coef;
+      lordoSospeso += importo;
+      imponibileSospeso += imponibile;
+      inpsSospeso += (imponibile * widget.aliquotaInps);
+      impostaSospeso += (imponibile * widget.aliquotaImposta);
+    }
+
+    final double saldoSospeso = inpsSospeso + impostaSospeso;
+    final double accontiSospeso = (inpsSospeso * 0.80) + (impostaSospeso * 1.00);
+    final double totaleF24Sospeso = saldoSospeso + accontiSospeso;
+
+    return AppBottomSheet(
       title: 'Stima Tasse P.IVA',
       badgeText: 'Forfettario',
       badgeColor: const Color(0xFF3B82F6),
-      badgeTextColor: const Color(0xFF60A5FA),
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.35),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'PROFILO FISCALE ATECO',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: _toggleAtecoAccordion,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2DD4BF).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 12),
-                              const SizedBox(width: 4),
-                              Text(
-                                _isModificaEspansa ? 'Chiudi' : 'Cambia',
-                                style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 9, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildRow('Codice ATECO:', _atecoSelezionato, isBold: true),
-                  _buildRow('Coeff. Redditività:', '${(_coeffSelezionato * 100).toInt()}%'),
-                  _buildRow('Imposta Sostitutiva:', '${(widget.aliquotaImposta * 100).toInt()}% (Startup)'),
-                  _buildRow('Contributi INPS:', '${(widget.aliquotaInps * 100).toStringAsFixed(2)}%'),
-                  if (_isModificaEspansa) ...[
-                    const SizedBox(height: 8),
-                    Divider(color: Colors.white.withOpacity(0.12), height: 1),
-                    const SizedBox(height: 8),
-                    Column(
-                      children: _listaAteco.map((item) {
-                        final bool isSelected = item['codice'] == _atecoSelezionato;
-                        final double coeff = item['coeff'] as double;
+      child: Container(
+        height: screenHeight * 0.55,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 📌 1. PROFILO FISCALE ATECO (RECUPERO DINAMICO DA PROVIDER & DATABASE)
+              Builder(
+                builder: (context) {
+                  final String codiceProv = walletProvider.codiceAteco.isNotEmpty 
+                      ? walletProvider.codiceAteco 
+                      : widget.codiceAteco;
+                  
+                  final String codicePulito = codiceProv.split(' ').first.replaceAll('.', '').trim();
 
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _atecoSelezionato = item['codice'] as String;
-                              _coeffSelezionato = coeff;
-                              _isModificaEspansa = false;
-                            });
-                            widget.onAtecoCambiato(_atecoSelezionato, _coeffSelezionato);
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF2DD4BF).withOpacity(0.15)
-                                  : Colors.black.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isSelected ? const Color(0xFF2DD4BF) : Colors.transparent,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item['codice'] as String,
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.white : Colors.white70,
-                                      fontSize: 11,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2DD4BF).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${(coeff * 100).toInt()}%',
-                                    style: const TextStyle(
-                                      color: Color(0xFF2DD4BF),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                  final atecoMatch = AtecoDatabase.lista.firstWhere(
+                    (item) => item['codice'].toString().replaceAll('.', '').trim() == codicePulito,
+                    orElse: () => {
+                      'codice': codiceProv,
+                      'descrizione': 'Attività Professionale',
+                      'coeff': walletProvider.coeffRedditivita > 0 ? walletProvider.coeffRedditivita : widget.coefficienteRedditivita,
+                    },
+                  );
+
+                  final String atecoFormattato = '${atecoMatch['codice']} - ${atecoMatch['descrizione']}';
+                  final double coeffEffettivo = (atecoMatch['coeff'] as num?)?.toDouble() ?? walletProvider.coeffRedditivita;
+                  final double impostaEffettiva = walletProvider.aliquotaImposta > 0 ? walletProvider.aliquotaImposta : widget.aliquotaImposta;
+                  final double inpsEffettiva = walletProvider.aliquotaInps > 0 ? walletProvider.aliquotaInps : widget.aliquotaInps;
+
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
                     ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'ACCANTONAMENTO REALE (SALDO + ACCONTI)',
+                          'PROFILO FISCALE ATECO',
                           style: TextStyle(
                             color: Colors.white54,
                             fontSize: 9,
@@ -336,167 +162,222 @@ class _TasseAccantonamentoSheetState extends State<TasseAccantonamentoSheet> {
                             letterSpacing: 0.8,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €',
-                          style: const TextStyle(
-                            color: Color(0xFF3B82F6),
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Netto spendibile rimanente: ${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €',
-                          style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
+                        const SizedBox(height: 6),
+                        _buildSimpleRow('Codice ATECO:', atecoFormattato, isBold: true),
+                        _buildSimpleRow('Coeff. Redditività:', '${(coeffEffettivo * 100).toInt()}%'),
+                        _buildSimpleRow('Imposta Sostitutiva:', '${(impostaEffettiva * 100).toInt()}%'),
+                        _buildSimpleRow('Contributi INPS:', '${(inpsEffettiva * 100).toStringAsFixed(2)}%'),
                       ],
                     ),
-                  ),
-                  const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 28),
-                ],
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.35),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'DETTAGLIO FISCALE (FATTURATO INCASSATO)',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildRow(
-                    'Fatturato Incassato:',
-                    '${fiscaliIncassato['lordo']!.toStringAsFixed(2)} €',
-                    color: const Color(0xFF10B981),
-                    isBold: true,
-                  ),
-                  _buildRow('Imponibile Fiscale:', '${fiscaliIncassato['imponibile']!.toStringAsFixed(2)} €'),
-                  Divider(color: Colors.white.withOpacity(0.12), height: 12),
-                  _buildRow(
-                    'Saldo Tasse:',
-                    '-${fiscaliIncassato['saldoY']!.toStringAsFixed(2)} €',
-                    color: const Color(0xFFF59E0B),
-                    onInfoTap: () => _mostraInfoTasse(
-                      context,
-                      'Saldo Tasse Anno Corrente',
-                      'Rappresenta le tasse reali sul fatturato incassato applicando il coefficiente ATECO di ciascuna fattura:\n\n'
-                      '• INPS: ${(widget.aliquotaInps * 100).toStringAsFixed(2)}%\n'
-                      '• Imposta Sostitutiva: ${(widget.aliquotaImposta * 100).toInt()}%\n\n'
-                      'Totale Saldo = ${((widget.aliquotaInps + widget.aliquotaImposta) * 100).toStringAsFixed(2)}% sull\'Imponibile.',
-                    ),
-                  ),
-                  _buildRow(
-                    'Acconto Tasse:',
-                    '-${fiscaliIncassato['accontiY1']!.toStringAsFixed(2)} €',
-                    color: const Color(0xFFF97316),
-                    onInfoTap: () => _mostraInfoTasse(
-                      context,
-                      'Acconti Anno Successivo',
-                      'Sono i contributi e le tasse che lo Stato chiede di anticipare per l\'anno a venire:\n\n'
-                      '• Acconto INPS: 80% dell\'INPS calcolato quest\'anno\n'
-                      '• Acconto Imposta: 100% dell\'Imposta calcolata quest\'anno\n\n'
-                      'Accantonarli ora ti evita brutte sorprese alla prossima dichiarazione dei redditi!',
-                    ),
-                  ),
-                  Divider(color: Colors.white.withOpacity(0.12), height: 12),
-                  _buildRow('Totale da Accantonare:', '-${fiscaliIncassato['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
-                  _buildRow('Netto Spendibile Reale:', '${fiscaliIncassato['nettoSpendibile']!.toStringAsFixed(2)} €', color: const Color(0xFF2DD4BF), isBold: true),
-                ],
-              ),
-            ),
-            if ((fiscaliSospeso['lordo'] ?? 0) > 0) ...[
+
               const SizedBox(height: 10),
+
+              // 📊 2. RIEPILOGO FISCALE COMPLETO (SPECULARE A 3_5)
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.12),
+                  color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.schedule_rounded, color: Color(0xFFF59E0B), size: 15),
-                        SizedBox(width: 6),
                         Text(
-                          'FATTURE EMESSE IN SOSPESO',
+                          'RIEPILOGO FISCALE COMPLETO',
                           style: TextStyle(
-                            color: Color(0xFFF59E0B),
+                            color: Color(0xFF2DD4BF),
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.8,
                           ),
                         ),
+                        Icon(Icons.analytics_outlined, color: Color(0xFF2DD4BF), size: 16),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    _buildSalvaDanaioRow(
+                      icon: Icons.add_circle_outline_rounded,
+                      color: const Color(0xFF10B981),
+                      title: 'Incasso Lordo:',
+                      value: '+${_formattaValuta(lordoTotale)}',
+                      isBold: true,
+                    ),
+                    const SizedBox(height: 6),
+                    _buildSalvaDanaioRow(
+                      icon: Icons.account_balance_wallet_rounded,
+                      color: const Color(0xFF2DD4BF),
+                      title: 'Netto:',
+                      value: '+${_formattaValuta(nettoTotaleReale)}',
+                      isBold: true,
+                    ),
+                    const SizedBox(height: 6),
+                    _buildSalvaDanaioRow(
+                      icon: Icons.shield_rounded,
+                      color: const Color(0xFF3B82F6),
+                      title: 'Totale Tasse (Saldo + Acconto):',
+                      value: '-${_formattaValuta(grandTotaleAccantonare)}',
+                      isBold: true,
+                    ),
+                    const SizedBox(height: 10),
+                    Divider(color: Colors.white.withOpacity(0.12), height: 1),
                     const SizedBox(height: 8),
-                    _buildRow('Non ancora incassate:', '${fiscaliSospeso['lordo']!.toStringAsFixed(2)} €', color: Colors.white),
-                    _buildRow('Saldo Tasse Stimato (Y):', '-${fiscaliSospeso['saldoY']!.toStringAsFixed(2)} €', color: const Color(0xFFF59E0B)),
-                    _buildRow('Acconti Stimati (Y+1):', '-${fiscaliSospeso['accontiY1']!.toStringAsFixed(2)} €', color: const Color(0xFFF97316)),
-                    Divider(color: Colors.white.withOpacity(0.12), height: 10),
-                    _buildRow('Totale Tasse in Sospeso:', '-${fiscaliSospeso['totaleTasse']!.toStringAsFixed(2)} €', color: const Color(0xFFEF4444), isBold: true),
+                    _buildSalvaDanaioRow(
+                      icon: Icons.remove_circle_outline,
+                      color: const Color(0xFFF59E0B),
+                      title: 'Totale Saldo (Anno $annoCorrente):',
+                      value: '-${_formattaValuta(totaleTasseY)}',
+                    ),
+                    const SizedBox(height: 6),
+                    _buildSalvaDanaioRow(
+                      icon: Icons.history_toggle_off_rounded,
+                      color: const Color(0xFFF97316),
+                      title: 'Totale Acconto (Anno $annoProssimo):',
+                      value: '-${_formattaValuta(totaleAccontiY1)}',
+                    ),
                   ],
                 ),
               ),
+
+              // ⏳ 3. FATTURE EMESSE IN SOSPESO (SE PRESENTI)
+              if (lordoSospeso > 0) ...[
+                const SizedBox(height: 12),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.35)),
+                  ),
+                  child: Column(
+                    children: [
+                      InkWell(
+                        onTap: () => setState(() => _isSospesoEspanso = !_isSospesoEspanso),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule_rounded, color: Color(0xFFF59E0B), size: 18),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'FATTURE EMESSE IN SOSPESO',
+                                        style: TextStyle(
+                                          color: Color(0xFFF59E0B),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${fattureInSospeso.length} fattur${fattureInSospeso.length == 1 ? "a" : "e"} per ${_formattaValuta(lordoSospeso)}',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Icon(
+                                _isSospesoEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                color: const Color(0xFFF59E0B),
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_isSospesoEspanso) ...[
+                        const Divider(color: Colors.white12, height: 1),
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSimpleRow('Lordo non incassato:', '+${_formattaValuta(lordoSospeso)}', isBold: true),
+                              _buildSimpleRow('Imponibile Fiscale Stimato:', _formattaValuta(imponibileSospeso)),
+                              _buildSimpleRow('Saldo Tasse Stimato (Anno $annoCorrente):', '-${_formattaValuta(saldoSospeso)}', color: const Color(0xFFF59E0B)),
+                              _buildSimpleRow('Acconti Stimati (Anno $annoProssimo):', '-${_formattaValuta(accontiSospeso)}', color: const Color(0xFFF97316)),
+                              Divider(color: Colors.white.withOpacity(0.12), height: 10),
+                              _buildSimpleRow('Totale Tasse Stimato in Sospeso:', '-${_formattaValuta(totaleF24Sospeso)}', color: const Color(0xFFEF4444), isBold: true),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isBold = false, Color? color, VoidCallback? onInfoTap}) {
+  Widget _buildSalvaDanaioRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String value,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isBold ? Colors.white : Colors.white70,
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSimpleRow(String label, String value, {Color? color, bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: isBold ? Colors.white : Colors.white54,
-                      fontSize: 11,
-                      fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (onInfoTap != null) ...[
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: onInfoTap,
-                    child: const Icon(Icons.info_outline_rounded, color: Color(0xFF2DD4BF), size: 14),
-                  ),
-                ],
-              ],
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isBold ? Colors.white : Colors.white54,
+                fontSize: 11,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
           Text(
             value,
-            textAlign: TextAlign.right,
             style: TextStyle(
               color: color ?? (isBold ? Colors.white : Colors.white.withOpacity(0.9)),
               fontSize: 11,

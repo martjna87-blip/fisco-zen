@@ -68,8 +68,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
     return AppBottomSheet(
       title: 'Pianificazione Strategica',
-      badgeText: isPro ? 'PRO' : 'Demo',
-      badgeColor: isPro ? greenProfit : goldAccent,
+      badgeText: isPro ? null : 'PRO',
+      badgeColor: goldAccent,
       child: Container(
         constraints: BoxConstraints(
           maxHeight: screenHeight * 0.65,
@@ -156,9 +156,14 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             const SizedBox(height: 14),
 
             Expanded(
-              child: _tabSelezionata == 0
-                  ? _buildTabRicorrenze(walletProvider)
-                  : _buildTabPilotaggioERegole(walletProvider),
+              child: Stack(
+                children: [
+                  _tabSelezionata == 0
+                      ? _buildTabRicorrenze(walletProvider)
+                      : _buildTabPilotaggioERegole(walletProvider),
+                  if (!isPro) _buildOverlayDemoPRO(context),
+                ],
+              ),
             ),
           ],
         ),
@@ -342,7 +347,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           height: 46,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: oceanCyan,
+              backgroundColor: isPro ? oceanCyan : goldAccent,
               foregroundColor: Colors.black,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -569,18 +574,24 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double totaleNettoAnnuo = totalePivaNettaAnnuo + totaleStipendioAnnuo;
     final double totaleRisparmioAnnuo = totaleNettoAnnuo - totaleSpeseAnnuo;
 
-    final double totaleGiaFissatoManualmenteLordo = provider.pilotaggioFatturatoMesi.values.fold(0.0, (sum, v) => sum + v) +
-        provider.pilotaggioStipendioMesi.values.fold(0.0, (sum, v) => sum + v);
+    final Map<int, double> pivaAnnoMap = provider.getPilotaggioFatturatoPerAnno(_annoSelezionatoPilotaggio);
+    final Map<int, double> stipAnnoMap = provider.getPilotaggioStipendioPerAnno(_annoSelezionatoPilotaggio);
+
+    final double totaleGiaFissatoManualmenteLordo = pivaAnnoMap.values.fold(0.0, (sum, v) => sum + v) +
+        stipAnnoMap.values.fold(0.0, (sum, v) => sum + v);
 
     final double totaleEntratePerBarra = (totalePivaNettaAnnuo + totaleStipendioAnnuo) > 0 ? (totalePivaNettaAnnuo + totaleStipendioAnnuo) : 1.0;
     final int flexPiva = ((totalePivaNettaAnnuo / totaleEntratePerBarra) * 100).round().clamp(1, 100);
     final int flexStipendio = (100 - flexPiva).clamp(0, 99);
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           // 📊 KPI HERO CARD MINIMALE: NETTO & RISPARMIO CON POPUP SU TAP SINGOLO
           GestureDetector(
             onTap: () => _mostraPopupDettaglioSintesi(
@@ -628,7 +639,15 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('RISPARMIO ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                        Row(
+                          children: [
+                            const Text('RISPARMIO ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            if (totaleSpeseAnnuo == 0) ...[
+                              const SizedBox(width: 4),
+                              const Text('(Spese = 0)', style: TextStyle(color: Colors.white24, fontSize: 7, fontStyle: FontStyle.italic)),
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
@@ -653,61 +672,37 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
           const SizedBox(height: 14),
 
-          // 🤖 SMART AI INSIGHT BANNER CON PULSANTE RESET
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: oceanCyan.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: oceanCyan.withOpacity(0.25)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.psychology_rounded, color: oceanCyan, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    totaleGiaFissatoManualmenteLordo > 0
-                        ? 'I tuoi interventi manuali hanno la priorità. L\'AI ricalcola il residuo sui mesi liberi.'
-                        : 'Algoritmo AI attivo: Ripartizione dinamica P.IVA sui mesi ON con tasse e stipendi calcolati.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    // Chiama il reset ufficiale sul Provider
-                    provider.resetPilotaggio();
-                    AppNotifications.mostraInAlto(context, 'Reset AI effettuato: Algoritmo ripristinato! 🎯');
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: oceanCyan.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: oceanCyan.withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.refresh_rounded, color: oceanCyan, size: 12),
-                        const SizedBox(width: 4),
-                        Text('Reset AI', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 18),
+          // 1. INTESTAZIONE PIANIFICAZIONE, PULSANTE CURVA E SELETTORE ANNO
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('PIANIFICAZIONE MESE PER MESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+              Row(
+                children: [
+                  const Text('PIANIFICAZIONE MESE PER MESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _mostraPopupCurvaStorica(context, provider),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: oceanCyan.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.show_chart_rounded, color: oceanCyan, size: 12),
+                          const SizedBox(width: 4),
+                          Text('Curva', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               
-              // 🗓️ SELETTORE MULTI-ANNO FUTURO
+              // 🗓️ SELETTORE ANNO
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -750,7 +745,79 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 10),
+
+          // 2. BANNER INFORMATIVO E PULSANTE RESET AI SOTTO L'INTESTAZIONE
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: oceanCyan.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: oceanCyan.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.psychology_rounded, color: oceanCyan, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    totaleGiaFissatoManualmenteLordo > 0
+                        ? 'Interventi manuali attivi per il $_annoSelezionatoPilotaggio. L\'AI ricalcola il residuo sui mesi liberi.'
+                        : 'Algoritmo AI attivo: Ripartizione dinamica P.IVA sui mesi ON per il $_annoSelezionatoPilotaggio.',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: totaleGiaFissatoManualmenteLordo > 0
+                      ? () {
+                          provider.resetPilotaggioAnno(_annoSelezionatoPilotaggio);
+                          AppNotifications.mostraInAlto(
+                            context,
+                            'Reset AI per l\'anno $_annoSelezionatoPilotaggio effettuato: Algoritmo ripristinato! 🎯',
+                          );
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: totaleGiaFissatoManualmenteLordo > 0
+                          ? oceanCyan.withOpacity(0.2)
+                          : Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: totaleGiaFissatoManualmenteLordo > 0
+                            ? oceanCyan.withOpacity(0.5)
+                            : Colors.white10,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.refresh_rounded,
+                          color: totaleGiaFissatoManualmenteLordo > 0 ? oceanCyan : Colors.white24,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Reset AI',
+                          style: TextStyle(
+                            color: totaleGiaFissatoManualmenteLordo > 0 ? oceanCyan : Colors.white24,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
 
           // 🗓️ GRIGLIA 12 MESI INTERATTIVA CON BADGE E ANOMALIE
           GridView.builder(
@@ -847,17 +914,26 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                           ),
                         ),
                       const SizedBox(height: 2),
-                      // ✅ ORA LEGGE IL BILANCIO NETTO REALE DALLA MATRICE
-                      FittedBox(
-                        child: Text(
-                          'Risparmio: ${_formattaInt((m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0))}',
-                          style: TextStyle(
-                            color: ((m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0)) >= 0 ? greenProfit : const Color(0xFFEF4444),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
+                      (() {
+                        final double valRisparmio = (m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0);
+                        Color coloreRisparmio = Colors.white38;
+                        if (valRisparmio > 0 && !isPassato) {
+                          coloreRisparmio = greenProfit;
+                        } else if (valRisparmio < 0) {
+                          coloreRisparmio = const Color(0xFFEF4444);
+                        }
+
+                        return FittedBox(
+                          child: Text(
+                            'Risparmio: ${_formattaInt(valRisparmio)}',
+                            style: TextStyle(
+                              color: coloreRisparmio,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      })(),
                     ],
                   ),
                 ),
@@ -870,31 +946,104 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           const SizedBox(height: 8),
 
           // 🎛️ REGOLATORE BUSSOLA 50/30/20
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSliderRegola('Spese Fisse (Bisogni)', provider.percentBisogni, oceanCyan, (val) {
-                  if (isPro) provider.salvaRegolaBudget(val, provider.percentSvago, 100 - val - provider.percentSvago);
-                  else _mostraModalPRO(context);
-                }),
-                const SizedBox(height: 10),
-                _buildSliderRegola('Svago & Tempo Libero', provider.percentSvago, goldAccent, (val) {
-                  if (isPro) provider.salvaRegolaBudget(provider.percentBisogni, val, 100 - provider.percentBisogni - val);
-                  else _mostraModalPRO(context);
-                }),
-                const SizedBox(height: 10),
-                _buildSliderRegola('Risparmi & Futuro', provider.percentRisparmio, purpleZen, (val) {}),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSliderRegola('Spese Fisse (Bisogni)', provider.percentBisogni, oceanCyan, (val) {
+                        if (isPro) provider.salvaRegolaBudget(val, provider.percentSvago, 100 - val - provider.percentSvago);
+                        else _mostraModalPRO(context);
+                      }),
+                      const SizedBox(height: 10),
+                      _buildSliderRegola('Svago & Tempo Libero', provider.percentSvago, goldAccent, (val) {
+                        if (isPro) provider.salvaRegolaBudget(provider.percentBisogni, val, 100 - provider.percentBisogni - val);
+                        else _mostraModalPRO(context);
+                      }),
+                      const SizedBox(height: 10),
+                      _buildSliderRegola('Risparmi & Futuro', provider.percentRisparmio, purpleZen, (val) {}),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
+        ),
+        if (!isPro) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: goldAccent,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.black),
+              label: const Text(
+                'Sblocca Pianificazione Reale',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              onPressed: () => _mostraModalPRO(context),
+            ),
+          ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildOverlayDemoPRO(BuildContext context) {
+    return Positioned(
+      bottom: 58,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181B).withOpacity(0.82),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: goldAccent.withOpacity(0.5), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.35),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_rounded, color: goldAccent, size: 12),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Anteprima Simulata • PRO',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -906,7 +1055,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final bool isPassato = m['isPassato'] as bool;
     final bool isMeseOFF = m['isMeseOFF'] as bool? ?? false;
     final bool isManualPiva = m['isManualOverride'] as bool;
-    final bool isManualStipendio = provider.pilotaggioStipendioMesi.containsKey(meseIdx) && provider.pilotaggioStipendioMesi[meseIdx]! > 0;
+    final bool isManualStipendio = provider.getPilotaggioStipendioPerAnno(_annoSelezionatoPilotaggio).containsKey(meseIdx) &&
+        (provider.getPilotaggioStipendioPerAnno(_annoSelezionatoPilotaggio)[meseIdx] ?? 0) > 0;
     final bool haAnomalia = m['haAnomalia'] as bool;
 
     final double stipendioTarget = m['entrataStipendio'] as double? ?? 0.0;
@@ -2442,5 +2592,324 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       ),
     );
   }
-  
+ void _mostraPopupCurvaStorica(BuildContext context, WalletProvider provider) {
+    HapticFeedback.mediumImpact();
+    final DateTime ora = DateTime.now();
+
+    // 🎯 1. Determinazione intelligente dell'anno di riferimento storico
+    int annoRiferimento = _annoSelezionatoPilotaggio < ora.year
+        ? _annoSelezionatoPilotaggio
+        : ora.year - 1;
+
+    // Se l'anno di riferimento non ha transazioni, cerca il primo anno disponibile nel passato
+    final anniConIncassi = provider.transactions
+        .where((tx) => tx.isIncome && (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso')))
+        .map((tx) => tx.date.year)
+        .toSet();
+
+    if (!anniConIncassi.contains(annoRiferimento) && anniConIncassi.isNotEmpty) {
+      annoRiferimento = (anniConIncassi.toList()..sort((a, b) => b.compareTo(a))).first;
+    }
+
+    final Map<int, double> pivaStorica = {};
+    final Map<int, double> stipendioStorico = {};
+    double maxValoreMese = 100.0;
+
+    for (int m = 1; m <= 12; m++) {
+      double pivaMese = provider.transactions.where((tx) {
+        return tx.isIncome && tx.date.year == annoRiferimento && tx.date.month == m &&
+            (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+      }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+      double stipMese = provider.transactions.where((tx) {
+        return tx.isIncome && tx.date.year == annoRiferimento && tx.date.month == m &&
+            (tx.category == 'Stipendio' || tx.category == 'Pensione' || tx.title.toLowerCase().contains('stipendio'));
+      }).fold(0.0, (sum, tx) => sum + tx.amount);
+
+      pivaStorica[m] = pivaMese;
+      stipendioStorico[m] = stipMese;
+
+      if (pivaMese > maxValoreMese) maxValoreMese = pivaMese;
+    }
+
+    int? meseSelezionatoIndex = ora.month - 1;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final selectedMonthNum = meseSelezionatoIndex != null ? meseSelezionatoIndex! + 1 : null;
+          final selectedPiva = selectedMonthNum != null ? (pivaStorica[selectedMonthNum] ?? 0.0) : 0.0;
+          final selectedStip = selectedMonthNum != null ? (stipendioStorico[selectedMonthNum] ?? 0.0) : 0.0;
+
+          final List<double> percentualiHeights = List.generate(12, (i) {
+            final m = i + 1;
+            final piva = pivaStorica[m] ?? 0.0;
+            return (piva / maxValoreMese).clamp(0.05, 1.0);
+          });
+
+          final bool isPrevisioneFutura = _annoSelezionatoPilotaggio >= ora.year;
+
+          return Dialog(
+            backgroundColor: const Color(0xFF18181B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: BorderSide(color: Colors.white.withOpacity(0.12)),
+            ),
+            child: SizedBox(
+              width: 360,
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.show_chart_rounded, color: oceanCyan, size: 20),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  isPrevisioneFutura
+                                      ? 'Stagionalità da Storico $annoRiferimento'
+                                      : 'Consuntivo Incassi $annoRiferimento',
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isPrevisioneFutura
+                          ? 'Curva usata dall\'AI per distribuire il fatturato del $_annoSelezionatoPilotaggio.'
+                          : 'Incassi effettivi P.IVA registrati nell\'anno $annoRiferimento.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, height: 1.2),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 💡 DETTAGLIO MESE SELEZIONATO
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: oceanCyan.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: oceanCyan.withOpacity(0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                meseSelezionatoIndex != null
+                                    ? 'FATTURATO P.IVA ${_nomiMesiBrevi[meseSelezionatoIndex!]} $annoRiferimento'
+                                    : 'SELEZIONA UN MESE',
+                                style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              ),
+                              Text(
+                                meseSelezionatoIndex != null ? _formattaInt(selectedPiva) : '0 €',
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
+                              ),
+                            ],
+                          ),
+                          if (selectedStip > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Stipendio / Pensione (Separato):',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
+                                ),
+                                Text(
+                                  _formattaInt(selectedStip),
+                                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 📊 GRAFICO A BARRE P.IVA + OVERLAY CURVA BÈZIER
+                    Container(
+                      height: 140,
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Stack(
+                            children: [
+                              // 📈 CURVA BÈZIER MORBIDA IN SOVRIMPRASE
+                              CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: _CurvaStagionalePainter(
+                                  heightsPct: percentualiHeights,
+                                  color: oceanCyan,
+                                ),
+                              ),
+
+                              // 📊 BARRE INTERATTIVE CON TAP
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: List.generate(12, (index) {
+                                  final m = index + 1;
+                                  final piva = pivaStorica[m] ?? 0.0;
+                                  final double altezzaPct = percentualiHeights[index];
+                                  final bool isSelected = meseSelezionatoIndex == index;
+
+                                  final pivaAnnoMap = provider.getPilotaggioFatturatoPerAnno(_annoSelezionatoPilotaggio);
+                                  final bool isOverrideManuale = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
+                                  final Color coloreBarra = isOverrideManuale ? purpleZen : oceanCyan;
+
+                                  return GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      setDialogState(() {
+                                        meseSelezionatoIndex = index;
+                                      });
+                                    },
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          width: isSelected ? 16 : 12,
+                                          height: 80 * altezzaPct,
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? coloreBarra
+                                                : (piva > 0 ? coloreBarra.withOpacity(0.4) : Colors.white10),
+                                            borderRadius: BorderRadius.circular(4),
+                                            boxShadow: isSelected
+                                                ? [BoxShadow(color: coloreBarra.withOpacity(0.6), blurRadius: 8)]
+                                                : null,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _nomiMesiBrevi[index],
+                                          style: TextStyle(
+                                            color: isSelected ? oceanCyan : (piva > 0 ? Colors.white : Colors.white38),
+                                            fontSize: 8,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(width: 8, height: 8, decoration: BoxDecoration(color: oceanCyan, shape: BoxShape.circle)),
+                        const SizedBox(width: 4),
+                        const Text('Algoritmo AI', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 14),
+                        Container(width: 8, height: 8, decoration: BoxDecoration(color: purpleZen, shape: BoxShape.circle)),
+                        const SizedBox(width: 4),
+                        const Text('Modifica Manuale', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.08),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Chiudi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CurvaStagionalePainter extends CustomPainter {
+  final List<double> heightsPct;
+  final Color color;
+
+  const _CurvaStagionalePainter({
+    required this.heightsPct,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (heightsPct.isEmpty) return;
+
+    final paint = Paint()
+      ..color = color.withOpacity(0.75)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final double availableWidth = size.width;
+    final double columnWidth = availableWidth / heightsPct.length;
+    final double maxBarHeight = 80.0;
+    final double bottomY = size.height - 20;
+
+    final path = Path();
+
+    for (int i = 0; i < heightsPct.length; i++) {
+      final double x = (columnWidth * i) + (columnWidth / 2);
+      final double barHeight = maxBarHeight * heightsPct[i];
+      final double y = bottomY - barHeight;
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        final double prevX = (columnWidth * (i - 1)) + (columnWidth / 2);
+        final double prevY = bottomY - (maxBarHeight * heightsPct[i - 1]);
+        final double controlX = (prevX + x) / 2;
+
+        path.cubicTo(controlX, prevY, controlX, y, x, y);
+      }
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CurvaStagionalePainter oldDelegate) {
+    return oldDelegate.heightsPct != heightsPct || oldDelegate.color != color;
+  }
 }
