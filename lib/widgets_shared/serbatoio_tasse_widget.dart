@@ -10,12 +10,14 @@ class SerbatoioTasseWidget extends StatefulWidget {
   final Color cardColor;
   final bool isCollapsible;
   final bool initiallyExpanded;
+  final bool forzaAnnoCorrenteReale;
 
   const SerbatoioTasseWidget({
     super.key,
     this.cardColor = const Color(0xFF292524),
     this.isCollapsible = true,
     this.initiallyExpanded = false,
+    this.forzaAnnoCorrenteReale = false,
   });
 
   static String _formattaInt(double importo) {
@@ -113,8 +115,19 @@ class SerbatoioTasseWidget extends StatefulWidget {
     );
   }
 
-  static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF18181B)}) {
+  static void mostraDialog(BuildContext context, {Color cardColor = const Color(0xFF18181B), bool forzaAnnoCorrenteReale = false}) {
     final walletProvider = context.read<WalletProvider>();
+    final bool isAnnoOperativo = forzaAnnoCorrenteReale || walletProvider.annoFiscaleCorrente == DateTime.now().year;
+
+    if (!isAnnoOperativo) {
+      AppNotifications.mostraInAlto(
+        context, 
+        'Gli accantonamenti e i trasferimenti sono operativi solo per l\'anno in corso (2026).', 
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
     final accounts = walletProvider.accounts;
 
     if (accounts.length < 2) {
@@ -126,8 +139,10 @@ class SerbatoioTasseWidget extends StatefulWidget {
       return;
     }
 
-    final double tasseTotaliCalcolate = walletProvider.fattureIncassate
-        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+    final double tasseTotaliCalcolate = forzaAnnoCorrenteReale
+        ? walletProvider.totaleTasseDovuteAnnoCorrenteReale
+        : walletProvider.fattureIncassateAnnoCorrente
+            .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
 
     final double riservaGiaAccantonata = accounts
         .where((a) => a.title.toLowerCase().contains('salvadanaio tasse') || a.title.toLowerCase().contains('acconto tasse'))
@@ -557,8 +572,10 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
 
-    final double tasseRealiFatture = walletProvider.fattureIncassate
-        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+    final double tasseRealiFatture = widget.forzaAnnoCorrenteReale
+        ? walletProvider.totaleTasseDovuteAnnoCorrenteReale
+        : walletProvider.fattureIncassateAnnoCorrente
+            .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
     final double tasseTotaliCalcolate = tasseRealiFatture;
 
     final double riservaAccantonata = walletProvider.accounts
@@ -575,9 +592,13 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
 
     final double mancanteReale = (tasseTotaliCalcolate - riservaAccantonata).clamp(0.0, double.infinity);
 
-    final double percentualeRatio = tasseTotaliCalcolate > 0.01
-        ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
-        : 1.0; // 👈 Riempimento completo visivo se non ci sono tasse dovute
+    final bool isAnnoPassatoRatio = !widget.forzaAnnoCorrenteReale && walletProvider.annoFiscaleCorrente < DateTime.now().year;
+
+    final double percentualeRatio = isAnnoPassatoRatio
+        ? 1.0
+        : (tasseTotaliCalcolate > 0.01
+            ? (riservaAccantonata / tasseTotaliCalcolate).clamp(0.0, 1.0)
+            : 1.0);
 
     final double calcoloPercentualeGreggio = tasseTotaliCalcolate > 0.01 
         ? (riservaAccantonata / tasseTotaliCalcolate * 100) 
@@ -644,7 +665,11 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                   ),
                 ),
                 InkWell(
-                  onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF18181B)),
+                  onTap: () => SerbatoioTasseWidget.mostraDialog(
+                    context, 
+                    cardColor: const Color(0xFF18181B),
+                    forzaAnnoCorrenteReale: widget.forzaAnnoCorrenteReale,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -670,7 +695,11 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
 
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => SerbatoioTasseWidget.mostraDialog(context, cardColor: const Color(0xFF18181B)),
+                onTap: () => SerbatoioTasseWidget.mostraDialog(
+                  context, 
+                  cardColor: const Color(0xFF18181B),
+                  forzaAnnoCorrenteReale: widget.forzaAnnoCorrenteReale,
+                ),
                 child: Center(
                   child: SizedBox(
                     width: 130,
@@ -717,24 +746,47 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                             ],
                           ),
                         ),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'IN SALVADANAIO',
-                              style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${SerbatoioTasseWidget._formattaInt(riservaAccantonata)} €',
-                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'su ${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
-                              style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w500),
-                            ),
-                          ],
+                        Builder(
+                          builder: (context) {
+                            final bool isAnnoPassato = !widget.forzaAnnoCorrenteReale && walletProvider.annoFiscaleCorrente < DateTime.now().year;
+
+                            if (isAnnoPassato) {
+                              return Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'TOTALE TASSE ${walletProvider.annoFiscaleCorrente}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
+                                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'IN SALVADANAIO',
+                                  style: TextStyle(color: Colors.white70, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${SerbatoioTasseWidget._formattaInt(riservaAccantonata)} €',
+                                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'su ${SerbatoioTasseWidget._formattaInt(tasseTotaliCalcolate)} €',
+                                  style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

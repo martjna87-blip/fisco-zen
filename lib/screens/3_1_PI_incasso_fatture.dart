@@ -122,6 +122,24 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
     return '$giorno/$mese/${date.year}';
   }
 
+  DateTime? _parseDataString(String? dataStr) {
+    if (dataStr == null || dataStr.isEmpty) return null;
+    try {
+      if (dataStr.contains('/')) {
+        final parts = dataStr.split('/');
+        if (parts.length == 3) {
+          final g = int.parse(parts[0]);
+          final m = int.parse(parts[1]);
+          final a = int.parse(parts[2]);
+          return DateTime(a, m, g);
+        }
+      } else if (dataStr.contains('-')) {
+        return DateTime.tryParse(dataStr);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   bool _isScadutaDaOltre15Giorni(String? dataStr) {
     if (dataStr == null || dataStr.isEmpty) return false;
     try {
@@ -216,12 +234,7 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
 
                     final double tasseTotaliAccantonare = totaleSaldoY + totaleAccontiY1;
 
-                    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
-                    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
-                    
-                    final double nettoDopoTasse = lordo - tasseTotaliAccantonare;
-                    final double quotaFondoFerie = nettoDopoTasse * percentualeFondoFerie;
-                    final double disponibileNetto = nettoDopoTasse - quotaFondoFerie;
+                    final double nettoReale = lordo - tasseTotaliAccantonare;
 
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -247,6 +260,10 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                               setState(() {
                                 _fatturaEspansaId = isEspansa ? null : id;
                                 _isTendinaContiAperta = false;
+                                if (_fatturaEspansaId != null) {
+                                  // 🎯 Sincronizza la data di incasso predefinita con l'anno della fattura originale
+                                  _dataSelezionata = _parseDataString(f['data']?.toString()) ?? DateTime.now();
+                                }
                               });
                             },
                             borderRadius: BorderRadius.circular(14),
@@ -352,8 +369,8 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                         const SizedBox(height: 6),
                                         _buildDetailRow(
                                           Icons.account_balance_wallet_outlined,
-                                          'Netto Spendibile:',
-                                          '+${_formattaValuta(disponibileNetto)}',
+                                          'Netto:',
+                                          '+${_formattaValuta(nettoReale)}',
                                           const Color(0xFF2DD4BF),
                                           isBold: true,
                                         ),
@@ -364,13 +381,6 @@ class _IncassoFattureSheetState extends State<IncassoFattureSheet> {
                                           '-${_formattaValuta(tasseTotaliAccantonare)}',
                                           const Color(0xFF3B82F6),
                                           isBold: true,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        _buildDetailRow(
-                                          Icons.beach_access_rounded,
-                                          'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
-                                          '-${_formattaValuta(quotaFondoFerie)}',
-                                          const Color(0xFF8B5CF6),
                                         ),
                                         const Divider(color: Colors.white12, height: 14),
                                         _buildDetailRow(

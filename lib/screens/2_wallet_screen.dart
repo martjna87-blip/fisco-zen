@@ -86,16 +86,36 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildCustomSelectorMovimenti() {
+    final DateTime ora = DateTime.now();
+
     final Map<String, String> opzioni = {
-      'ultimi_5': 'Ultimi 5 Movimenti',
+      'ultimi_5': '⚡ Ultimi 5 Movimenti',
       'ricorrenti': '🔄 Solo Ricorrenti',
-      '8_2026': 'Agosto 2026',
-      '7_2026': 'Luglio 2026',
-      '6_2026': 'Giugno 2026',
-      '5_2026': 'Maggio 2026',
     };
 
-    final String etichettaCorrente = opzioni[_filtroMeseMovimenti] ?? 'Ultimi 5 Movimenti';
+    // 🎯 Genera dinamicamente gli ultimi 4 mesi
+    for (int i = 0; i < 4; i++) {
+      int m = ora.month - i;
+      int y = ora.year;
+      if (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      opzioni['${m}_$y'] = '${_nomiMesiBrevi[m - 1]} $y';
+    }
+
+    opzioni['storico'] = '📅 Apri Storico Mesi...';
+
+    String etichettaCorrente = 'Ultimi 5 Movimenti';
+    if (opzioni.containsKey(_filtroMeseMovimenti)) {
+      etichettaCorrente = opzioni[_filtroMeseMovimenti]!;
+    } else {
+      final parts = _filtroMeseMovimenti.split('_');
+      if (parts.length == 2) {
+        final int m = int.tryParse(parts[0]) ?? 1;
+        etichettaCorrente = '${_nomiMesiBrevi[m - 1]} ${parts[1]}';
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -138,12 +158,20 @@ class _WalletScreenState extends State<WalletScreen> {
             Column(
               children: opzioni.entries.map((entry) {
                 final bool isSelected = _filtroMeseMovimenti == entry.key;
+                final bool isStoricoBtn = entry.key == 'storico';
+
                 return InkWell(
                   onTap: () {
                     setState(() {
-                      _filtroMeseMovimenti = entry.key;
                       _isFiltroMovimentiAperto = false;
                     });
+                    if (isStoricoBtn) {
+                      _mostraPopupStoricoMesi();
+                    } else {
+                      setState(() {
+                        _filtroMeseMovimenti = entry.key;
+                      });
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -151,17 +179,19 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                          color: isSelected ? oceanCyan : Colors.white24,
+                          isStoricoBtn
+                              ? Icons.calendar_month_rounded
+                              : (isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded),
+                          color: isStoricoBtn ? Colors.white54 : (isSelected ? oceanCyan : Colors.white24),
                           size: 18,
                         ),
                         const SizedBox(width: 12),
                         Text(
                           entry.value,
                           style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
+                            color: isStoricoBtn ? Colors.white70 : (isSelected ? Colors.white : Colors.white70),
                             fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: (isSelected || isStoricoBtn) ? FontWeight.bold : FontWeight.w500,
                           ),
                         ),
                       ],
@@ -176,6 +206,112 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  void _mostraPopupStoricoMesi() {
+    int annoSelezionato = DateTime.now().year;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            backgroundColor: const Color(0xFF18181B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: SizedBox(
+              width: 320,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 📅 Selettore Anno
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+                          onPressed: () => setDialogState(() => annoSelezionato--),
+                        ),
+                        Text(
+                          '$annoSelezionato',
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                          onPressed: () => setDialogState(() => annoSelezionato++),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 🔠 Griglia dei 12 Mesi
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 1.8,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, index) {
+                        final int mese = index + 1;
+                        final String etichetta = _nomiMesiBrevi[index];
+                        final String chiaveMese = '${mese}_$annoSelezionato';
+                        final bool isAttuale = _filtroMeseMovimenti == chiaveMese;
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _filtroMeseMovimenti = chiaveMese;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: isAttuale ? goldAccent.withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isAttuale ? goldAccent.withOpacity(0.5) : Colors.white.withOpacity(0.08),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                etichetta,
+                                style: TextStyle(
+                                  color: isAttuale ? goldAccent : Colors.white60,
+                                  fontSize: 12,
+                                  fontWeight: isAttuale ? FontWeight.bold : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Annulla', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildTargetECuscinettoGlass({required WalletProvider walletProvider}) {
     final double target = walletProvider.nettoTargetMensile;
     if (target <= 0) return const SizedBox.shrink();
@@ -183,46 +319,46 @@ class _WalletScreenState extends State<WalletScreen> {
     final DateTime ora = DateTime.now();
     final int meseCorrenteIndex = ora.month - 1;
     
+    // 1. Incassi P.IVA del mese corrente (qualsiasi fattura o incasso P.IVA)
     final double incassatoPivaMese = walletProvider.transactions.where((tx) {
-      return tx.isIncome &&
-             tx.date.year == ora.year &&
-             tx.date.month == ora.month &&
-             (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
+      final cat = tx.category.toLowerCase();
+      final title = tx.title.toLowerCase();
+      final isPiva = cat.contains('p.iva') || cat.contains('fattura') || title.contains('incasso') || title.contains('fattura');
+      return tx.isIncome && tx.date.year == ora.year && tx.date.month == ora.month && isPiva;
     }).fold(0.0, (sum, tx) => sum + tx.amount);
 
+    // 2. Solo Entrate da Stipendio / Pensione (Esclude Regali, Rimborsi e Occasionali)
     final double stipendioRegistratoMese = walletProvider.transactions.where((tx) {
-      return tx.isIncome &&
-             tx.date.year == ora.year &&
-             tx.date.month == ora.month &&
-             tx.category != 'P.IVA' &&
-             !tx.title.toLowerCase().contains('incasso') &&
-             !tx.category.toLowerCase().contains('giroconto');
+      final cat = tx.category.toLowerCase();
+      final title = tx.title.toLowerCase();
+      final isStipendioOPensione = cat.contains('stipendio') ||
+          cat.contains('pensione') ||
+          title.contains('stipendio') ||
+          title.contains('pensione');
+      return tx.isIncome && tx.date.year == ora.year && tx.date.month == ora.month && isStipendioOPensione;
     }).fold(0.0, (sum, tx) => sum + tx.amount);
-
-    final double nettoExtraMese = stipendioRegistratoMese > 0 
-        ? stipendioRegistratoMese 
-        : walletProvider.entrataExtraMensile;
 
     final bool isMeseLavorativo = walletProvider.mesiAttiviState.length > meseCorrenteIndex
         ? walletProvider.mesiAttiviState[meseCorrenteIndex]
         : true;
 
     double nettoPivaIncassato = 0.0;
+    double quotaCuscinettoErogata = 0.0;
 
     if (isMeseLavorativo) {
-      final double fattoreMesiAttivi = (walletProvider.mesiAttivi / 12).clamp(0.0, 1.0);
-      nettoPivaIncassato = incassatoPivaMese * (1 - walletProvider.aliquotaFiscaleReale) * fattoreMesiAttivi;
+      // 🟢 MESE ON: Consuntivo P.IVA reale al netto delle tasse
+      nettoPivaIncassato = incassatoPivaMese * (1 - walletProvider.aliquotaFiscaleReale);
     } else {
-      final double quotaCuscinettoMensile = (target - nettoExtraMese).clamp(0.0, double.infinity);
-      nettoPivaIncassato = quotaCuscinettoMensile;
+      // 🏖️ MESE OFF: Erogazione automatica della quota Cuscinetto
+      quotaCuscinettoErogata = (target - walletProvider.entrataExtraMensile).clamp(0.0, double.infinity);
     }
 
-    final double nettoRealizzatoMese = (walletProvider.isPartitaIVA ? nettoPivaIncassato : 0.0) + nettoExtraMese;
+    // Netto realizzato totale del mese (solo transazioni ed entrate reali registrate)
+    final double nettoRealizzatoMese = nettoPivaIncassato + stipendioRegistratoMese;
 
     final double gap = target - nettoRealizzatoMese;
     final bool isCoperto = gap <= 0;
     final double percentuale = (nettoRealizzatoMese / target).clamp(0.0, 1.0);
-    final int mesiOff = 12 - walletProvider.mesiAttivi;
 
     final Color statusColor = isCoperto ? oceanCyan : const Color(0xFFF97316);
 
@@ -256,7 +392,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Obiettivo Target Netto',
+                        'Obiettivo Target Mensile',
                         style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(width: 4),
@@ -274,7 +410,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      isCoperto ? '100% OK' : 'Mancano ${_formattaInt(gap)}',
+                      isCoperto ? 'Obiettivo Raggiunto 🎉' : 'Mancano ${_formattaInt(gap)}',
                       style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -288,12 +424,18 @@ class _WalletScreenState extends State<WalletScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
+                  width: double.infinity, // 👈 FORZA IL BINARIO GRIGIO A OCCUPARE TUTTO LO SPAZIO
                   height: 8,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withOpacity(0.15), // 👈 Grigio di base un po' più visibile
                   child: FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     widthFactor: percentuale,
-                    child: Container(color: statusColor),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(6), // Bordo arrotondato anche per la parte colorata
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -307,7 +449,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'NETTO REALIZZATO (MESE)',
+                        'NETTO REALIZZATO',
                         style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0),
                       ),
                       const SizedBox(height: 2),
@@ -334,20 +476,19 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
 
-              if (mesiOff > 0) ...[
+              // 🏖️ INFORMAZIONE CUSCINETTO (COMPARE ESCLUSIVAMENTE NEI MESI OFF)
+              if (!isMeseLavorativo) ...[
                 const SizedBox(height: 14),
                 Divider(color: Colors.white.withOpacity(0.08), height: 1),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.beach_access_rounded, color: oceanCyan, size: 14),
+                    Icon(Icons.beach_access_rounded, color: purpleZen, size: 15),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        isMeseLavorativo
-                            ? 'Cuscinetto Mesi OFF: $mesiOff mesi di pausa previsti (in accantonamento)'
-                            : 'Cuscinetto Mesi OFF: Mese di pausa in corso (quota erogata)',
-                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                        '🏖️ Mese OFF (Pausa): Quota di ${_formattaInt(quotaCuscinettoErogata)} erogata dal Cuscinetto',
+                        style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -457,173 +598,227 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _mostraMovimentiConto(BuildContext context, dynamic acc) {
+    final Set<int> anniEspansi = {};
+
     AppBottomSheet.mostra(
       context: context,
-      child: Consumer<WalletProvider>(
-        builder: (context, walletProvider, child) {
-          final txsConto = walletProvider.transactions
-              .where((tx) => tx.accountId == acc.id)
-              .toList();
-              
-          txsConto.sort((a, b) => b.date.compareTo(a.date));
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Consumer<WalletProvider>(
+            builder: (context, walletProvider, child) {
+              final txsConto = walletProvider.transactions
+                  .where((tx) => tx.accountId == acc.id && !tx.id.startsWith('rule_'))
+                  .toList();
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF18181B), 
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
-            ),
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.55,
-            ),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 38,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  Row(
+              txsConto.sort((a, b) => b.date.compareTo(a.date));
+
+              // 🗓️ Raggruppa i movimenti per Anno -> Mese
+              final Map<int, Map<int, List<dynamic>>> mappaAnnoMese = {};
+              for (var tx in txsConto) {
+                final anno = tx.date.year;
+                final mese = tx.date.month;
+                mappaAnnoMese.putIfAbsent(anno, () => {});
+                mappaAnnoMese[anno]!.putIfAbsent(mese, () => []);
+                mappaAnnoMese[anno]![mese]!.add(tx);
+              }
+
+              final int annoCorrente = DateTime.now().year;
+              final List<int> anniPresenti = mappaAnnoMese.keys.toList()..sort((a, b) => b.compareTo(a));
+
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                ),
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.65,
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: (acc.color as Color).withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.account_balance_wallet_rounded, color: acc.color as Color, size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Movimenti: ${acc.title}',
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              acc.subtitle as String,
-                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (txsConto.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'Nessun movimento registrato per questo conto.',
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-                        ),
-                      ),
-                    )
-                  else
-                    ...txsConto.asMap().entries.map((entry) {
-                      final int index = entry.key;
-                      final tx = entry.value;
-                      final bool isIncome = tx.isIncome;
-                      final Color color = isIncome ? oceanCyan : const Color(0xFFF43F5E);
-                      final String sign = isIncome ? '+' : '-';
-                      final String dateStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}/${tx.date.year}';
-
-                      return Dismissible(
-                        key: Key('modal_dismiss_${tx.id}_$index'),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
-                        ),
-                        confirmDismiss: (direction) async {
-                          _gestisciEliminazioneMovimento(context, tx);
-                          return false; 
-                        },
+                      Center(
                         child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
+                          width: 38,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 14),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            color: Colors.white.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          child: Row(
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (acc.color as Color).withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.account_balance_wallet_rounded, color: acc.color as Color, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Movimenti: ${acc.title}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  acc.subtitle as String,
+                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (txsConto.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'Nessun movimento registrato per questo conto.',
+                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                            ),
+                          ),
+                        )
+                      else
+                        ...anniPresenti.map((anno) {
+                          final mesiDellAnno = mappaAnnoMese[anno]!;
+                          final bool isAnnoCorrente = anno == annoCorrente;
+                          final bool isEspanso = isAnnoCorrente || anniEspansi.contains(anno);
+
+                          double totaleAnno = 0.0;
+                          mesiDellAnno.forEach((_, listaTx) {
+                            for (var tx in listaTx) {
+                              totaleAnno += tx.isIncome ? tx.amount : -tx.amount;
+                            }
+                          });
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: color.withOpacity(0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                  color: color,
-                                  size: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              // 📁 HEADER ANNO PASSATO (MINIMALE INTEGRATO)
+                              if (!isAnnoCorrente) ...[
+                                const SizedBox(height: 14),
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      if (anniEspansi.contains(anno)) {
+                                        anniEspansi.remove(anno);
+                                      } else {
+                                        anniEspansi.add(anno);
+                                      }
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Flexible(
-                                          child: Text(
-                                            tx.title,
-                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isEspanso ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
+                                              color: Colors.white54,
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'ARCHIVIO ANNO $anno',
+                                              style: TextStyle(
+                                                color: Colors.white.withOpacity(0.6),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Text(
+                                          '${totaleAnno >= 0 ? '+' : '-'}${_formattaValuta(totaleAnno.abs())}',
+                                          style: TextStyle(
+                                            color: totaleAnno >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        if (tx.isRecurrent ?? false) ...[
-                                          const SizedBox(width: 6),
-                                          Icon(Icons.sync_rounded, color: oceanCyan.withOpacity(0.8), size: 13),
-                                        ],
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '$dateStr • ${tx.category}',
-                                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '$sign${_formattaValuta(tx.amount)}',
-                                style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
-                              ),
+                                Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                              ],
+
+                              if (isEspanso)
+                                ...(mesiDellAnno.keys.toList()..sort((a, b) => b.compareTo(a))).map((m) {
+                                  final listaTxMese = mesiDellAnno[m]!;
+
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: double.infinity,
+                                        margin: const EdgeInsets.only(top: 10, bottom: 6),
+                                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '${_nomiMesiBrevi[m - 1]} $anno',
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                      ),
+                                      ...listaTxMese.map((tx) {
+                                        return Dismissible(
+                                          key: Key('modal_dismiss_${tx.id}'),
+                                          direction: DismissDirection.endToStart,
+                                          background: Container(
+                                            margin: const EdgeInsets.only(bottom: 8),
+                                            alignment: Alignment.centerRight,
+                                            padding: const EdgeInsets.only(right: 20),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEF4444).withOpacity(0.85),
+                                              borderRadius: BorderRadius.circular(14),
+                                            ),
+                                            child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+                                          ),
+                                          confirmDismiss: (direction) async {
+                                            _gestisciEliminazioneMovimento(context, tx);
+                                            return false;
+                                          },
+                                          child: _buildTransactionRow(tx: tx, fromAccountId: tx.accountId),
+                                        );
+                                      }),
+                                    ],
+                                  );
+                                }),
                             ],
-                          ),
-                        ),
-                      );
-                    }),
-                  const SizedBox(height: 12),
-                ],
-              ),
-            ),
+                          );
+                        }),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -642,8 +837,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final movimenti = walletProvider.transactions.where((t) => !t.id.startsWith('rule_')).toList();
     final bool mostraPiva = widget.isPiva || walletProvider.isPartitaIVA;
 
-    final double tasseRealiFatture = walletProvider.fattureIncassate
-        .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
+    final double tasseRealiFatture = walletProvider.totaleTasseDovuteAnnoCorrenteReale;
     final double tasseTotaliCalcolate = tasseRealiFatture;
 
     final double tasseDaAccantonare = walletProvider.accounts.fold(0.0, (sum, acc) => sum + acc.virtualTaxAmount);
@@ -783,8 +977,8 @@ class _WalletScreenState extends State<WalletScreen> {
         return uniciRicorrenti.values.toList();
       } else {
         final parts = _filtroMeseMovimenti.split('_');
-        final m = int.tryParse(parts[0]) ?? 8;
-        final y = int.tryParse(parts[1]) ?? 2026;
+        final m = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? DateTime.now().month) : DateTime.now().month;
+        final y = parts.length > 1 ? (int.tryParse(parts[1]) ?? DateTime.now().year) : DateTime.now().year;
         return lista.where((tx) => tx.date.month == m && tx.date.year == y).toList();
       }
     })();
@@ -1036,6 +1230,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             cardColor: Colors.transparent,
                             isCollapsible: true,
                             initiallyExpanded: false,
+                            forzaAnnoCorrenteReale: true,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -1316,7 +1511,7 @@ class _WalletScreenState extends State<WalletScreen> {
           Text(
             isOver
                 ? 'Stai fatturando più del previsto rispetto al target di $targetFormattato. Vuoi ricalibrare l\'obiettivo annuo?'
-                : 'Ad oggi hai fatturato ${_formattaInt(walletProvider.fatturatoTotale)} su $targetFormattato. Per raggiungere il target dovresti fatturare a ritmi molto elevati nei mesi ON rimasti.',
+                : 'Ad oggi hai fatturato ${_formattaInt(walletProvider.fatturatoTotaleAnnoCorrenteReale)} su $targetFormattato. Per raggiungere il target dovresti fatturare a ritmi molto elevati nei mesi ON rimasti.',
             style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, height: 1.3),
           ),
           const SizedBox(height: 12),

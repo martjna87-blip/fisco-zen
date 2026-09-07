@@ -159,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
         aliquotaInps: _aliquotaInps,
         totaleFatturatoIncassato: totaleIncassatoReale,
         totaleFatturatoInSospeso: totaleInSospeso,
-        fattureIncassate: walletProvider.fattureIncassate,
-        fattureDaIncassare: walletProvider.fattureDaIncassare,
+        fattureIncassate: walletProvider.fattureIncassateAnnoCorrente, // 👈 Filtro Anno
+        fattureDaIncassare: walletProvider.fattureDaIncassareAnnoCorrente, // 👈 Filtro Anno
         onAtecoCambiato: (nuovoAteco, nuovoCoeff) {
           setState(() {
             _codiceAteco = nuovoAteco;
@@ -172,10 +172,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostraDialogDettaglioFatture(List<Map<String, dynamic>> fattureIncassate) {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
     AppBottomSheet.mostra(
       context: context,
       child: DettaglioFattureSheet(
-        fattureIncassate: fattureIncassate,
+        fattureIncassate: walletProvider.fattureIncassateAnnoCorrente, // 👈 Filtro Anno
         coefficienteRedditivita: _coefficienteRedditivita,
         aliquotaImposta: _aliquotaImposta,
         aliquotaInps: _aliquotaInps,
@@ -425,16 +426,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final double fatturato = walletProvider.fatturatoTotale;
 
-    final fattureDaIncassare = walletProvider.fattureDaIncassare;
-    final fattureIncassate = walletProvider.fattureIncassate;
+    // 💡 Sincronizza i conteggi delle card in base all'anno selezionato in alto
+    final fattureDaIncassare = walletProvider.fattureDaIncassareAnnoCorrente;
+    final fattureIncassate = walletProvider.fattureIncassateAnnoCorrente;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationsProvider>().verificaFattureInRitardo(fattureDaIncassare);
     });
 
-    final double totaleInSospeso = fattureDaIncassare.fold(0.0, (sum, item) => sum + (item['importo'] as double));
+    // 💡 Usa la lista già filtrata dichiarata sopra
+    final double totaleInSospeso = walletProvider.fattureDaIncassareAnnoCorrente.fold(0.0, (sum, item) => sum + (item['importo'] as double));
 
-    final double tasseRealiFatture = walletProvider.fattureIncassate
+    // 💡 Sincronizzato con l'anno fiscale selezionato
+    final double tasseRealiFatture = walletProvider.fattureIncassateAnnoCorrente
         .fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
     final double tasseTotaliCalcolate = tasseRealiFatture;
 
@@ -490,28 +494,77 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       const FiscOnLogo(fontSize: 22, sottotitolo: 'Gestione P.IVA'),
                       
-                      // BADGE ATECO (In Vetro)
+                      // 🗓️ SELETTORE ANNO FISCALE
                       _buildGlassContainer(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         borderRadius: BorderRadius.circular(20),
-                        child: InkWell(
-                          onTap: () {
-                            AppNotifications.mostraInAlto(
-                              context,
-                              'Profilo ATECO attivo: ${walletProvider.codiceAteco}',
-                              type: NotificationType.success,
-                            );
-                          },
-                          child: Row(
-                            children: [
-                              const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF10B981)), // Smeraldo Business
-                              const SizedBox(width: 6),
-                              Text(
-                                'ATECO ${walletProvider.codiceAteco.split(' - ').first.trim()}',
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Freccia Indietro (Anno Precedente)
+                            InkWell(
+                              onTap: () {
+                                walletProvider.setAnnoFiscale(walletProvider.annoFiscaleCorrente - 1);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
                               ),
-                            ],
-                          ),
+                            ),
+                            
+                            // Anno Selezionato (Cliccabile per tornare all'Anno Corrente)
+                            InkWell(
+                              onTap: () {
+                                final int annoAttuale = DateTime.now().year;
+                                if (walletProvider.annoFiscaleCorrente != annoAttuale) {
+                                  walletProvider.setAnnoFiscale(annoAttuale);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: Text(
+                                  '${walletProvider.annoFiscaleCorrente}',
+                                  style: TextStyle(
+                                    color: walletProvider.annoFiscaleCorrente == DateTime.now().year 
+                                        ? const Color(0xFF2DD4BF) 
+                                        : const Color(0xFFF59E0B),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            // Freccia Avanti (Anno Successivo)
+                            InkWell(
+                              onTap: walletProvider.annoFiscaleCorrente < DateTime.now().year
+                                  ? () {
+                                      walletProvider.setAnnoFiscale(walletProvider.annoFiscaleCorrente + 1);
+                                    }
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: walletProvider.annoFiscaleCorrente < DateTime.now().year 
+                                      ? Colors.white.withOpacity(0.1) 
+                                      : Colors.transparent, 
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.chevron_right_rounded, 
+                                  color: walletProvider.annoFiscaleCorrente < DateTime.now().year 
+                                      ? Colors.white70 
+                                      : Colors.white24, 
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -568,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // 🔹 PILLOLA TASSE DOVUTE (In Vetro)
                 Center(
                   child: InkWell(
-                    onTap: null, // 👈 Disabilitata l'apertura della pagina //=> _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
+                    onTap: () => _mostraDialogDettaglioTasse(totaleInSospeso, fatturato), // 👈 Disabilitata l'apertura della pagina //=> _mostraDialogDettaglioTasse(totaleInSospeso, fatturato),
                     onLongPress: () {
                       AppPopupWrapper.mostraInfo(
                         context: context,

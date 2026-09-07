@@ -527,13 +527,103 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     ];
     return '${date.day.toString().padLeft(2, '0')} ${mesi[date.month - 1]} ${date.year}';
   }
-
-  String _formattaMeseAnno(DateTime date) {
+String _formattaMeseAnno(DateTime date) {
     final List<String> mesiBrevi = [
       'gen', 'feb', 'mar', 'apr', 'mag', 'giu',
       'lug', 'ago', 'set', 'ott', 'nov', 'dic'
     ];
     return '${mesiBrevi[date.month - 1]} ${date.year}';
+  }
+  Future<void> _selezionaMeseAnnoRiepilogo(BuildContext context) async {
+    int tempAnno = _meseSelezionatoRiepilogo.year;
+    int tempMese = _meseSelezionatoRiepilogo.month;
+
+    final List<String> mesiBrevi = [
+      'GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU',
+      'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AppSecondaryPopup(
+            backgroundColor: const Color(0xFF18181B),
+            icon: Icons.calendar_month_rounded,
+            iconColor: const Color(0xFF2DD4BF),
+            titolo: 'Seleziona Mese e Anno',
+            testoAnnulla: 'Annulla',
+            testoConferma: 'Applica',
+            onConferma: () {
+              setState(() {
+                _meseSelezionatoRiepilogo = DateTime(tempAnno, tempMese);
+                _categoriaEspansaIndex = null;
+              });
+              Navigator.pop(ctx);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF2DD4BF)),
+                      onPressed: () => setDialogState(() => tempAnno--),
+                    ),
+                    Text(
+                      '$tempAnno',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF2DD4BF)),
+                      onPressed: () => setDialogState(() => tempAnno++),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.8,
+                  ),
+                  itemCount: 12,
+                  itemBuilder: (context, idx) {
+                    final isSel = (idx + 1) == tempMese;
+                    return InkWell(
+                      onTap: () => setDialogState(() => tempMese = idx + 1),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFF2DD4BF) : Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSel ? const Color(0xFF2DD4BF) : Colors.white12,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          mesiBrevi[idx],
+                          style: TextStyle(
+                            color: isSel ? Colors.black : Colors.white,
+                            fontSize: 11,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   bool _isPreferitoSelezionato = false;
@@ -1220,18 +1310,7 @@ Expanded(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       InkWell(
-                        onTap: () async {
-                          final DateTime? picked = await AppDatePicker.selezionaData(
-                            context,
-                            dataIniziale: _meseSelezionatoRiepilogo,
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              _meseSelezionatoRiepilogo = picked;
-                              _categoriaEspansaIndex = null;
-                            });
-                          }
-                        },
+                        onTap: () => _selezionaMeseAnnoRiepilogo(context),
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -2178,11 +2257,19 @@ Expanded(
                                 }
                               } else if (val == '1 anno') {
                                 setState(() {
-                                  _dataFineRicorrenza = DateTime.now().add(const Duration(days: 365));
+                                  _dataFineRicorrenza = DateTime(
+                                    _dataSelezionata.year + 1,
+                                    _dataSelezionata.month,
+                                    _dataSelezionata.day,
+                                  ).subtract(const Duration(days: 1));
                                 });
                               } else if (val == '2 anni') {
                                 setState(() {
-                                  _dataFineRicorrenza = DateTime.now().add(const Duration(days: 730));
+                                  _dataFineRicorrenza = DateTime(
+                                    _dataSelezionata.year + 2,
+                                    _dataSelezionata.month,
+                                    _dataSelezionata.day,
+                                  ).subtract(const Duration(days: 1));
                                 });
                               } else if (val == 'Senza fine (default)') {
                                 setState(() {

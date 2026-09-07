@@ -125,29 +125,36 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     }).toList();
   }
 
-  String _formattaGiornoMese(dynamic rawData) {
+  String _formattaDataCompleta(dynamic rawData, int defaultAnno) {
     if (rawData == null) return '';
     if (rawData is DateTime) {
       final g = rawData.day.toString().padLeft(2, '0');
       final m = rawData.month.toString().padLeft(2, '0');
-      return '$g/$m';
+      return '$g/$m/${rawData.year}';
     }
     if (rawData is String) {
-      final parti = rawData.split(RegExp(r'[/.-]'));
-      if (parti.length >= 2) {
-        if (parti[0].length <= 2) {
-          final g = parti[0].padLeft(2, '0');
-          final m = parti[1].padLeft(2, '0');
-          return '$g/$m';
-        } 
-        else if (parti[0].length == 4 && parti.length >= 3) {
+      final str = rawData.trim();
+      final parti = str.split(RegExp(r'[/.-]'));
+      if (parti.length >= 3) {
+        if (parti[0].length == 4) {
+          final a = parti[0];
           final m = parti[1].padLeft(2, '0');
           final g = parti[2].padLeft(2, '0');
-          return '$g/$m';
+          return '$g/$m/$a';
+        } else {
+          final g = parti[0].padLeft(2, '0');
+          final m = parti[1].padLeft(2, '0');
+          var a = parti[2].split(' ').first;
+          if (a.length == 2) a = '20$a';
+          return '$g/$m/$a';
         }
+      } else if (parti.length == 2) {
+        final g = parti[0].padLeft(2, '0');
+        final m = parti[1].padLeft(2, '0');
+        return '$g/$m/$defaultAnno';
       }
     }
-    return '';
+    return rawData.toString();
   }
 
   @override
@@ -155,13 +162,13 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final screenHeight = MediaQuery.of(context).size.height;
     final walletProvider = Provider.of<WalletProvider>(context);
 
-    // 💡 Legge direttamente lo stato aggiornato dal provider in tempo reale
-    final listaTutteIncassate = walletProvider.fattureIncassate;
+    // 💡 Legge esclusivamente le fatture dell'anno fiscale selezionato in alto
+    final listaTutteIncassate = walletProvider.fattureIncassateAnnoCorrente;
     final fattureFiltrate = _getFattureFiltrate(listaTutteIncassate);
-    final fattureInSospeso = walletProvider.fattureDaIncassare;
+    final fattureInSospeso = walletProvider.fattureDaIncassareAnnoCorrente;
 
-    final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
-    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
+    final int annoCorrente = walletProvider.annoFiscaleCorrente;
+    final int annoProssimo = annoCorrente + 1;
 
     double lordoTotale = 0.0;
     double inpsYTotale = 0.0;
@@ -190,10 +197,7 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final double totaleTasseY = inpsYTotale + impostaYTotale;
     final double totaleAccontiY1 = accontoInpsY1Totale + accontoImpostaY1Totale;
     final double grandTotaleAccantonare = totaleTasseY + totaleAccontiY1;
-
-    final double grandNettoDopoTasse = lordoTotale - grandTotaleAccantonare;
-    final double grandQuotaFondoFerie = grandNettoDopoTasse * percentualeFondoFerie;
-    final double nettoTotaleSpendibile = grandNettoDopoTasse - grandQuotaFondoFerie;
+    final double nettoTotaleReale = lordoTotale - grandTotaleAccantonare;
 
     double lordoSospeso = 0.0;
     double imponibileSospeso = 0.0;
@@ -214,9 +218,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
     final double saldoSospeso = inpsSospeso + impostaSospeso;
     final double accontiSospeso = (inpsSospeso * 0.80) + (impostaSospeso * 1.00);
     final double totaleF24Sospeso = saldoSospeso + accontiSospeso;
-
-    final int annoCorrente = DateTime.now().year;
-    final int annoProssimo = annoCorrente + 1;
 
     return AppBottomSheet(
       title: 'Dettaglio Fiscale',
@@ -301,12 +302,10 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
 
                         final double totaleTasseAccantonare = totaleTasseYCard + totaleAccontiY1Card;
 
-                        final double nettoDopoTasseCard = lordo - totaleTasseAccantonare;
-                        final double quotaFondoFerieCard = nettoDopoTasseCard * percentualeFondoFerie;
-                        final double nettoSpendibileCard = nettoDopoTasseCard - quotaFondoFerieCard;
+                        final double nettoRealeCard = lordo - totaleTasseAccantonare;
 
-                        final String dataIncassoStr = _formattaGiornoMese(f['dataIncasso'] ?? f['data']);
-                        final String dataEmissioneStr = _formattaGiornoMese(f['data'] ?? f['dataIncasso']);
+                        final String dataIncassoStr = _formattaDataCompleta(f['dataIncasso'] ?? f['data'], annoCorrente);
+                        final String dataEmissioneStr = _formattaDataCompleta(f['data'] ?? f['dataIncasso'], annoCorrente);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
@@ -420,8 +419,8 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                     _buildSalvaDanaioRow(
                                       icon: Icons.account_balance_wallet_rounded,
                                       color: const Color(0xFF2DD4BF),
-                                      title: 'Netto Spendibile:',
-                                      value: '+${_formattaValuta(nettoSpendibileCard)}',
+                                      title: 'Netto:',
+                                      value: '+${_formattaValuta(nettoRealeCard)}',
                                       isBold: true,
                                     ),
                                     const SizedBox(height: 6),
@@ -431,13 +430,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                                       title: 'Tasse (Saldo + Acconto):',
                                       value: '-${_formattaValuta(totaleTasseAccantonare)}',
                                       isBold: true,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _buildSalvaDanaioRow(
-                                      icon: Icons.beach_access_rounded,
-                                      color: const Color(0xFF8B5CF6),
-                                      title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
-                                      value: '-${_formattaValuta(quotaFondoFerieCard)}',
                                     ),
                                     const SizedBox(height: 10),
                                     Divider(color: Colors.white.withOpacity(0.12), height: 1),
@@ -524,8 +516,8 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                           _buildSalvaDanaioRow(
                             icon: Icons.account_balance_wallet_rounded,
                             color: const Color(0xFF2DD4BF),
-                            title: 'Netto Spendibile:',
-                            value: '+${_formattaValuta(nettoTotaleSpendibile)}',
+                            title: 'Netto:',
+                            value: '+${_formattaValuta(nettoTotaleReale)}',
                             isBold: true,
                           ),
                           const SizedBox(height: 6),
@@ -535,13 +527,6 @@ class _DettaglioFattureSheetState extends State<DettaglioFattureSheet> {
                             title: 'Totale Tasse (Saldo + Acconto):',
                             value: '-${_formattaValuta(grandTotaleAccantonare)}',
                             isBold: true,
-                          ),
-                          const SizedBox(height: 6),
-                          _buildSalvaDanaioRow(
-                            icon: Icons.beach_access_rounded,
-                            color: const Color(0xFF8B5CF6),
-                            title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
-                            value: '-${_formattaValuta(grandQuotaFondoFerie)}',
                           ),
                           const SizedBox(height: 10),
                           Divider(color: Colors.white.withOpacity(0.12), height: 1),

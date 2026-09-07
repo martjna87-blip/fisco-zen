@@ -134,6 +134,11 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         _isNumeroSuggerito = true;
       }
 
+      // 🗓️ Sincronizza l'anno della nuova fattura con l'Anno Fiscale selezionato nell'app
+      if (wallet.annoFiscaleCorrente != DateTime.now().year) {
+        _dataSelezionata = DateTime(wallet.annoFiscaleCorrente, DateTime.now().month, DateTime.now().day);
+      }
+
       _initializedAteco = true;
     }
   }
@@ -169,10 +174,11 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     return '$giorno/$mese/${dt.year}';
   }
 
-  void _salvaFattura() {
+  Future<void> _salvaFattura() async {
     final numero = _numeroController.text.trim();
     final cliente = _clienteController.text.trim();
     final importoText = _importoController.text.trim();
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
 
     if (cliente.isEmpty || importoText.isEmpty) {
       AppNotifications.mostraInAlto(
@@ -193,8 +199,69 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       return;
     }
 
+    final int annoSelezionato = _dataSelezionata.year;
+
+    // 🛡️ 1. CONTROLLO ANTI-DUPLICATI: Verifica se il numero di fattura esiste già nell'anno scelto
+    if (numero.isNotEmpty) {
+      final tutteLeFatture = [...wallet.fattureDaIncassare, ...wallet.fattureIncassate];
+
+      final bool giaEsistente = tutteLeFatture.any((f) {
+        final numFattura = (f['numero'] as String? ?? '').trim();
+        final dataStr = (f['data'] as String? ?? f['dataIncasso'] as String? ?? '');
+        return numFattura == numero && dataStr.contains('$annoSelezionato');
+      });
+
+      if (giaEsistente) {
+        AppNotifications.mostraInAlto(
+          context,
+          'La fattura #$numero risulta già registrata per l\'anno $annoSelezionato!',
+          type: NotificationType.warning,
+        );
+        return;
+      }
+    }
+
+    // ⚠️ 2. POPUP CONFERMA SE L'ANNO DELLA FATTURA È DIVERSO DALL'ANNO CORRENTE
+    final int annoCorrente = DateTime.now().year;
+    if (annoSelezionato != annoCorrente) {
+      final bool? confermaAnno = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.calendar_month_rounded, color: Color(0xFFF59E0B), size: 22),
+              SizedBox(width: 8),
+              Text('Conferma Anno Fiscale', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Stai registrando una fattura con data del $annoSelezionato (anno differente da quello solare corrente $annoCorrente).\n\nI calcoli fiscali e l\'incasso verranno attribuiti all\'esercizio $annoSelezionato. Vuoi procedere?',
+            style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2DD4BF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Conferma e Salva', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (confermaAnno != true) return;
+    }
+
+    // 💾 3. REGISTRAZIONE EFFETTIVA
     final double imponibile = importo * _atecoCoef;
-    final wallet = Provider.of<WalletProvider>(context, listen: false);
     final double aliquotaTasse = wallet.aliquotaImposta > 0 ? wallet.aliquotaImposta : 0.05;
     const double aliquotaInps = 0.2607;
 
@@ -206,7 +273,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
 
     final dataFormattata = _formattaData(_dataSelezionata);
 
-    Provider.of<WalletProvider>(context, listen: false).addFatturaPiva(
+    wallet.addFatturaPiva(
       cliente: cliente,
       importo: importo,
       data: dataFormattata,
@@ -225,12 +292,13 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
       } catch (_) {}
     }
 
-    Navigator.pop(context);
-
-    AppNotifications.mostraInAlto(
-      context,
-      'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉',
-    );
+    if (mounted) {
+      Navigator.pop(context);
+      AppNotifications.mostraInAlto(
+        context,
+        'Fattura ${numero.isNotEmpty ? "#$numero " : ""}di $cliente del $dataFormattata registrata! 🎉',
+      );
+    }
   }
 
   Future<void> _avviaScansioneFattura() async {
@@ -792,12 +860,9 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
     final double totaleAcconto = accontoImposta + accontoInps;
 
     final double totaleF24 = _calcolaAncheAccontoF24 ? (totaleSaldo + totaleAcconto) : totaleSaldo;
-    final double nettoDopoTasse = importoLordo - totaleF24;
+    final double nettoReale = importoLordo - totaleF24;
 
-    final int mesiLavorati = wallet.mesiAttivi > 0 ? wallet.mesiAttivi : 10;
-    final double percentualeFondoFerie = (12 - mesiLavorati) / 12;
-    final double quotaFondoFerie = nettoDopoTasse * percentualeFondoFerie;
-    final double nettoSpendibileSubito = nettoDopoTasse - quotaFondoFerie;
+    final int annoEmissione = _dataSelezionata.year;
 
     return Container(
       margin: const EdgeInsets.only(top: 14),
@@ -811,7 +876,7 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'RIPARTIZIONE F24 & CUSCINETTO',
+            'RIPARTIZIONE NETTO & F24',
             style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
           ),
           const SizedBox(height: 12),
@@ -828,8 +893,8 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
           _buildSalvaDanaioRow(
             icon: Icons.account_balance_wallet_rounded,
             color: const Color(0xFF2DD4BF),
-            title: 'Netto Spendibile:',
-            value: '+${_formattaValuta(nettoSpendibileSubito)}',
+            title: 'Netto:',
+            value: '+${_formattaValuta(nettoReale)}',
             isBold: true,
           ),
           const SizedBox(height: 6),
@@ -841,14 +906,24 @@ class _RegistraFatturaSheetState extends State<RegistraFatturaSheet> {
             value: '-${_formattaValuta(totaleF24)}',
             isBold: true,
           ),
-          const SizedBox(height: 6),
+
+          const Divider(color: Colors.white12, height: 14),
 
           _buildSalvaDanaioRow(
-            icon: Icons.beach_access_rounded,
-            color: const Color(0xFF8B5CF6),
-            title: 'Cuscinetto mesi No-Lavoro ($mesiLavorati Mesi):',
-            value: '-${_formattaValuta(quotaFondoFerie)}',
+            icon: Icons.remove_circle_outline,
+            color: const Color(0xFFF59E0B),
+            title: 'Saldo Tasse (Anno $annoEmissione):',
+            value: '-${_formattaValuta(totaleSaldo)}',
           ),
+          if (_calcolaAncheAccontoF24) ...[
+            const SizedBox(height: 6),
+            _buildSalvaDanaioRow(
+              icon: Icons.history_toggle_off_rounded,
+              color: const Color(0xFFF97316),
+              title: 'Acconti (Anno ${annoEmissione + 1}):',
+              value: '-${_formattaValuta(totaleAcconto)}',
+            ),
+          ],
         ],
       ),
     );

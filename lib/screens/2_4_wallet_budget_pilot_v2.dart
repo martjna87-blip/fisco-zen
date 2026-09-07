@@ -23,6 +23,7 @@ class PianoSpesaSheet extends StatefulWidget {
 class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   int _tabSelezionata = 0; // 0 = 🔄 Ricorrenze, 1 = 🎯 Pilotaggio & Regole
   int _subTabRicorrenze = 0; // 👈 AGGIUNTO: 0 = Attive, 1 = Passate
+  int _annoSelezionatoPilotaggio = DateTime.now().year;
   final Color oceanCyan   = const Color(0xFF38BDF8);
   final Color goldAccent  = const Color(0xFFFBBF24);
   final Color purpleZen   = const Color(0xFFC084FC);
@@ -172,19 +173,24 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final bool isPro = provider.isProUser;
 
     final List<Map<String, dynamic>> tutteLeVoci = [];
-    final Set<String> nomiProcessati = {};
+    final Set<String> rootIdsProcessati = {};
 
     for (var v in provider.vociPianificate) {
-      final String nome = (v['nome'] ?? 'Ricorrenza').toString().toLowerCase().trim();
-      if (nome.isNotEmpty) nomiProcessati.add(nome);
+      final String rId = RecurrenceManager.getRootId((v['id'] ?? '').toString());
+      if (rId.isNotEmpty) rootIdsProcessati.add(rId);
       tutteLeVoci.add(Map<String, dynamic>.from(v));
     }
 
-    final txsRicorrenti = provider.transactions.where((tx) => (tx.isRecurrent ?? false) == true).toList();
+    final txsRicorrenti = provider.transactions.where((tx) =>
+      (tx.isRecurrent || tx.isArchived || tx.id.startsWith('rule_')) &&
+      !tx.id.startsWith('rec_real_') &&
+      !tx.id.startsWith('prev_')
+    ).toList();
+
     for (var tx in txsRicorrenti) {
-      final String nome = (tx.title ?? 'Ricorrenza').toString().toLowerCase().trim();
-      if (!nomiProcessati.contains(nome)) {
-        nomiProcessati.add(nome);
+      final String rId = RecurrenceManager.getRootId(tx.id);
+      if (!rootIdsProcessati.contains(rId)) {
+        rootIdsProcessati.add(rId);
 
         int giornoAddebito = tx.date.day;
         if (tx.giornoRicorrenza != null) {
@@ -202,15 +208,18 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           'giornoAddebito': giornoAddebito,
           'isTransaction': true,
           'dataFineRicorrenza': tx.dataFineRicorrenza?.toIso8601String(),
+          'isArchived': tx.isArchived,
         });
       }
     }
 
-    // 🎯 SEPARAZIONE REGOLE ATTIVE E TERMINATE/PASSATE
+    // 🎯 SEPARAZIONE REGOLE ATTIVE ED ARCHIVIATE / TERMINATE
     final List<Map<String, dynamic>> vociAttive = [];
     final List<Map<String, dynamic>> vociTerminate = [];
 
     for (var voce in tutteLeVoci) {
+      final bool isArchived = voce['isArchived'] == true;
+
       DateTime? dataFine;
       if (voce['dataFineRicorrenza'] != null) {
         dataFine = voce['dataFineRicorrenza'] is DateTime 
@@ -219,7 +228,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       }
       final bool isTerminata = dataFine != null && dataFine.isBefore(DateTime.now());
 
-      if (isTerminata) {
+      if (isArchived || isTerminata) {
         vociTerminate.add(voce);
       } else {
         vociAttive.add(voce);
@@ -231,52 +240,70 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🔹 INTESTAZIONE CON PULSANTE TOGGLE STORICO
+        // 🔹 SELETTORE A DOPPIO PULSANTE AFFIANCATO
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              _subTabRicorrenze == 0 
-                  ? 'REGOLE ATTIVE (${vociAttive.length})' 
-                  : 'REGOLE PASSATE (${vociTerminate.length})',
+              _subTabRicorrenze == 0 ? 'REGOLE ATTIVE' : 'ARCHIVIO REGOLE',
               style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
             ),
-            Row(
-              children: [
-                if (isPro && provider.vociArchiviate.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Row(
+                children: [
                   GestureDetector(
-                    onTap: () => _mostraModalArchivio(context, provider),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      child: Text('Archivio (${provider.vociArchiviate.length})', style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                    onTap: () => setState(() => _subTabRicorrenze = 0),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _subTabRicorrenze == 0 ? oceanCyan.withOpacity(0.2) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _subTabRicorrenze == 0 ? oceanCyan : Colors.transparent,
+                        ),
+                      ),
+                      child: Text(
+                        'Attive (${vociAttive.length})',
+                        style: TextStyle(
+                          color: _subTabRicorrenze == 0 ? Colors.white : Colors.white54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                GestureDetector(
-                  onTap: () => setState(() => _subTabRicorrenze = _subTabRicorrenze == 0 ? 1 : 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _subTabRicorrenze == 0 ? Icons.history_rounded : Icons.check_circle_outline_rounded,
-                          color: Colors.white70,
-                          size: 12,
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => setState(() => _subTabRicorrenze = 1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _subTabRicorrenze == 1 ? goldAccent.withOpacity(0.2) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _subTabRicorrenze == 1 ? goldAccent : Colors.transparent,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _subTabRicorrenze == 0 ? 'Storico' : 'Attive',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      child: Text(
+                        'Archivio (${vociTerminate.length})',
+                        style: TextStyle(
+                          color: _subTabRicorrenze == 1 ? Colors.white : Colors.white54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -292,7 +319,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     child: Text(
                       _subTabRicorrenze == 0 
                           ? 'Nessuna regola attiva al momento.'
-                          : 'Nessuna regola passata nello storico.',
+                          : 'Nessuna regola salvata in archivio.',
                       style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
                     ),
                   ),
@@ -309,7 +336,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
         const SizedBox(height: 12),
 
-        // 🔘 UNICO ED ESCLUSIVO BOTTONE D'AZIONE IN BASSO
+        // 🔘 BOTTONE D'AZIONE IN BASSO
         SizedBox(
           width: double.infinity,
           height: 46,
@@ -530,8 +557,8 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final bool isPro = provider.isProUser;
     final double targetAnnuoPivaLordo = provider.fatturatoStimato;
 
-    // ⚡ RECUPERO MATRICE CENTRALIZZATA DAL PROVIDER
-    final List<Map<String, dynamic>> matriceMesi = provider.calcolaMatriceProiezioneAnnuale();
+    // ⚡ RECUPERO MATRICE CENTRALIZZATA DAL PROVIDER PER L'ANNO SELEZIONATO
+    final List<Map<String, dynamic>> matriceMesi = provider.calcolaMatriceProiezioneAnnuale(annoSelezionato: _annoSelezionatoPilotaggio);
 
     // 1. Dichiariamo prima i totali parziali della matrice
     final double totalePivaNettaAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['entrataPivaNetta'] as double));
@@ -675,7 +702,54 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           ),
 
           const SizedBox(height: 18),
-          const Text('PIANIFICAZIONE MESE PER MESE (NETTO (€))', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('PIANIFICAZIONE MESE PER MESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+              
+              // 🗓️ SELETTORE MULTI-ANNO FUTURO
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _annoSelezionatoPilotaggio--;
+                        });
+                      },
+                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        '$_annoSelezionatoPilotaggio',
+                        style: TextStyle(
+                          color: _annoSelezionatoPilotaggio == DateTime.now().year ? oceanCyan : goldAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _annoSelezionatoPilotaggio++;
+                        });
+                      },
+                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
 
           // 🗓️ GRIGLIA 12 MESI INTERATTIVA CON BADGE E ANOMALIE
@@ -2202,9 +2276,17 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                 } else {
                                   setPopupState(() {
                                     if (val == '1 anno') {
-                                      dataFineSel = DateTime.now().add(const Duration(days: 365));
+                                      dataFineSel = DateTime(
+                                        dataInizioSel.year + 1,
+                                        dataInizioSel.month,
+                                        dataInizioSel.day,
+                                      ).subtract(const Duration(days: 1));
                                     } else if (val == '2 anni') {
-                                      dataFineSel = DateTime.now().add(const Duration(days: 730));
+                                      dataFineSel = DateTime(
+                                        dataInizioSel.year + 2,
+                                        dataInizioSel.month,
+                                        dataInizioSel.day,
+                                      ).subtract(const Duration(days: 1));
                                     } else {
                                       dataFineSel = null;
                                     }
@@ -2338,17 +2420,18 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               AppActionCard(
                 icon: Icons.delete_forever_rounded,
                 iconColor: const Color(0xFFEF4444),
-                title: 'Elimina definitivamente dallo storico',
+                title: 'Elimina definitivamente dall\'elenco',
                 subtitle: 'Rimuove la scheda dall\'elenco mantenendo intatto lo storico dei pagamenti e dei saldi.',
                 isDanger: true,
                 onTap: () {
-                  // 🎯 Nasconde la regola dall'elenco 2.4 senza stornare denari né cancellare i movimenti passati
-                  provider.archiviaRicorrenza(id);
+                  // 💥 Converte le uscite passate in spese fisse ordinarie e rimuove solo il modello ricorrente dall'Archivio
+                  provider.eliminaRegolaRicorrenteDefinitivamente(id);
                   
                   Navigator.pop(ctx);
+                  setState(() {});
                   AppNotifications.mostraInAlto(
                     context,
-                    'Regola "$nome" rimossa dall\'elenco',
+                    'Regola "$nome" eliminata definitivamente',
                     type: NotificationType.error,
                   );
                 },
@@ -2359,82 +2442,5 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       ),
     );
   }
-  void _mostraModalArchivio(BuildContext context, WalletProvider provider) {
-    AppSecondaryPopup.mostra(
-      context: context,
-      icon: Icons.inventory_2_outlined,
-      iconColor: goldAccent,
-      titolo: 'Archivio Ricorrenze',
-      testoAnnulla: 'Chiudi',
-      child: Consumer<WalletProvider>(
-        builder: (context, prov, _) {
-          final archiviate = prov.vociArchiviate;
-          if (archiviate.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Text('Nessuna regola salvata in archivio.', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              ),
-            );
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: archiviate.map((item) {
-              final String id = item['id'].toString();
-              final String nome = item['nome'] ?? 'Ricorrenza';
-              final double importo = (item['previsto'] as num?)?.toDouble() ?? 0.0;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.history_toggle_off_rounded, color: goldAccent, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(nome, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text(_formattaValuta(importo), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: oceanCyan,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                      ),
-                      icon: const Icon(Icons.restore_rounded, size: 14),
-                      label: const Text('Ripristina', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        prov.ripristinaRicorrenzaArchiviata(id);
-                        AppNotifications.mostraInAlto(context, 'Regola "$nome" ripristinata dall\'archivio! 🎉');
-                      },
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 18),
-                      onPressed: () {
-                        prov.deleteTransaction(id);
-                        AppNotifications.mostraInAlto(context, 'Regola eliminata definitivamente', type: NotificationType.error);
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          );
-        },
-      ),
-    );
-  }
+  
 }

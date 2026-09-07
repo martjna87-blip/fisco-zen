@@ -20,6 +20,7 @@ class ManageAccountsSheet extends StatefulWidget {
 class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   final ScrollController _scrollController = ScrollController();
   int? _contoEspansoIndex;
+  final Set<int> _anniEspansi = {};
 
   String _formattaValuta(double importo) {
     final parti = importo.abs().toStringAsFixed(2).split('.');
@@ -262,59 +263,35 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   }
 
   void _mostraDettaglioMovimentiConto(BuildContext context, AccountModel account) {
-    final transactions = context.read<WalletProvider>().transactions;
+    final walletProvider = context.read<WalletProvider>();
 
-    final movimentiConto = transactions
-        .where((t) =>
-            !t.id.startsWith('rule_') && // 👈 QUESTO È IL FILTRO MAGICO DA AGGIUNGERE
-            (t.accountId == account.id ||
-            t.title.contains(account.title) ||
-            account.title.contains(t.title)))
-        .toList();
+    final tuttiMovimentiConto = walletProvider.transactions.where((tx) {
+      if (tx.id.startsWith('rule_')) return false;
+      return tx.accountId == account.id ||
+          tx.title.toLowerCase().contains(account.title.toLowerCase()) ||
+          account.title.toLowerCase().contains(tx.title.toLowerCase());
+    }).toList();
 
-    movimentiConto.sort((a, b) => b.date.compareTo(a.date));
+    tuttiMovimentiConto.sort((a, b) => b.date.compareTo(a.date));
+
+    // 🗓️ Raggruppa i movimenti per Anno -> Mese
+    final Map<int, Map<int, List<TransactionModel>>> mappaAnnoMese = {};
+    for (var tx in tuttiMovimentiConto) {
+      final anno = tx.date.year;
+      final mese = tx.date.month;
+
+      mappaAnnoMese.putIfAbsent(anno, () => {});
+      mappaAnnoMese[anno]!.putIfAbsent(mese, () => []);
+      mappaAnnoMese[anno]![mese]!.add(tx);
+    }
+
+    final int annoCorrente = DateTime.now().year;
+    final List<int> anniPresenti = mappaAnnoMese.keys.toList()..sort((a, b) => b.compareTo(a));
 
     const List<String> nomiMesi = [
       'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
       'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
     ];
-
-    List<Widget> elementiLista = [];
-    String? meseAnnoCorrente;
-
-    for (var tx in movimentiConto) {
-      String meseAnno = '${nomiMesi[tx.date.month - 1].toUpperCase()} ${tx.date.year}';
-
-      if (meseAnno != meseAnnoCorrente) {
-        meseAnnoCorrente = meseAnno;
-        elementiLista.add(
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(top: 10, bottom: 6),
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              meseAnno,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-        );
-      }
-
-      final String sign = tx.isIncome ? '+' : '-';
-      final String impFormatted = '$sign${_formattaValuta(tx.amount)}';
-      final String dataStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}';
-
-      elementiLista.add(_buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome));
-    }
 
     AppSecondaryPopup.mostra(
       context: context,
@@ -322,31 +299,152 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       iconColor: account.color,
       titolo: 'Movimenti: ${account.title}',
       testoAnnulla: 'Chiudi',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Divider(color: Colors.white12, height: 1),
-          const SizedBox(height: 8),
-          elementiLista.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Text(
-                    'Nessun movimento registrato su questo conto.',
-                    style: TextStyle(color: Colors.white38, fontSize: 12),
-                  ),
-                )
-              : ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.45,
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      children: elementiLista,
+      child: StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Divider(color: Colors.white12, height: 1),
+              const SizedBox(height: 8),
+              tuttiMovimentiConto.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Nessun movimento registrato su questo conto.',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                    )
+                  : ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: anniPresenti.map((anno) {
+                            final mesiDellAnno = mappaAnnoMese[anno]!;
+                            final bool isAnnoCorrente = anno == annoCorrente;
+                            final bool isEspanso = isAnnoCorrente || _anniEspansi.contains(anno);
+
+                            double totaleAnno = 0.0;
+                            mesiDellAnno.forEach((_, listaTx) {
+                              for (var tx in listaTx) {
+                                totaleAnno += tx.isIncome ? tx.amount : -tx.amount;
+                              }
+                            });
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 📁 HEADER ANNO PASSATO (MINIMALE INTEGRATO)
+                                if (!isAnnoCorrente) ...[
+                                  const SizedBox(height: 14),
+                                  InkWell(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        if (_anniEspansi.contains(anno)) {
+                                          _anniEspansi.remove(anno);
+                                        } else {
+                                          _anniEspansi.add(anno);
+                                        }
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                isEspanso ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
+                                                color: Colors.white54,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'ARCHIVIO ANNO $anno',
+                                                style: TextStyle(
+                                                  color: Colors.white.withOpacity(0.6),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            '${totaleAnno >= 0 ? '+' : '-'}${_formattaValuta(totaleAnno)}',
+                                            style: TextStyle(
+                                              color: totaleAnno >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                                ],
+
+                                // 📅 LISTA MESI ED ELEMENTI DELL'ANNO (LAZY RENDERED)
+                                if (isEspanso)
+                                  Builder(
+                                    builder: (context) {
+                                      // Ordina i mesi ed esegui la mappa solo quando la sezione è visibile
+                                      final mesiOrdinati = mesiDellAnno.keys.toList()..sort((a, b) => b.compareTo(a));
+
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: mesiOrdinati.map((m) {
+                                          final listaTxMese = mesiDellAnno[m]!;
+
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // INTESTAZIONE MESE
+                                              Container(
+                                                width: double.infinity,
+                                                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  '${nomiMesi[m - 1].toUpperCase()} $anno',
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 0.8,
+                                                  ),
+                                                ),
+                                              ),
+
+                                              // SINGOLI MOVIMENTI DEL MESE
+                                              ...listaTxMese.map((tx) {
+                                                final String sign = tx.isIncome ? '+' : '-';
+                                                final String impFormatted = '$sign${_formattaValuta(tx.amount)}';
+                                                final String dataStr = '${tx.date.day.toString().padLeft(2, '0')}/${tx.date.month.toString().padLeft(2, '0')}';
+                                                return _buildRigaMovimento(tx.title, impFormatted, dataStr, tx.isIncome);
+                                              }),
+                                            ],
+                                          );
+                                        }).toList(),
+                                      );
+                                    },
+                                  ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -652,7 +750,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
 
     final int mesiLavorati = walletProvider.mesiAttivi > 0 ? walletProvider.mesiAttivi : 10;
 
-    final double totaleTasseDovute = walletProvider.totaleTasseDovute;
+    final double totaleTasseDovute = walletProvider.totaleTasseDovuteAnnoCorrenteReale;
     final double cuscinettoFerie = walletProvider.cuscinettoResiduo;
     final double nettoRealeSpendibile = (saldoTotale - totaleTasseDovute - cuscinettoFerie).clamp(0.0, double.infinity);
 
@@ -962,7 +1060,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        if (mostraPiva && account.virtualTaxAmount > 0) ...[
+                                        if (mostraPiva && account.virtualTaxAmount > 0.01) ...[
                                           const SizedBox(height: 3),
                                           Row(
                                             children: [

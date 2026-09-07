@@ -368,6 +368,75 @@ class WalletProvider with ChangeNotifier {
 
   bool isPartitaIVA = true;
 
+  // 🗓️ GESTIONE ANNO FISCALE E PRINCIPIO DI CASSA
+  int _annoFiscaleCorrente = DateTime.now().year;
+  int get annoFiscaleCorrente => _annoFiscaleCorrente;
+
+  void setAnnoFiscale(int anno) {
+    if (_annoFiscaleCorrente != anno) {
+      _annoFiscaleCorrente = anno;
+      notifyListeners();
+    }
+  }
+
+  int _estraiAnnoDaData(String? dataStr) {
+    if (dataStr == null || dataStr.isEmpty) {
+      return _annoFiscaleCorrente;
+    }
+    final cleanStr = dataStr.trim().toLowerCase();
+    if (cleanStr == 'oggi') {
+      return DateTime.now().year;
+    }
+    try {
+      if (cleanStr.contains('/')) {
+        final parts = cleanStr.split('/');
+        if (parts.length >= 3) {
+          final aStr = parts[2].trim().split(' ').first;
+          final a = int.tryParse(aStr);
+          if (a != null) {
+            return a < 100 ? 2000 + a : a;
+          }
+        }
+      }
+      if (cleanStr.contains('-')) {
+        final parts = cleanStr.split('-');
+        if (parts.length >= 3) {
+          final a = int.tryParse(parts[0].trim());
+          if (a != null) return a;
+        }
+      }
+      final parsed = DateTime.tryParse(cleanStr);
+      if (parsed != null) return parsed.year;
+    } catch (_) {}
+    return _annoFiscaleCorrente;
+  }
+
+  // 🎯 FATTURE INCASSATE NELL'ANNO SELEZIONATO (PRINCIPIO DI CASSA)
+  List<Map<String, dynamic>> get fattureIncassateAnnoCorrente {
+    return _fattureIncassate.where((f) {
+      final dataIncasso = f['dataIncasso'] as String? ?? '';
+      final dataEmissione = f['data'] as String? ?? '';
+
+      // 1. Tenta di estrarre l'anno dalla data d'incasso
+      int anno = _estraiAnnoDaData(dataIncasso);
+
+      // 2. Se la data d'incasso è incompleta (es. "06/06"), usa l'anno della data di registrazione
+      if (!dataIncasso.contains('/20') && !dataIncasso.contains('-20') && dataEmissione.isNotEmpty) {
+        anno = _estraiAnnoDaData(dataEmissione);
+      }
+
+      return anno == _annoFiscaleCorrente;
+    }).toList();
+  }
+
+  // 🎯 FATTURE DA INCASSARE PER L'ANNO SELEZIONATO
+  List<Map<String, dynamic>> get fattureDaIncassareAnnoCorrente {
+    return _fattureDaIncassare.where((f) {
+      final dataStr = f['data'] as String? ?? '';
+      return _estraiAnnoDaData(dataStr) == _annoFiscaleCorrente;
+    }).toList();
+  }
+
   double get aliquotaFiscaleReale {
     final imponibile = coeffRedditivita;                 
     final saldoInps = imponibile * aliquotaInps;         
@@ -500,6 +569,14 @@ class WalletProvider with ChangeNotifier {
     if (!isPartitaIVA || _fatturatoStimatoAnnuo <= 0) return 'in_linea';
 
     final int meseCorrente = DateTime.now().month;
+    final int annoReale = DateTime.now().year;
+
+    // 🎯 Calcola il fatturato reale incassato nell'anno solare corrente (indipendente dal filtro P.IVA)
+    final double fatturatoRealeAnnoCorrente = _fattureIncassate.where((f) {
+      final dataIncasso = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+      return _estraiAnnoDaData(dataIncasso) == annoReale;
+    }).fold(0.0, (sum, item) => sum + ((item['importo'] as num?)?.toDouble() ?? 0.0));
+
     // Calcoliamo quanti mesi lavorativi sono passati fino ad oggi
     int mesiLavorativiPassati = 0;
     for (int i = 0; i < meseCorrente; i++) {
@@ -515,7 +592,8 @@ class WalletProvider with ChangeNotifier {
 
     if (targetAdOggi <= 0) return 'in_linea';
 
-    final double scostamento = (_fatturatoTotale - targetAdOggi) / targetAdOggi;
+    // 🎯 Usa il fatturato reale indipendente (NON fatturatoTotale che cambia con i filtri)
+    final double scostamento = (fatturatoRealeAnnoCorrente - targetAdOggi) / targetAdOggi;
 
     if (scostamento > 0.15) return 'over';   // +15% di deviazione
     if (scostamento < -0.15) return 'under'; // -15% di deviazione
@@ -555,7 +633,7 @@ class WalletProvider with ChangeNotifier {
           }
         }
 
-        final double fatturatoResiduo = (_fatturatoStimatoAnnuo - _fatturatoTotale).clamp(0.0, double.infinity);
+        final double fatturatoResiduo = (_fatturatoStimatoAnnuo - fatturatoTotale).clamp(0.0, double.infinity);
 
         double lordoMensileStima = mesiLavorativiRimanenti > 0 
             ? (fatturatoResiduo / mesiLavorativiRimanenti) 
@@ -974,10 +1052,25 @@ class WalletProvider with ChangeNotifier {
   double get spesoRisparmi => getSpesoBussola('Risparmi');
 
   double _fatturatoTotale = 0.00;
-  double get fatturatoTotale => _fatturatoTotale;
+  
+  // 🎯 Calcola dinamicamente il Fatturato Incassato in base all'Anno Fiscale selezionato
+  double get fatturatoTotale {
+    return fattureIncassateAnnoCorrente.fold(
+      0.0,
+      (sum, item) => sum + ((item['importo'] as num?)?.toDouble() ?? 0.0),
+    );
+  }
 
-  double get stimaTasseAccantonate => _fatturatoTotale * aliquotaFiscaleReale;
-  double get nettoPiva => _fatturatoTotale - stimaTasseAccantonate;
+  double get fatturatoTotaleAnnoCorrenteReale {
+    final int annoReale = DateTime.now().year;
+    return _fattureIncassate.where((f) {
+      final dataIncasso = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+      return _estraiAnnoDaData(dataIncasso) == annoReale;
+    }).fold(0.0, (sum, item) => sum + ((item['importo'] as num?)?.toDouble() ?? 0.0));
+  }
+
+  double get stimaTasseAccantonate => fatturatoTotale * aliquotaFiscaleReale;
+  double get nettoPiva => fatturatoTotale - stimaTasseAccantonate;
 
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
@@ -1786,10 +1879,19 @@ class WalletProvider with ChangeNotifier {
   }
 
   double get totaleTasseDovute {
-    return _fattureIncassate.fold(
+    return fattureIncassateAnnoCorrente.fold(
       0.0,
       (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0),
     );
+  }
+
+  // 🎯 Calcola le tasse dovute ESCLUSIVAMENTE per l'anno solare corrente (2026)
+  double get totaleTasseDovuteAnnoCorrenteReale {
+    final int annoReale = DateTime.now().year;
+    return _fattureIncassate.where((f) {
+      final dataIncasso = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
+      return _estraiAnnoDaData(dataIncasso) == annoReale;
+    }).fold(0.0, (sum, f) => sum + ((f['importoTasse'] as num?)?.toDouble() ?? 0.0));
   }
 
   double get saldoSalvadanaioTasse {
@@ -1801,7 +1903,7 @@ class WalletProvider with ChangeNotifier {
   }
 
   double get tasseScoperteContoPrincipale {
-    final scoperte = totaleTasseDovute - saldoSalvadanaioTasse;
+    final scoperte = totaleTasseDovuteAnnoCorrenteReale - saldoSalvadanaioTasse;
     return scoperte > 0 ? scoperte : 0.0;
   }
 
@@ -1918,8 +2020,32 @@ class WalletProvider with ChangeNotifier {
       orElse: () => _accounts.first,
     );
 
-    final String dataFinale = dataIncasso ?? 'Oggi';
+    final DateTime ora = DateTime.now();
+    final String dataOggiFormattata = '${ora.day.toString().padLeft(2, '0')}/${ora.month.toString().padLeft(2, '0')}/${ora.year}';
+    final String dataFinale = (dataIncasso == null || dataIncasso.toLowerCase() == 'oggi' || dataIncasso.isEmpty)
+        ? dataOggiFormattata
+        : dataIncasso;
+        
+    // 🎯 Converte qualsiasi formato di data d'incasso in DateTime reale per lo storico Wallet
     DateTime dataObj = DateTime.now();
+    try {
+      final strPulita = dataFinale.trim().split(' ').first;
+      if (strPulita.contains('/')) {
+        final parts = strPulita.split('/');
+        if (parts.length == 3) {
+          dataObj = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+        }
+      } else if (strPulita.contains('-')) {
+        final parts = strPulita.split('-');
+        if (parts.length == 3) {
+          if (parts[0].length == 4) {
+            dataObj = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+          } else {
+            dataObj = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+          }
+        }
+      }
+    } catch (_) {}
 
     if (idFattura != null) {
       final idx = _fattureDaIncassare.indexWhere((f) => f['id'] == idFattura);
@@ -2059,11 +2185,57 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 💥 ELIMINAZIONE TRANSAZIONE O SINGOLA RATA SCADUTA
+  // 🗑️ ELIMINA LA REGOLA DALL'ARCHIVIO CONSERVANDO I MOVIMENTI NEI MESI
+  void eliminaRegolaRicorrenteDefinitivamente(String id) {
+    final String rootId = RecurrenceManager.getRootId(id);
+
+    // 1. Rimuove la regola pianificata da 2.4 (sparisce dall'Archivio)
+    _vociPianificateReali.removeWhere((v) =>
+        RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
+
+    // 2. Converte tutti i movimenti passati in transazioni singole slegate
+    for (int i = 0; i < _transactions.length; i++) {
+      if (RecurrenceManager.getRootId(_transactions[i].id) == rootId) {
+        final tx = _transactions[i];
+
+        // Se è solo un segnaposto/template fittizio (rule_...), lo eliminiamo
+        if (tx.id.startsWith('rule_')) {
+          _transactions.removeAt(i);
+          i--;
+          continue;
+        }
+
+        // Se è un movimento reale (rec_real_... o la prima rata), lo convertiamo in transazione normale
+        _transactions[i] = TransactionModel(
+          id: tx.id,
+          title: tx.title,
+          subtitle: tx.subtitle,
+          amount: tx.amount,
+          isIncome: tx.isIncome,
+          category: tx.category,
+          date: tx.date,
+          accountId: tx.accountId,
+          isRecurrent: false, // 👈 Impostato a false per non farlo cancellare come regola
+          frequenza: null,
+          giornoRicorrenza: null,
+          dataInizio: null,
+          dataFineRicorrenza: null,
+          isArchived: false,
+        );
+      }
+    }
+
+    _skippedPredictions.removeWhere((k) => k.startsWith(rootId));
+
+    _salvaDatiInLocalStorage();
+    notifyListeners();
+  }
+
+  // 💥 ELIMINAZIONE TRANSAZIONE O REGOLE RICORRENTI
   void deleteTransaction(String id) {
     final String rootId = RecurrenceManager.getRootId(id);
 
-    // 1. Se l'ID appartiene a una rata specifica (reale o prevista), aggiungiamo l'eccezione
+    // 1. Se è una singola rata specifica (reale o prevista)
     if (id.startsWith('rec_real_') || id.startsWith('prev_')) {
       final parts = id.split('_');
       if (parts.length >= 4) {
@@ -2076,34 +2248,34 @@ class WalletProvider with ChangeNotifier {
         }
       }
       
-      // Storniamo e rimuoviamo solo quella singola rata
       final idx = _transactions.indexWhere((t) => t.id == id);
       if (idx != -1) {
         _stornaSaldoConto(_transactions[idx]);
         _transactions.removeAt(idx);
       }
     } else {
-      // 2. Se l'ID NON è una rata specifica, controlliamo se è una Regola Madre o una transazione normale
-      final idx = _transactions.indexWhere((t) => t.id == id);
-      if (idx != -1) {
-        final bool isMotherRule = _transactions[idx].isRecurrent;
+      // 2. Controllo se è una transazione singola non ricorrente
+      final txSingolaIdx = _transactions.indexWhere((t) => t.id == id && !t.isRecurrent);
 
-        if (isMotherRule) {
-          // Rimuoviamo TUTTO: la regola madre, le rate reali generate e la pianificazione
-          final daRimuovere = _transactions.where((t) => RecurrenceManager.getRootId(t.id) == rootId).toList();
+      if (txSingolaIdx != -1) {
+        // Singolo movimento autonomo: storno il saldo e rimuovo
+        _stornaSaldoConto(_transactions[txSingolaIdx]);
+        _transactions.removeAt(txSingolaIdx);
+      } else {
+        // Intera serie ricorrente: Rimuovo sia la pianificazione che TUTTE le transazioni della serie
+        _vociPianificateReali.removeWhere((v) =>
+          RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId
+        );
 
-          for (var tx in daRimuovere) {
+        for (int i = _transactions.length - 1; i >= 0; i--) {
+          final tx = _transactions[i];
+          if (tx.id == id || tx.id == rootId || tx.id == 'rule_$rootId' || RecurrenceManager.getRootId(tx.id) == rootId) {
             _stornaSaldoConto(tx);
+            _transactions.removeAt(i);
           }
-
-          _transactions.removeWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
-          _vociPianificateReali.removeWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
-          _skippedPredictions.removeWhere((k) => k.startsWith(rootId));
-        } else {
-          // 3. È solo una transazione normale (es. un caffè o incasso)
-          _stornaSaldoConto(_transactions[idx]);
-          _transactions.removeAt(idx);
         }
+
+        _skippedPredictions.removeWhere((k) => k.startsWith(rootId));
       }
     }
 
@@ -2122,16 +2294,13 @@ class WalletProvider with ChangeNotifier {
       _skippedPredictions.add(keySkip);
     }
 
-    // Se l'ID è una rata generata (rec_real_...)
     if (id.startsWith('rec_real_')) {
       final idx = _transactions.indexWhere((t) => t.id == id);
       if (idx != -1) {
         _stornaSaldoConto(_transactions[idx]);
         _transactions.removeAt(idx);
       }
-    } 
-    // Se l'ID è la Regola Madre del primo mese, storna e trasforma la transazione in regola pura
-    else if (id == rootId) {
+    } else if (id == rootId) {
       final idx = _transactions.indexWhere((t) => t.id == rootId);
       if (idx != -1) {
         final tx = _transactions[idx];
@@ -2164,10 +2333,8 @@ class WalletProvider with ChangeNotifier {
   void eliminaQuestoEFuturi(String id, DateTime dataRata) {
     final String rootId = RecurrenceManager.getRootId(id);
 
-    // 1. Ferma la regola madre per i mesi futuri
     stopRecurrenceFromDate(rootId, dataRata);
 
-    // 2. Cancella la rata del mese corrente e rimborsa se è una spesa reale
     if (id.startsWith('rec_real_')) {
       final idx = _transactions.indexWhere((t) => t.id == id);
       if (idx != -1) {
@@ -2260,12 +2427,10 @@ class WalletProvider with ChangeNotifier {
   void stopRecurrenceFromDate(String id, DateTime limiteData) {
     final rootId = RecurrenceManager.getRootId(id);
 
-    // 1. Imposta la data di fine esatta (ultimo secondo del mese scelto)
     final DateTime dataFine = limiteData.day > 1 
         ? limiteData 
         : DateTime(limiteData.year, limiteData.month + 1, 0, 23, 59, 59);
 
-    // 2. Aggiorna la regola madre nel registro transazioni
     final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId && !t.id.startsWith('rec_real_'));
     if (idx != -1) {
       final tx = _transactions[idx];
@@ -2287,13 +2452,11 @@ class WalletProvider with ChangeNotifier {
       );
     }
 
-    // 3. Aggiorna la voce pianificata in 2.4
     final pIdx = _vociPianificateReali.indexWhere((v) => RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
     if (pIdx != -1) {
       _vociPianificateReali[pIdx]['dataFineRicorrenza'] = dataFine.toIso8601String();
     }
 
-    // 🎯 4. STORNO E CANCELLAZIONE: Trova tutti i movimenti reali di questa serie successivi alla data di fine
     final movimentiDaStornare = _transactions.where((t) {
       final bool eDellaSerie = RecurrenceManager.getRootId(t.id) == rootId;
       final bool eSuccessivo = t.date.isAfter(dataFine);
@@ -2301,8 +2464,8 @@ class WalletProvider with ChangeNotifier {
     }).toList();
 
     for (var tx in movimentiDaStornare) {
-      _stornaSaldoConto(tx); // Riaccredita il denaro sul conto (es. Agosto e Settembre)
-      _transactions.removeWhere((t) => t.id == tx.id); // Rimuove la transazione dallo storico
+      _stornaSaldoConto(tx);
+      _transactions.removeWhere((t) => t.id == tx.id);
     }
 
     _aggiornaTasseVirtuali();
@@ -2325,10 +2488,8 @@ class WalletProvider with ChangeNotifier {
     if (idx != -1) {
       final tx = _transactions[idx];
 
-      // 🛡️ Storico saldo conto istantaneo
       _stornaSaldoConto(tx);
 
-      // Trasforma la transazione in regola pura per i mesi futuri
       _transactions[idx] = TransactionModel(
         id: 'rule_${tx.id}',
         title: tx.title,
@@ -2564,7 +2725,6 @@ class WalletProvider with ChangeNotifier {
     _fatturatoStimatoAnnuo = fatturatoStimato;
     _mesiAttiviIncasso = mesiAttivi;
 
-    // Preserva la selezione dei singoli mesi se fornita o già esistente
     if (mesiAttiviStateCustom != null && mesiAttiviStateCustom.length == 12) {
       _mesiAttiviState = List.from(mesiAttiviStateCustom);
     } else if (_mesiAttiviState.where((m) => m).length != mesiAttivi) {
@@ -2579,12 +2739,11 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🎯 AGGIORNAMENTO PREFERENZE PROFILO FISCALE (NO RETROATTIVITÀ SULLO STORICO)
   void aggiornaProfiloFiscale({
     required String nuovoAteco,
     required double nuovoCoeff,
     required double nuovaImposta,
-    bool ricalcolaFattureAnnoCorrente = false, // Ignorato: il passato non si tocca
+    bool ricalcolaFattureAnnoCorrente = false,
   }) {
     salvaProfiloFiscale(
       codiceAteco: nuovoAteco,
@@ -2609,7 +2768,6 @@ class WalletProvider with ChangeNotifier {
     _fatturatoTotale = 0.00;
     _haRispostoRicalibrazione = false;
 
-    // 🎯 MATRICE ESATTA: Agosto (idx 7), Novembre (idx 10), Dicembre (idx 11) OFF
     _mesiAttiviState = [true, true, true, true, true, true, true, false, true, true, false, false];
     _mesiAttiviIncasso = 9;
 
