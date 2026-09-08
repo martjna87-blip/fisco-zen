@@ -638,10 +638,13 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
 
     AppPopupWrapper.mostra(
       context: context,
-      child: Material(
-        color: const Color(0xFF1B2026),
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: Material(
+          color: const Color(0xFF1B2026),
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.82,
           ),
@@ -685,6 +688,8 @@ class _TaxProfileScreenState extends State<TaxProfileScreen> with SingleTickerPr
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1002,6 +1007,7 @@ _buildModalTextField(entrataExtraCtrl, '1.500', suffix: '€', isNumber: true, f
           ),
         ),
       ),
+    ),
     );
   }
 

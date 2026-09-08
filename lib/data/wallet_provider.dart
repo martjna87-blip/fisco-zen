@@ -1063,6 +1063,10 @@ class WalletProvider with ChangeNotifier {
   String ottieniBussolaSemplificata(TransactionModel tx) {
     final testoCompleto = '${tx.category} ${tx.title} ${tx.subtitle}'.toLowerCase();
 
+    if (tx.category == 'Imposte & F24' || testoCompleto.contains('f24') || testoCompleto.contains('imposte')) {
+      return 'Escluso'; // Categoria Neutra
+    }
+
     if (testoCompleto.contains('20%') ||
         testoCompleto.contains('risparm') ||
         testoCompleto.contains('invest')) {
@@ -2726,21 +2730,30 @@ class WalletProvider with ChangeNotifier {
     required String accountId,
     required double importoF24,
     required DateTime data,
+    required int annoRiferimentoTasse,
   }) {
-    final targetAccount = _accounts.firstWhere((acc) => acc.id == accountId);
+    final targetAccount = _accounts.firstWhere((acc) => acc.id == accountId, orElse: () => _accounts.first);
 
     targetAccount.amount -= importoF24;
 
+    // Quando pago un F24 per un anno specifico, aumento l'acconto versato.
+    // L'app lo decurterà automaticamente dal carico fiscale totale dovuto per quell'anno.
+    if (annoRiferimentoTasse == _annoFiscaleCorrente - 1) {
+      accontiVersatiAnnoPrecedente += importoF24;
+      _accontiVersati += importoF24;
+    }
+
     final newTx = TransactionModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: 'Pagamento F24 / Tasse',
-      subtitle: 'Tasse',
+      title: 'Pagamento F24 (Anno $annoRiferimentoTasse)',
+      subtitle: 'Liquidazione / Acconti Tasse',
       amount: importoF24,
       isIncome: false,
-      category: 'Tasse', 
+      category: 'Imposte & F24', 
       date: data,
       accountId: targetAccount.id,
     );
+    
     _transactions.insert(0, newTx);
 
     _aggiornaTasseVirtuali();

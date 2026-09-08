@@ -11,6 +11,7 @@ import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_image_picker.dart';
 import '../widgets_shared/app_bottom_sheet.dart';
 import '../screens/0_1_pro_upgrade.dart';
+import '2_2_wallet_manage_accounts.dart';
 import '../services/document_scanner_service.dart';
 import 'package:flutter/services.dart';
 import '../widgets_shared/app_action_card.dart';
@@ -21,6 +22,7 @@ class AddMovementSheet extends StatefulWidget {
   final String? initialTitle;
   final double? initialAmount;
   final String? initialCategory;
+  final DateTime? initialDate; // ✨ Supporto per posizionare il riepilogo sul mese esatto
 
   const AddMovementSheet({
     super.key,
@@ -28,6 +30,7 @@ class AddMovementSheet extends StatefulWidget {
     this.initialTitle,
     this.initialAmount,
     this.initialCategory,
+    this.initialDate,
   });
 
   @override
@@ -51,6 +54,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
   final FocusNode _amountFocusNode = FocusNode();
   
+  String? _editingTransactionId; // ✨ Memorizza l'ID del movimento in modifica
+
   final ScrollController _scrollControllerSpesa = ScrollController();
   final ScrollController _scrollControllerEntrata = ScrollController();
 
@@ -71,6 +76,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Auto',
     'Viaggi',
     'Salute & Benessere',
+    'Imposte & F24',
     'Altro',
   ];
 
@@ -81,6 +87,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Supermercato': '50% Spese Fisse',
     'Auto': '50% Spese Fisse',
     'Salute & Benessere': '50% Spese Fisse',
+    'Imposte & F24': 'Escluso / Neutro',
     'Ristoranti & Bar': '30% Spese Variabili',
     'Divertimento': '30% Spese Variabili',
     'Acquisti': '30% Spese Variabili',
@@ -120,7 +127,8 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   final List<String> _categorieSpesa = [
     '50% Spese Fisse', 
     '30% Spese Variabili', 
-    '20% Risparmio'
+    '20% Risparmio',
+    'Escluso / Neutro'
   ];
 
   final List<String> _opzioniFrequenza = [
@@ -137,7 +145,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
 
-  final List<Map<String, dynamic>> _speseFrequenti = [
+  List<Map<String, dynamic>> _speseFrequenti = [
     {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Supermercato'},
     {'label': 'Affitto', 'icon': Icons.home_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
     {'label': 'Mutuo', 'icon': Icons.account_balance_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Mutuo'},
@@ -146,9 +154,10 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Ristoranti & Bar'},
     {'label': 'Carburante', 'icon': Icons.local_gas_station_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Auto'},
     {'label': 'Palestra / Sport', 'icon': Icons.fitness_center_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Divertimento'},
+    {'label': 'F24 / Tasse', 'icon': Icons.shield_outlined, 'cat': 'Escluso / Neutro', 'sottoCat': 'Imposte & F24'},
   ];
 
-  final List<Map<String, dynamic>> _entrateFrequenti = [
+  List<Map<String, dynamic>> _entrateFrequenti = [
     {'label': 'Stipendio', 'icon': Icons.work_outline, 'sottoCat': 'Stipendio'},
     {'label': 'Regalo', 'icon': Icons.card_giftcard_outlined, 'sottoCat': 'Regalo'},
     {'label': 'Entrate Extra', 'icon': Icons.add_chart_outlined, 'sottoCat': 'Entrate Extra / Freelance'},
@@ -156,32 +165,93 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
 
   final List<IconData> _iconeDisponibili = [
-    Icons.shopping_bag_outlined,
-    Icons.shopping_cart_outlined,
-    Icons.home_outlined,
-    Icons.bolt_outlined,
-    Icons.restaurant_outlined,
-    Icons.local_gas_station_outlined,
-    Icons.fitness_center_outlined,
-    Icons.pets_outlined,
-    Icons.directions_bus_outlined,
-    Icons.medical_services_outlined,
-    Icons.subscriptions_outlined,
-    Icons.wifi_rounded,
-    Icons.flight_takeoff_rounded,
-    Icons.build_outlined,
-    Icons.work_outline,
-    Icons.card_giftcard_outlined,
-    Icons.attach_money_outlined,
+    // 🚗 Auto, Trasporti e Parcheggi
+    Icons.local_parking_rounded,       // 🅿️ Parcheggio
+    Icons.directions_car_outlined,     // Auto
+    Icons.local_gas_station_outlined,  // Carburante
+    Icons.directions_bus_outlined,     // Bus / Mezzi
+    Icons.train_outlined,              // Treno
+    Icons.flight_takeoff_rounded,      // Aereo / Viaggi
+    Icons.build_outlined,              // Offina / Manutenzione
+
+    // 🏠 Casa, Utenze e Tecnologia
+    Icons.home_outlined,               // Casa / Affitto
+    Icons.bolt_outlined,               // Luce / Elettricità
+    Icons.water_drop_outlined,         // Acqua / Gas
+    Icons.wifi_rounded,                // Internet
+    Icons.tv_rounded,                  // TV / Streaming
+    Icons.phone_android_rounded,       // Ricarica Telefonica
+
+    // 🛒 Spesa, Cibo e Ristorazione
+    Icons.shopping_cart_outlined,      // Supermercato
+    Icons.shopping_bag_outlined,       // Acquisti / Shopping
+    Icons.restaurant_outlined,         // Ristorante
+    Icons.local_cafe_outlined,         // Bar / Caffè
+    Icons.fastfood_outlined,           // Asporto / Fast Food
+
+    // ⚽ Svago, Sport e Benessere
+    Icons.fitness_center_outlined,     // Palestra / Sport
+    Icons.sports_soccer_rounded,       // Calcio / Attività
+    Icons.movie_outlined,              // Cinema
+    Icons.videogame_asset_outlined,    // Gaming / Svago
+    Icons.spa_outlined,                // Benessere / Cura
+    Icons.content_cut_rounded,         // Parrucchiere / Estetica
+
+    // 👶 Famiglia, Salute e Istruzione
+    Icons.child_care_rounded,          // Infanzia / Figli
+    Icons.school_outlined,             // Scuola / Università
+    Icons.medical_services_outlined,   // Medico / Farmacia
+    Icons.pets_outlined,               // Animali
+
+    // 💰 Lavoro, Finanze e Tasse
+    Icons.work_outline,                // Lavoro / Stipendio
+    Icons.shield_outlined,             // F24 / Tasse
+    Icons.receipt_long_outlined,       // Tasse / Bolli
+    Icons.credit_card_rounded,         // Carte / Bancomat
+    Icons.account_balance_outlined,    // Banca / Mutuo
+    Icons.savings_outlined,            // Risparmio / PAC
+    Icons.card_giftcard_outlined,      // Regali
+    Icons.attach_money_outlined,       // Entrate Varie
   ];
 
   IconData _iconaCorrente = Icons.shopping_cart_outlined;
+
+  // 🧠 Algoritmo Adattivo: riordina le scorciatoie in base alle abitudini dell'utente
+  void _ordinaPreferitiDinamici() {
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
+    final txs = wallet.transactions;
+
+    setState(() {
+      _speseFrequenti.sort((a, b) {
+        final countA = txs.where((t) => !t.isIncome && t.category == a['sottoCat']).length;
+        final countB = txs.where((t) => !t.isIncome && t.category == b['sottoCat']).length;
+        
+        // Se usati lo stesso numero di volte, relega in fondo l'F24
+        if (countA == countB) {
+          if (a['sottoCat'] == 'Imposte & F24') return 1;
+          if (b['sottoCat'] == 'Imposte & F24') return -1;
+          return 0;
+        }
+        return countB.compareTo(countA); // Ordine dal più usato al meno usato
+      });
+
+      _entrateFrequenti.sort((a, b) {
+        final countA = txs.where((t) => t.isIncome && t.category == a['sottoCat']).length;
+        final countB = txs.where((t) => t.isIncome && t.category == b['sottoCat']).length;
+        return countB.compareTo(countA);
+      });
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _tipoMovimento = widget.initialTab;
     
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ordinaPreferitiDinamici();
+    });
+
     if (widget.initialTitle != null) {
       _noteController.text = widget.initialTitle!;
     }
@@ -191,6 +261,11 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     if (widget.initialCategory != null) {
       _sottocategoriaEntrataSelezionata = widget.initialCategory!;
       _sottocategoriaSelezionata = widget.initialCategory!;
+    }
+
+    if (widget.initialDate != null) {
+      _dataSelezionata = widget.initialDate!;
+      _meseSelezionatoRiepilogo = widget.initialDate!; // ✨ Imposta il mese del Riepilogo
     }
 
     int initialPage = 0;
@@ -239,9 +314,19 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     if (testo.isEmpty) return;
 
     final paroleFisse = ['affitto', 'mutuo', 'bolletta', 'luce', 'gas', 'internet', 'assicurazione', 'carburante', 'supermercato', 'spesa'];
+    final paroleTasse = ['f24', 'tasse', 'imposta', 'inps', 'irpef', 'acconto tasse'];
     final paroleRistorazione = ['ristorante', 'trattoria', 'osteria', 'pizzeria', 'pub', 'bar', 'cena', 'pranzo', 'caffè'];
     final paroleVariabili = ['palestra', 'sport', 'cinema', 'svago', 'abiti', 'shopping'];
     final paroleRisparmio = ['fondo', 'investimento', 'risparmio', 'pac', 'crypto', 'emerg'];
+
+    if (paroleTasse.any((p) => testo.contains(p))) {
+      setState(() {
+        _sottocategoriaSelezionata = 'Imposte & F24';
+        _categoriaSelezionata = 'Escluso / Neutro';
+        _iconaCorrente = Icons.shield_outlined;
+      });
+      return;
+    }
 
     if (paroleRistorazione.any((p) => testo.contains(p))) {
       setState(() {
@@ -356,6 +441,47 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
   }
 
+  // ✨ NUOVA FUNZIONE PER AVVIARE LA MODIFICA
+  void _avviaModificaMovimento({
+    required String id, required String desc, required double imp,
+    required String cat, required DateTime data, required bool isSpesa,
+    required bool isFattura, required bool isGiroconto,
+    required bool isRecurrent, required bool isPrevisto, required String parentId
+  }) {
+    // 1. Blocco sicurezza per documenti speciali
+    if (isFattura || isGiroconto) {
+      AppNotifications.mostraInAlto(context, 'Modifica non consentita da qui. Vai alla sezione dedicata (P.IVA o Trasferimenti).', type: NotificationType.warning);
+      return;
+    }
+
+    // 2. Ricorrenze/Previsti: Carica la singola occorrenza nel form per la modifica immediata dei dati
+
+    // 3. Spesa/Entrata Singola: Carichiamo i dati nel form!
+    setState(() {
+      _editingTransactionId = id;
+      _tipoMovimento = isSpesa ? 'uscita' : 'entrata';
+      _amountController.text = imp.toStringAsFixed(2).replaceAll('.', ',');
+      _noteController.text = desc;
+      _dataSelezionata = data;
+      _isRicorrente = false;
+
+      if (isSpesa) {
+        _sottocategoriaSelezionata = cat;
+        if (_mappaSottocategoriaABussola.containsKey(cat)) {
+          _categoriaSelezionata = _mappaSottocategoriaABussola[cat]!;
+        }
+      } else {
+        _sottocategoriaEntrataSelezionata = cat;
+      }
+
+      _categoriaEspansaIndex = null; // Chiude il menu a tendina
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _amountFocusNode.requestFocus(); // Apre la tastiera sull'importo
+    });
+  }
+
   void _salvaMovimento() {
     final importo = double.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
     if (importo <= 0) {
@@ -391,31 +517,138 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
           : _giornoRicorrenzaController.text;
     }
 
-    context.read<WalletProvider>().addTransaction(
-      title: descrizione,
-      amount: importo,
-      isIncome: !isSpesa,
-      category: categoriaFinale,
-      accountId: accountId,
-      date: _dataSelezionata,
-      isRecurrent: _isRicorrente,
-      frequenza: _isRicorrente ? _frequenzaSelezionata : null,
-      giornoRicorrenza: giornoRicorrenzaFinale,
-      dataInizio: _isRicorrente ? _dataSelezionata : null,
-      dataFineRicorrenza: _isRicorrente ? _dataFineRicorrenza : null,
-    );
+    final provider = context.read<WalletProvider>();
+
+    if (_editingTransactionId != null) {
+      // ✨ MODIFICA ESISTENTE
+      provider.deleteTransaction(_editingTransactionId!);
+      if (categoriaFinale == 'Imposte & F24' && isSpesa) {
+        provider.pagaF24(
+          accountId: accountId,
+          importoF24: importo,
+          data: _dataSelezionata,
+          annoRiferimentoTasse: _dataSelezionata.year,
+        );
+      } else {
+        provider.addTransaction(
+          title: descrizione,
+          amount: importo,
+          isIncome: !isSpesa,
+          category: categoriaFinale,
+          accountId: accountId,
+          date: _dataSelezionata,
+        );
+      }
+      AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" aggiornato! ✨');
+    } else {
+      // ✨ CREA NUOVO
+      if (categoriaFinale == 'Imposte & F24' && isSpesa && !_isRicorrente) {
+        provider.pagaF24(
+          accountId: accountId,
+          importoF24: importo,
+          data: _dataSelezionata,
+          annoRiferimentoTasse: _dataSelezionata.year,
+        );
+      } else {
+        provider.addTransaction(
+          title: descrizione,
+          amount: importo,
+          isIncome: !isSpesa,
+          category: categoriaFinale,
+          accountId: accountId,
+          date: _dataSelezionata,
+          isRecurrent: _isRicorrente,
+          frequenza: _isRicorrente ? _frequenzaSelezionata : null,
+          giornoRicorrenza: giornoRicorrenzaFinale,
+          dataInizio: _isRicorrente ? _dataSelezionata : null,
+          dataFineRicorrenza: _isRicorrente ? _dataFineRicorrenza : null,
+        );
+      }
+      AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
+    }
+
+    // 💡 SUGGERIMENTO SMART: Se l'F24 viene pagato da un conto diverso dal Salvadanaio Tasse
+    if (categoriaFinale == 'Imposte & F24' && isSpesa && !_isRicorrente) {
+      final salvadanaioTasse = accounts.firstWhere(
+        (a) => a.role == AccountRole.taxReserve || a.id == 'tax_account' || a.id == '3',
+        orElse: () => accounts.last,
+      );
+
+      final bool pagatoDaAltroConto = accountId != salvadanaioTasse.id;
+      final bool haFondiInSalvadanaio = salvadanaioTasse.amount > 0;
+
+      if (pagatoDaAltroConto && haFondiInSalvadanaio) {
+        final double importoF24Val = importo;
+        final DateTime dataF24Val = _dataSelezionata;
+        final AccountModel contoDestVal = matchingAccount;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _mostraPropostaGirocontoSmart(
+            context,
+            salvadanaioTasse: salvadanaioTasse,
+            contoDestinazione: contoDestVal,
+            importoF24: importoF24Val,
+            dataF24: dataF24Val,
+          );
+        });
+      }
+    }
 
     setState(() {
+      _editingTransactionId = null; // Resetta stato modifica
       _amountController.clear();
       _noteController.clear();
       _dataSelezionata = DateTime.now();
       _isRicorrente = false;
       _dataFineRicorrenza = null;
+      _tipoMovimento = 'riepilogo'; // Torna al riepilogo
     });
+  }
 
-    _amountFocusNode.requestFocus();
+  void _mostraPropostaGirocontoSmart(
+    BuildContext context, {
+    required AccountModel salvadanaioTasse,
+    required AccountModel contoDestinazione,
+    required double importoF24,
+    required DateTime dataF24,
+  }) {
+    final walletProvider = context.read<WalletProvider>();
+    final double importoConsigliato = importoF24 <= salvadanaioTasse.amount ? importoF24 : salvadanaioTasse.amount;
 
-    AppNotifications.mostraInAlto(context, 'Movimento "$descrizione" registrato con successo! 🎉');
+    showDialog(
+      context: context,
+      builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
+        icon: Icons.lightbulb_outline_rounded,
+        iconColor: const Color(0xFF38BDF8),
+        titolo: 'Suggerimento Smart 💡',
+        testoAnnulla: 'No, grazie',
+        testoConferma: 'Apri Giroconto',
+        onConferma: () {
+          Navigator.pop(ctx);
+          ManageAccountsSheet.mostraDialogGiroconto(
+            context,
+            accounts: walletProvider.accounts,
+            daContoIniziale: salvadanaioTasse.title,
+            aContoIniziale: contoDestinazione.title,
+            importoIniziale: importoConsigliato,
+            dataIniziale: dataF24,
+          );
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hai addebitato l\'F24 di ${_formatValuta(importoF24)} su "${contoDestinazione.title}".\n\n'
+              'Nel "Salvadanaio Tasse" risultano accantonati ${_formatValuta(salvadanaioTasse.amount)}.\n\n'
+              'Vuoi aprire il Giroconto pre-compilato per trasferire la cifra su "${contoDestinazione.title}"?',
+              style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _confermaEliminazioneMovimento(BuildContext context, String id, String desc, bool isRecurrent, {String? gemelloId, bool isFattura = false}) {
@@ -1640,24 +1873,44 @@ Expanded(
                                   );
 
                                   return Dismissible(
-                                    key: UniqueKey(),
-                                    direction: DismissDirection.endToStart,
+                                    key: ValueKey(id),
+                                    direction: DismissDirection.horizontal, // Permette swipe in entrambe le direzioni
                                     background: Container(
-                                      alignment: Alignment.centerRight,
-                                      padding: const EdgeInsets.only(right: 12),
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.only(left: 16),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFEF4444).withOpacity(0.85),
+                                        color: const Color(0xFF38BDF8).withOpacity(0.85), // Azzurro per modifica
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 16),
+                                      child: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                                    ),
+                                    secondaryBackground: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 16),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444).withOpacity(0.85), // Rosso per elimina
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 18),
                                     ),
                                     confirmDismiss: (direction) async {
-                                      if (isPrevisto) {
-                                        _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
-                                      } else {
-                                        _confermaEliminazioneMovimento(context, id, desc, isRecurrent, gemelloId: gemelloId, isFattura: isFattura);
+                                      if (direction == DismissDirection.endToStart) {
+                                        // 🔴 Swipe verso sinistra -> ELIMINA
+                                        if (isPrevisto) {
+                                          _confermaEliminazioneMovimentoFuturo(context, id, parentId, desc, dt);
+                                        } else {
+                                          _confermaEliminazioneMovimento(context, id, desc, isRecurrent, gemelloId: gemelloId, isFattura: isFattura);
+                                        }
+                                      } else if (direction == DismissDirection.startToEnd) {
+                                        // 🔵 Swipe verso destra -> MODIFICA
+                                        _avviaModificaMovimento(
+                                          id: id, desc: desc, imp: imp, cat: catSpecifica,
+                                          data: dt, isSpesa: isSpesa, isFattura: isFattura,
+                                          isGiroconto: isGiroconto, isRecurrent: isRecurrent,
+                                          isPrevisto: isPrevisto, parentId: parentId,
+                                        );
                                       }
-                                      return false;
+                                      return false; // Non fa mai scomparire la riga graficamente, gestiamo tutto tramite stato
                                     },
                                     child: rowContent,
                                   );
@@ -2319,33 +2572,65 @@ Expanded(
               ),
               const SizedBox(height: 20),
 
-              // 🔘 PULSANTE SALVA RIMODERNATO CON STILE PILL
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _salvaMovimento,
-                  icon: const Icon(
-                    Icons.check_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  label: Text(
-                    isSpesa ? 'Salva Uscita' : 'Salva Entrata',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              // 🔘 PULSANTI AZIONE FINALE
+              Row(
+                children: [
+                  if (_editingTransactionId != null) ...[
+                    Expanded(
+                      flex: 1,
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _editingTransactionId = null;
+                              _amountController.clear();
+                              _noteController.clear();
+                              _tipoMovimento = 'riepilogo';
+                            });
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Annulla', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: _salvaMovimento,
+                        icon: Icon(
+                          _editingTransactionId != null ? Icons.save_as_rounded : Icons.check_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _editingTransactionId != null
+                              ? (isSpesa ? 'Aggiorna Uscita' : 'Aggiorna Entrata')
+                              : (isSpesa ? 'Salva Uscita' : 'Salva Entrata'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeAccent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: themeAccent,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
+                ],
               ),
             ],
           ),

@@ -810,8 +810,8 @@ class _SerbatoioTasseWidgetState extends State<SerbatoioTasseWidget> with Single
                       mancanteReale > 0
                           ? 'Consiglio: accantona i ${SerbatoioTasseWidget._formattaInt(mancanteReale)} € mancanti per metterti al sicuro.'
                           : (cuscinettoExtraVal > 0
-                              ? 'Ottimo! Hai +${SerbatoioTasseWidget._formattaInt(cuscinettoExtraVal)} € di cuscinetto extra protetto.'
-                              : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta.'),
+                              ? 'Ottimo! Hai +${SerbatoioTasseWidget._formattaInt(cuscinettoExtraVal)} € già pronti a coprire le prossime tasse.'
+                              : 'Ottimo! Hai accantonato tutta la stima fiscale dovuta per l\'anno in corso.'),
                       style: TextStyle(
                         color: mancanteReale > 0 ? const Color(0xFFF59E0B) : Colors.white70,
                         fontSize: 11,

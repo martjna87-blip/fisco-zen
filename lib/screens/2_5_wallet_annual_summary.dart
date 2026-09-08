@@ -16,6 +16,21 @@ class AnnualSummarySheet extends StatefulWidget {
 class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
   final PageController _pageController = PageController(viewportFraction: 0.88, initialPage: 1);
   int _selectedYearIndex = 1; // 0: Anno Scorso, 1: Anno Corrente, 2: Anno Prossimo
+  int? _expandedMeseIdx; // Indice del mese aperto a tendina
+  final Map<int, String> _meseViewMode = {}; // Traccia il tab attivo per mese: 'Bussola', 'Categorie', 'Movimenti'
+  String? _expandedSubKey; // Traccia la sotto-tendina aperta (Bussola o Categorie)
+  int? _selectedGraphMonthIndex; // Mese toccato sul grafico per il dettaglio puntuale
+
+  bool _isSpesaFissa(String category) {
+    final c = category.toLowerCase();
+    return c.contains('mutuo') || c.contains('affitto') || c.contains('bollet') ||
+           c.contains('utenz') || c.contains('spesa') || c.contains('alimentar') ||
+           c.contains('supermercat') || c.contains('polizz') || c.contains('assicuraz') ||
+           c.contains('finanziam') || c.contains('rate') || c.contains('scuola') ||
+           c.contains('infanz') || c.contains('auto') || c.contains('carburant') ||
+           c.contains('trasport') || c.contains('tv') || c.contains('internet') ||
+           c.contains('telefon') || c.contains('casa');
+  }
 
   final Color oceanCyan   = const Color(0xFF38BDF8);
   final Color greenProfit = const Color(0xFF10B981);
@@ -104,8 +119,17 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                  !cat.contains('giroconto');
         }).fold(0.0, (s, t) => s + t.amount);
 
-        // Spese
-        final double spesoMese = txMese.where((t) => !t.isIncome && !t.category.toLowerCase().contains('giroconto')).fold(0.0, (s, t) => s + t.amount);
+        // Spese (Escludiamo Giroconti e pagamenti F24/Tasse per evitare il doppio conteggio nel Risparmio Netto)
+        final double spesoMese = txMese.where((t) {
+          if (t.isIncome) return false;
+          final String cat = t.category.toLowerCase();
+          final String title = t.title.toLowerCase();
+          
+          final bool isGiroconto = cat.contains('giroconto');
+          final bool isPagamentoTasse = cat.contains('tasse') || cat.contains('f24') || title.contains('f24');
+          
+          return !isGiroconto && !isPagamentoTasse;
+        }).fold(0.0, (s, t) => s + t.amount);
 
         final previstiMese = wallet.getMovimentiPrevisti(dtMese);
         final double budgetMese = previstiMese.where((t) => !t.isIncome).fold(0.0, (s, t) => s + t.amount);
@@ -133,17 +157,23 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
           'extraNetto': extraMese,
           'incassatoTotaleNetto': pivaMeseNetta + stipMeseNetto + extraMese,
           'speso': spesoMese,
-          'budget': budgetMese > 0 ? budgetMese : (spesoMese > 0 ? spesoMese * 1.05 : 2000.0),
+          'budget': budgetMese > 0 ? budgetMese : spesoMese,
           'isPassato': isPassato,
           'anno': anno,
         };
       });
 
-      final double saldoTasseAnno = inpsSaldoAnno + impostaSaldoAnno;
-      final double accontiAnnoSuccessivo = (inpsSaldoAnno * 0.80) + (impostaSaldoAnno * 1.00);
-      final double totaleF24Accantonare = saldoTasseAnno + accontiAnnoSuccessivo;
+      // Recupero acconti già versati nell'anno precedente per l'anno in corso
+      final double accontiGiaVersati = (anno == wallet.annoFiscaleCorrente)
+          ? wallet.accontiVersatiAnnoPrecedente
+          : 0.0;
 
-      final double pivaNettaAnno = (pivaLordaAnno - saldoTasseAnno).clamp(0.0, double.infinity);
+      final double saldoTasseLordo = inpsSaldoAnno + impostaSaldoAnno;
+      final double saldoTasseNetto = (saldoTasseLordo - accontiGiaVersati).clamp(0.0, double.infinity);
+      final double accontiAnnoSuccessivo = (inpsSaldoAnno * 0.80) + (impostaSaldoAnno * 1.00);
+      final double totaleF24Accantonare = saldoTasseNetto + accontiAnnoSuccessivo;
+
+      final double pivaNettaAnno = (pivaLordaAnno - saldoTasseLordo).clamp(0.0, double.infinity);
       final double totaleIncassatoNetto = pivaNettaAnno + stipendioNettoAnno + extraNettoAnno;
       final double risparmioNetto = totaleIncassatoNetto - totSpesoAnno;
 
@@ -155,9 +185,11 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
         'stipendioNetto': stipendioNettoAnno,
         'extraNetto': extraNettoAnno,
         'totaleIncassatoNetto': totaleIncassatoNetto,
-        'incassato': totaleIncassatoNetto, // fallback per grafici
+        'incassato': totaleIncassatoNetto,
         'speso': totSpesoAnno,
-        'saldoTasse': saldoTasseAnno,
+        'saldoTasseLordo': saldoTasseLordo,
+        'accontiGiaVersati': accontiGiaVersati,
+        'saldoTasse': saldoTasseNetto,
         'accontiF24ProssimoAnno': accontiAnnoSuccessivo,
         'totaleF24Accantonare': totaleF24Accantonare,
         'risparmioNetto': risparmioNetto,
@@ -180,8 +212,13 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
 
   // 📊 MODALE REPORT SINTESI ANNUALE CON DETTAGLIO FISCALE & ACCONTI F24
   void _mostraReportAnalitico(Map<String, dynamic> annoData) {
+    final wallet = context.read<WalletProvider>();
     final int annoNum = annoData['annoNum'] as int;
     final int prossimoAnno = annoNum + 1;
+    final int annoPrec = annoNum - 1;
+
+    // Label dinamica legata all'Onboarding
+    final String etichettaEntrataFissa = wallet.hasPensione ? 'Pensione' : 'Stipendio';
 
     final double pivaLorda = (annoData['pivaLorda'] as num?)?.toDouble() ?? 0.0;
     final double pivaNetta = (annoData['pivaNetta'] as num?)?.toDouble() ?? 0.0;
@@ -190,6 +227,8 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
     final double totaleIncassatoNetto = (annoData['totaleIncassatoNetto'] as num?)?.toDouble() ?? 0.0;
 
     final double saldoTasse = (annoData['saldoTasse'] as num?)?.toDouble() ?? 0.0;
+    final double saldoTasseLordo = (annoData['saldoTasseLordo'] as num?)?.toDouble() ?? saldoTasse;
+    final double accontiGiaVersati = (annoData['accontiGiaVersati'] as num?)?.toDouble() ?? 0.0;
     final double accontiF24 = (annoData['accontiF24ProssimoAnno'] as num?)?.toDouble() ?? 0.0;
     final double totaleF24 = (annoData['totaleF24Accantonare'] as num?)?.toDouble() ?? 0.0;
 
@@ -242,11 +281,13 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                   ),
                   child: Column(
                     children: [
-                      _buildReportRow('Fatturato P.IVA (Lordo):', _formattaValutaDecimale(pivaLorda), Colors.white70),
-                      const SizedBox(height: 4),
-                      _buildReportRow('Fatturato P.IVA (Netto):', _formattaValutaDecimale(pivaNetta), greenProfit),
-                      const SizedBox(height: 4),
-                      _buildReportRow('Stipendio / Pensione (Netto):', _formattaValutaDecimale(stipendioNetto), greenProfit),
+                      if (wallet.isPartitaIVA) ...[
+                        _buildReportRow('Fatturato P.IVA (Lordo):', _formattaValutaDecimale(pivaLorda), Colors.white70),
+                        const SizedBox(height: 4),
+                        _buildReportRow('Fatturato P.IVA (Netto):', _formattaValutaDecimale(pivaNetta), greenProfit),
+                        const SizedBox(height: 4),
+                      ],
+                      _buildReportRow('$etichettaEntrataFissa (Netto):', _formattaValutaDecimale(stipendioNetto), greenProfit),
                       if (extraNetto > 0) ...[
                         const SizedBox(height: 4),
                         _buildReportRow('Entrate Extra / Altro:', _formattaValutaDecimale(extraNetto), greenProfit),
@@ -257,33 +298,38 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
 
                 const SizedBox(height: 16),
 
-                // 🛡️ 2. SCHEMINO F24 (SALDO + ACCONTI)
-                const Text('IMPOSTE & PREVISIONE ACCONTI F24', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: taxBlue.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: taxBlue.withOpacity(0.35)),
+                // 🛡️ 2. SCHEMINO F24 (TOTALE + DETTAGLIO ACCONTI & SALDO) - SOLO SE P.IVA
+                if (wallet.isPartitaIVA) ...[
+                  const Text('IMPOSTE & PREVISIONE ACCONTI F24', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                  const SizedBox(height: 8),
+                  _buildReportRow('TOTALE F24 DA ACCANTONARE:', '-${_formattaValutaDecimale(totaleF24)}', taxBlue, isBold: true),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: taxBlue.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: taxBlue.withOpacity(0.35)),
+                    ),
+                    child: Column(
+                      children: [
+                        if (accontiGiaVersati > 0) ...[
+                          _buildReportRow('(-) Acconti Versati $annoPrec:', '+${_formattaValutaDecimale(accontiGiaVersati)}', greenProfit),
+                          const SizedBox(height: 4),
+                        ],
+                        _buildReportRow('Saldo Tasse $annoNum:', '-${_formattaValutaDecimale(saldoTasse)}', goldAccent),
+                        const SizedBox(height: 4),
+                        _buildReportRow('(+) Acconto Tasse $prossimoAnno:', '-${_formattaValutaDecimale(accontiF24)}', const Color(0xFFF97316)),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      _buildReportRow('Saldo Tasse Anno $annoNum:', '-${_formattaValutaDecimale(saldoTasse)}', goldAccent),
-                      const SizedBox(height: 6),
-                      _buildReportRow('Acconti Anticipati per Anno $prossimoAnno:', '-${_formattaValutaDecimale(accontiF24)}', const Color(0xFFF97316)),
-                      const Divider(color: Colors.white12, height: 14),
-                      _buildReportRow('Totale F24 da Accantonare:', '-${_formattaValutaDecimale(totaleF24)}', taxBlue, isBold: true),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
 
                 // 💰 3. SPESE E RISPARMIO NETTO
                 const Text('BILANCIO & RISPARMIO REALE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
                 const SizedBox(height: 8),
-                _buildReportRow('Totale Uscite / Spese:', '-${_formattaValutaDecimale(speso)}', alertRed),
+                _buildReportRow('TOTALE USCITE / SPESE:', '-${_formattaValutaDecimale(speso)}', alertRed, isBold: true),
                 const Divider(color: Colors.white10, height: 16),
                 _buildReportRow('RISPARMIO NETTO REALE:', _formattaValutaDecimale(risparmioNetto), risparmioNetto >= 0 ? purpleZen : alertRed, isBold: true),
 
@@ -414,6 +460,46 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
         Text(label, style: TextStyle(color: isBold ? Colors.white : Colors.white70, fontSize: 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         Text(value, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildListaTransazioniSub(List<dynamic> txs) {
+    if (txs.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.only(left: 10),
+      child: Column(
+        children: txs.map((tx) {
+          final Color colorTx = tx.isIncome ? greenProfit : alertRed;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.02)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tx.title, style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                      Text('${tx.category} • ${tx.date.day}/${tx.date.month}', style: const TextStyle(color: Colors.white38, fontSize: 8)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${tx.isIncome ? '+' : '-'}${_formattaValutaDecimale(tx.amount)}',
+                  style: TextStyle(color: colorTx, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -707,7 +793,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                       children: [
                         const Expanded(
                           child: Text(
-                            'Uscite Totali dell\'Anno', 
+                            'Andamento Entrate vs Uscite', 
                             style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -716,35 +802,125 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                         const SizedBox(width: 6),
                         Row(
                           children: [
-                            _buildLegendaItem('Reale', oceanCyan),
+                            _buildLegendaItem('Entrate', greenProfit),
                             const SizedBox(width: 8),
-                            _buildLegendaItem('Budget', Colors.white38),
+                            _buildLegendaItem('Uscite', oceanCyan),
+                            const SizedBox(width: 8),
+                            _buildLegendaItem('Pianificato', Colors.white38),
                           ],
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      _formattaValuta(currentAnno['speso']),
-                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: greenProfit.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: greenProfit.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            'Entrate: +${_formattaValuta(currentAnno['incassato'])}',
+                            style: TextStyle(color: greenProfit, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: oceanCyan.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            'Uscite: -${_formattaValuta(currentAnno['speso'])}',
+                            style: TextStyle(color: oceanCyan, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.check_circle_outline_rounded, color: oceanCyan, size: 16),
+                        Icon(Icons.insights_rounded, color: oceanCyan, size: 16),
                         const SizedBox(width: 6),
-                        Text('Analisi uscite calcolata 🎉', style: TextStyle(color: oceanCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Risparmio Cumulato: ${_formattaValuta((currentAnno['incassato'] as double) - (currentAnno['speso'] as double))}',
+                          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 18),
 
-                    SizedBox(
-                      height: 110,
-                      width: double.infinity,
-                      child: CustomPaint(
-                        painter: _FuturisticTrendPainter(datiMesi: storicoMesiInUso),
+                    GestureDetector(
+                      onTapUp: (details) {
+                        final double localX = details.localPosition.dx;
+                        final double totalWidth = MediaQuery.of(context).size.width - 76; // Larghezza netta dell'area di disegno
+                        final double stepX = totalWidth / (storicoMesiInUso.length == 1 ? 1 : storicoMesiInUso.length - 1);
+                        final int touchedIdx = (localX / stepX).round().clamp(0, storicoMesiInUso.length - 1);
+
+                        setState(() {
+                          _selectedGraphMonthIndex = (_selectedGraphMonthIndex == touchedIdx) ? null : touchedIdx;
+                        });
+                      },
+                      child: SizedBox(
+                        height: 110,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _FuturisticTrendPainter(
+                            datiMesi: storicoMesiInUso,
+                            selectedIndex: _selectedGraphMonthIndex,
+                          ),
+                        ),
                       ),
                     ),
+
+                    // 🎯 BADGE DETTAGLIO MESE TOCCATO SUL GRAFICO
+                    if (_selectedGraphMonthIndex != null && _selectedGraphMonthIndex! < storicoMesiInUso.length) ...[
+                      const SizedBox(height: 12),
+                      Builder(
+                        builder: (context) {
+                          final mGraph = storicoMesiInUso[_selectedGraphMonthIndex!];
+                          final bool isPass = mGraph['isPassato'] == true;
+                          final double inM = (mGraph['incassatoTotaleNetto'] as num?)?.toDouble() ?? 0.0;
+                          final double outM = (mGraph['speso'] as num?)?.toDouble() ?? 0.0;
+                          final double diffM = inM - outM;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Dettaglio ${mGraph['mese']} ${mGraph['anno']}:',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Entrate: +${_formattaValuta(inM)}',
+                                      style: TextStyle(color: greenProfit, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Uscite: -${_formattaValuta(outM)}',
+                                      style: TextStyle(color: alertRed, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -776,102 +952,347 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
               itemBuilder: (context, index) {
                 final m = storicoMesiInUso[index];
                 final bool isPassato = m['isPassato'] == true;
-                final double delta = (m['budget'] as double) - (m['speso'] as double);
+                final double incassatoMese = (m['incassatoTotaleNetto'] as num?)?.toDouble() ?? 0.0;
+                final double spesoMese = (m['speso'] as num?)?.toDouble() ?? 0.0;
+                final double delta = incassatoMese - spesoMese;
                 final bool isVirtuoso = delta >= 0;
+                final bool isEspanso = _expandedMeseIdx == index;
 
-                return Container(
+                final int annoMese = m['anno'] as int;
+                final int idxMese = m['meseIdx'] as int;
+                final txsMese = walletProvider.transactions
+                    .where((t) => t.date.year == annoMese && t.date.month == idxMese && !t.id.startsWith('rule_'))
+                    .toList();
+                txsMese.sort((a, b) => b.date.compareTo(a.date));
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFF141417),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    border: Border.all(
+                      color: isEspanso ? oceanCyan.withOpacity(0.5) : Colors.white.withOpacity(0.06),
+                      width: isEspanso ? 1.5 : 1,
+                    ),
                   ),
-                  child: InkWell(
-                    onTap: () {
-                      if (!isUserPro) {
-                        _apriUpgradePro(context);
-                      } else {
-                        _mostraDettaglioMese(context, walletProvider, m);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(18),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isPassato
-                                  ? (isVirtuoso ? greenProfit.withOpacity(0.12) : alertRed.withOpacity(0.12))
-                                  : Colors.white.withOpacity(0.05),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isPassato
-                                  ? (isVirtuoso ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded)
-                                  : Icons.schedule_rounded,
-                              color: isPassato
-                                  ? (isVirtuoso ? greenProfit : alertRed)
-                                  : Colors.white38,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                    if (!isPassato) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white10,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isPassato
-                                      ? 'In: +${_formattaValuta(m['incassatoTotaleNetto'])} • Out: -${_formattaValuta(m['speso'])}'
-                                      : 'Budget Stimato: ${_formattaValuta(m['budget'])}',
-                                  style: const TextStyle(color: Colors.white38, fontSize: 10),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Row(
+                  child: Column(
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          if (!isUserPro) {
+                            _apriUpgradePro(context);
+                          } else {
+                            setState(() {
+                              _expandedMeseIdx = isEspanso ? null : index;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
                             children: [
-                              Text(
-                                isPassato
-                                    ? '${isVirtuoso ? '+' : ''}${_formattaValuta(delta)}'
-                                    : _formattaValuta(m['speso']),
-                                style: TextStyle(
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
                                   color: isPassato
-                                      ? (isVirtuoso ? oceanCyan : alertRed)
-                                      : Colors.white54,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                      ? (isVirtuoso ? greenProfit.withOpacity(0.12) : alertRed.withOpacity(0.12))
+                                      : Colors.white.withOpacity(0.05),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isPassato
+                                      ? (isVirtuoso ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded)
+                                      : Icons.schedule_rounded,
+                                  color: isPassato
+                                      ? (isVirtuoso ? greenProfit : alertRed)
+                                      : Colors.white38,
+                                  size: 18,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 16),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(m['mese'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                        if (!isPassato) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white10,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text('Previsto', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isPassato
+                                          ? 'In: +${_formattaValuta(incassatoMese)} • Out: -${_formattaValuta(spesoMese)}'
+                                          : 'Budget Stimato: ${_formattaValuta(m['budget'])}',
+                                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Row(
+                                children: [
+                                  Text(
+                                    isPassato
+                                        ? '${isVirtuoso ? '+' : ''}${_formattaValuta(delta)}'
+                                        : _formattaValuta(m['speso']),
+                                    style: TextStyle(
+                                      color: isPassato
+                                          ? (isVirtuoso ? oceanCyan : alertRed)
+                                          : Colors.white54,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    isEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                    color: isEspanso ? oceanCyan : Colors.white24,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+
+                      // 📂 TENDINA MULTI-VISTA (BUSSOLA / CATEGORIE / MOVIMENTI)
+                      if (isEspanso) ...[
+                        Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                        
+                        // 🔘 TAB SELECTOR
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.4),
+                          ),
+                          child: Row(
+                            children: ['Bussola', 'Categorie', 'Movimenti'].map((mode) {
+                              final String currentView = _meseViewMode[index] ?? 'Bussola';
+                              final bool isSel = currentView == mode;
+                              return Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _meseViewMode[index] = mode;
+                                    _expandedSubKey = null; // Resetta sotto-tendina al cambio tab
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                                    decoration: BoxDecoration(
+                                      color: isSel ? Colors.white.withOpacity(0.12) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: isSel ? Colors.white.withOpacity(0.2) : Colors.transparent),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      mode,
+                                      style: TextStyle(
+                                        color: isSel ? Colors.white : Colors.white54,
+                                        fontSize: 10,
+                                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+
+                        // 📄 CONTENUTO DELLA VISTA SELEZIONATA
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.25),
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+                          ),
+                          child: Builder(
+                            builder: (context) {
+                              final String currentView = _meseViewMode[index] ?? 'Bussola';
+
+                              // 🧭 VISTA 1: BUSSOLA (Espandibile per macrocategorie 50/30/20)
+                              if (currentView == 'Bussola') {
+                                final entrateTxs = txsMese.where((t) => t.isIncome).toList();
+                                final usciteTxs = txsMese.where((t) => !t.isIncome).toList();
+
+                                final fisseTxs = <dynamic>[];
+                                final variabiliTxs = <dynamic>[];
+                                final risparmioTxs = <dynamic>[];
+
+                                for (var tx in usciteTxs) {
+                                  final cat = tx.category.toLowerCase();
+                                  if (cat.contains('salvadanaio') || cat.contains('investim') || cat.contains('previdenz') || cat.contains('fondo')) {
+                                    risparmioTxs.add(tx);
+                                  } else if (_isSpesaFissa(tx.category)) {
+                                    fisseTxs.add(tx);
+                                  } else {
+                                    variabiliTxs.add(tx);
+                                  }
+                                }
+
+                                final double totEntrate = entrateTxs.fold(0.0, (s, t) => s + t.amount);
+                                final double totFisse = fisseTxs.fold(0.0, (s, t) => s + t.amount);
+                                final double totVariabili = variabiliTxs.fold(0.0, (s, t) => s + t.amount);
+                                final double totRisparmio = risparmioTxs.fold(0.0, (s, t) => s + t.amount);
+
+                                final List<Map<String, dynamic>> gruppiBussola = [
+                                  if (entrateTxs.isNotEmpty || totEntrate > 0)
+                                    {'key': 'entrate', 'title': 'Entrate', 'total': totEntrate, 'txs': entrateTxs, 'color': greenProfit, 'sign': '+'},
+                                  {'key': 'fisse', 'title': '50% Spese Fisse', 'total': totFisse, 'txs': fisseTxs, 'color': alertRed, 'sign': '-'},
+                                  {'key': 'variabili', 'title': '30% Spese Variabili', 'total': totVariabili, 'txs': variabiliTxs, 'color': alertRed, 'sign': '-'},
+                                  if (risparmioTxs.isNotEmpty)
+                                    {'key': 'risparmio', 'title': '20% Risparmio / Accantonamenti', 'total': totRisparmio, 'txs': risparmioTxs, 'color': purpleZen, 'sign': '-'},
+                                ];
+
+                                return Column(
+                                  children: gruppiBussola.map((grp) {
+                                    final String subKey = '${annoMese}_${idxMese}_bussola_${grp['key']}';
+                                    final bool isOpen = _expandedSubKey == subKey;
+                                    final List txsGrp = grp['txs'] as List;
+
+                                    return Column(
+                                      children: [
+                                        InkWell(
+                                          onTap: txsGrp.isEmpty ? null : () {
+                                            setState(() {
+                                              _expandedSubKey = isOpen ? null : subKey;
+                                            });
+                                          },
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      isOpen ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
+                                                      color: txsGrp.isNotEmpty ? Colors.white54 : Colors.white12,
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(grp['title'], style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                Text(
+                                                  '${grp['sign']}${_formattaValutaDecimale(grp['total'])}',
+                                                  style: TextStyle(color: grp['color'] as Color, fontSize: 11, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (isOpen) _buildListaTransazioniSub(txsGrp),
+                                        const Divider(color: Colors.white10, height: 1),
+                                      ],
+                                    );
+                                  }).toList(),
+                                );
+                              }
+
+                              // 🥧 VISTA 2: CATEGORIE (Legge esattamente tx.category con sotto-tendina)
+                              if (currentView == 'Categorie') {
+                                final Map<String, Map<String, dynamic>> catMap = {};
+
+                                for (var tx in txsMese.where((t) => !t.isIncome)) {
+                                  final String name = tx.category.trim().isEmpty ? 'Altre uscite' : tx.category.trim();
+
+                                  if (!catMap.containsKey(name)) {
+                                    catMap[name] = {
+                                      'name': name,
+                                      'total': 0.0,
+                                      'txs': <dynamic>[],
+                                    };
+                                  }
+                                  catMap[name]!['total'] = (catMap[name]!['total'] as double) + tx.amount;
+                                  (catMap[name]!['txs'] as List).add(tx);
+                                }
+
+                                if (catMap.isEmpty) {
+                                  return const Center(child: Text('Nessuna uscita registrata in questo mese.', style: TextStyle(color: Colors.white38, fontSize: 11)));
+                                }
+
+                                final sortedCats = catMap.values.toList()
+                                  ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+
+                                return Column(
+                                  children: sortedCats.map((cat) {
+                                    final String name = cat['name'] as String;
+                                    final double tot = cat['total'] as double;
+                                    final List catTxs = cat['txs'] as List;
+                                    final String subKey = '${annoMese}_${idxMese}_cat_$name';
+                                    final bool isOpen = _expandedSubKey == subKey;
+
+                                    return Column(
+                                      children: [
+                                        InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              _expandedSubKey = isOpen ? null : subKey;
+                                            });
+                                          },
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      isOpen ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
+                                                      color: Colors.white54,
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                                Text('-${_formattaValutaDecimale(tot)}', style: TextStyle(color: alertRed, fontSize: 11, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (isOpen) _buildListaTransazioniSub(catTxs),
+                                        const Divider(color: Colors.white10, height: 1),
+                                      ],
+                                    );
+                                  }).toList(),
+                                );
+                              }
+
+                              // 📜 VISTA 3: MOVIMENTI (Lista diretta transazioni)
+                              if (txsMese.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Center(child: Text('Nessuna transazione registrata.', style: TextStyle(color: Colors.white38, fontSize: 11))),
+                                );
+                              }
+                              return _buildListaTransazioniSub(txsMese);
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               },
@@ -897,8 +1318,9 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
 
 class _FuturisticTrendPainter extends CustomPainter {
   final List<Map<String, dynamic>> datiMesi;
+  final int? selectedIndex;
 
-  _FuturisticTrendPainter({required this.datiMesi});
+  _FuturisticTrendPainter({required this.datiMesi, this.selectedIndex});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -907,95 +1329,127 @@ class _FuturisticTrendPainter extends CustomPainter {
     final double heightGraph = size.height - 22;
     final double stepX = size.width / (datiMesi.length == 1 ? 1 : datiMesi.length - 1);
 
-    List<Offset> puntiSpesoPassati = [];
-    List<Offset> puntiBudgetTotali = [];
-    List<Offset> puntiFuturi = [];
+    // Calcolo del picco massimo per scalare il grafico correttamente
+    double maxVal = 1000.0;
+    for (var m in datiMesi) {
+      final double inVal = (m['incassatoTotaleNetto'] as num?)?.toDouble() ?? 0.0;
+      final double outVal = (m['speso'] as num?)?.toDouble() ?? 0.0;
+      if (inVal > maxVal) maxVal = inVal;
+      if (outVal > maxVal) maxVal = outVal;
+    }
+    maxVal *= 1.15; // Margine superiore del 15%
+
+    List<Offset> entrateReali = [];
+    List<Offset> entratePianificate = [];
+    List<Offset> usciteReali = [];
+    List<Offset> uscitePianificate = [];
 
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
     for (int i = 0; i < datiMesi.length; i++) {
       final double x = i * stepX;
-      final double spesoVal = datiMesi[i]['speso'];
-      final double budgetVal = datiMesi[i]['budget'];
+      final double inVal = (datiMesi[i]['incassatoTotaleNetto'] as num?)?.toDouble() ?? 0.0;
+      final double outVal = (datiMesi[i]['speso'] as num?)?.toDouble() ?? 0.0;
       final bool isPassato = datiMesi[i]['isPassato'] == true;
 
-      final double ySpeso = heightGraph - ((spesoVal / 3200.0) * heightGraph).clamp(0.0, heightGraph);
-      final double yBudget = heightGraph - ((budgetVal / 3200.0) * heightGraph).clamp(0.0, heightGraph);
+      final double yIn = heightGraph - ((inVal / maxVal) * heightGraph).clamp(0.0, heightGraph);
+      final double yOut = heightGraph - ((outVal / maxVal) * heightGraph).clamp(0.0, heightGraph);
 
-      final offsetSpeso = Offset(x, ySpeso);
-      final offsetBudget = Offset(x, yBudget);
-
-      puntiBudgetTotali.add(offsetBudget);
+      final offsetIn = Offset(x, yIn);
+      final offsetOut = Offset(x, yOut);
 
       if (isPassato) {
-        puntiSpesoPassati.add(offsetSpeso);
+        entrateReali.add(offsetIn);
+        usciteReali.add(offsetOut);
       } else {
-        if (puntiSpesoPassati.isNotEmpty && puntiFuturi.isEmpty) {
-          puntiFuturi.add(puntiSpesoPassati.last);
+        if (entrateReali.isNotEmpty && entratePianificate.isEmpty) {
+          entratePianificate.add(entrateReali.last);
         }
-        puntiFuturi.add(offsetSpeso);
+        if (usciteReali.isNotEmpty && uscitePianificate.isEmpty) {
+          uscitePianificate.add(usciteReali.last);
+        }
+        entratePianificate.add(offsetIn);
+        uscitePianificate.add(offsetOut);
+      }
+
+      final bool isSelected = selectedIndex == i;
+
+      if (isSelected) {
+        final paintHighlight = Paint()..color = const Color(0xFF38BDF8);
+        canvas.drawCircle(offsetOut, 4, paintHighlight);
+        canvas.drawCircle(offsetIn, 4, Paint()..color = const Color(0xFF10B981));
       }
 
       textPainter.text = TextSpan(
         text: datiMesi[i]['mese'],
         style: TextStyle(
-          color: isPassato ? Colors.white70 : Colors.white24,
+          color: isSelected ? const Color(0xFF38BDF8) : (isPassato ? Colors.white70 : Colors.white24),
           fontSize: 9,
-          fontWeight: isPassato ? FontWeight.bold : FontWeight.normal,
+          fontWeight: (isPassato || isSelected) ? FontWeight.bold : FontWeight.normal,
         ),
       );
       textPainter.layout();
       textPainter.paint(canvas, Offset(x - (textPainter.width / 2).clamp(0, x), heightGraph + 6));
     }
 
-    if (puntiBudgetTotali.length >= 2) {
-      final pathBudget = _creaPathMorbido(puntiBudgetTotali);
-      final paintBudget = Paint()
-        ..color = Colors.white38
+    // 🟢 1. TRACCIAMENTO ENTRATE (Verde)
+    if (entrateReali.length >= 2) {
+      final pathInReale = _creaPathMorbido(entrateReali);
+      final paintInReale = Paint()
+        ..color = const Color(0xFF10B981)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
+        ..strokeWidth = 2.6
+        ..strokeCap = StrokeCap.round;
 
-      canvas.drawPath(pathBudget, paintBudget);
+      canvas.drawPath(pathInReale, paintInReale);
+    }
+    if (entratePianificate.length >= 2) {
+      final pathInPianificato = _creaPathMorbido(entratePianificate);
+      final paintInPianificato = Paint()
+        ..color = const Color(0xFF10B981).withOpacity(0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8;
+
+      _disegnaLineaTratteggiata(canvas, pathInPianificato, paintInPianificato);
     }
 
-    if (puntiSpesoPassati.length >= 2) {
-      final pathPassato = _creaPathMorbido(puntiSpesoPassati);
+    // 🔵 2. TRACCIAMENTO USCITE (Azzurro)
+    if (usciteReali.length >= 2) {
+      final pathOutReale = _creaPathMorbido(usciteReali);
 
-      final pathFillPassato = Path.from(pathPassato)
-        ..lineTo(puntiSpesoPassati.last.dx, heightGraph)
-        ..lineTo(puntiSpesoPassati.first.dx, heightGraph)
+      final pathFillOut = Path.from(pathOutReale)
+        ..lineTo(usciteReali.last.dx, heightGraph)
+        ..lineTo(usciteReali.first.dx, heightGraph)
         ..close();
 
-      final paintGradientPassato = Paint()
+      final paintGradientOut = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF38BDF8).withOpacity(0.35),
+            const Color(0xFF38BDF8).withOpacity(0.25),
             const Color(0xFF38BDF8).withOpacity(0.0),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, heightGraph));
 
-      canvas.drawPath(pathFillPassato, paintGradientPassato);
+      canvas.drawPath(pathFillOut, paintGradientOut);
 
-      final paintLineaVerde = Paint()
+      final paintOutReale = Paint()
         ..color = const Color(0xFF38BDF8)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.8
+        ..strokeWidth = 2.6
         ..strokeCap = StrokeCap.round;
 
-      canvas.drawPath(pathPassato, paintLineaVerde);
+      canvas.drawPath(pathOutReale, paintOutReale);
     }
-
-    if (puntiFuturi.length >= 2) {
-      final pathFuturo = _creaPathMorbido(puntiFuturi);
-
-      final paintLineaFutura = Paint()
-        ..color = Colors.white38
+    if (uscitePianificate.length >= 2) {
+      final pathOutPianificato = _creaPathMorbido(uscitePianificate);
+      final paintOutPianificato = Paint()
+        ..color = const Color(0xFF38BDF8).withOpacity(0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.8;
 
-      _disegnaLineaTratteggiata(canvas, pathFuturo, paintLineaFutura);
+      _disegnaLineaTratteggiata(canvas, pathOutPianificato, paintOutPianificato);
     }
   }
 

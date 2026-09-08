@@ -163,4 +163,110 @@ REGOLE TASSATIVE DI ESTRAZIONE FISCALE:
       rethrow;
     }
   }
+  // 🏦 Analisi Estratto Conto con Retry Automatico per errori 503 / Timeout
+  static Future<List<Map<String, dynamic>>> scanEstrattoConto({
+    required List<int> fileBytes,
+    required String mimeType,
+  }) async {
+    const int maxRetries = 3;
+    int attempt = 0;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        final String base64File = base64Encode(fileBytes);
+
+        final String promptText = '''
+Sei un esperto contabile. Analizza questo ESTRATTO CONTO BANCARIO ed estrai tutte le transazioni (entrate e uscite) visibili.
+Restituisci ESCLUSIVAMENTE un ARRAY JSON valido in questo esatto formato, senza Markdown o testo aggiuntivo:
+[
+  {
+    "date": "YYYY-MM-DD",
+    "title": "Nome del negozio, azienda o causale bonifico",
+    "amount": 150.50,
+    "isIncome": false,
+    "category": "Una categoria logica (es. Spesa Alimentare, Bollette, Ristoranti, Bonifico in Ingresso, Stipendio)"
+  }
+]
+Regole:
+1. "amount" DEVE essere un numero positivo. Se è un'uscita imposta "isIncome": false, se è un'entrata imposta "isIncome": true.
+2. "date" DEVE essere in formato YYYY-MM-DD.
+3. Se non trovi transazioni restituisci un array vuoto [].
+''';
+
+        final payload = {
+          "contents": [
+            {
+              "parts": [
+                {"text": promptText},
+                {
+                  "inline_data": {
+                    "mime_type": mimeType,
+                    "data": base64File
+                  }
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "response_mime_type": "application/json"
+          }
+        };
+
+        final response = await http.post(
+          Uri.parse(_proxyUrl),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(payload),
+        ).timeout(
+          const Duration(seconds: 45),
+          onTimeout: () => throw TimeoutException("Timeout connessione con il server AI"),
+        );
+
+        if (response.statusCode == 503 || response.statusCode == 429) {
+          throw Exception("Server AI temporaneamente occupato (${response.statusCode})");
+        }
+
+        final Map<String, dynamic> resData = jsonDecode(response.body);
+
+        if (response.statusCode != 200 || resData.containsKey('error')) {
+          final errObj = resData['error'];
+          String errorMsg = "Errore HTTP (${response.statusCode})";
+          if (errObj is String) errorMsg = errObj;
+          if (errObj is Map && errObj.containsKey('message')) errorMsg = errObj['message'].toString();
+          throw Exception(errorMsg);
+        }
+
+        final String textContent = resData['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
+
+        if (textContent.isEmpty) {
+          throw Exception("Risposta AI vuota.");
+        }
+
+        String cleanJson = textContent.trim();
+        if (cleanJson.startsWith('```json')) cleanJson = cleanJson.substring(7);
+        if (cleanJson.startsWith('```')) cleanJson = cleanJson.substring(3);
+        if (cleanJson.endsWith('```')) cleanJson = cleanJson.substring(0, cleanJson.length - 3);
+        cleanJson = cleanJson.trim();
+
+        final List<dynamic> parsedList = jsonDecode(cleanJson);
+        List<Map<String, dynamic>> finalResult = [];
+
+        for (var item in parsedList) {
+          if (item is Map<String, dynamic>) {
+            finalResult.add(item);
+          }
+        }
+
+        return finalResult; // Scansione riuscita
+      } catch (e) {
+        print('⚠️ Tentativo Scansione $attempt/$maxRetries fallito: $e');
+        if (attempt >= maxRetries) {
+          rethrow;
+        }
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    throw Exception("Impossibile completare la scansione dopo $maxRetries tentativi.");
+  }
 }

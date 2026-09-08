@@ -424,6 +424,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final walletProvider = context.watch<WalletProvider>();
 
+    // 🎯 IDENTIFICAZIONE CONTESTO TEMPORALE
+    final int annoAttuale = DateTime.now().year;
+    final int annoSelezionato = walletProvider.annoFiscaleCorrente;
+    final bool isAnnoCorrente = annoSelezionato == annoAttuale;
+    final bool isAnnoPassato = annoSelezionato < annoAttuale;
+    final bool isAnnoFuturo = annoSelezionato > annoAttuale;
+
+    final Color coloreAnnoTema = isAnnoCorrente
+        ? const Color(0xFF2DD4BF)
+        : (isAnnoPassato ? const Color(0xFFF59E0B) : const Color(0xFFA855F7));
+
     final double fatturato = walletProvider.fatturatoTotale;
 
     // 💡 Sincronizza i conteggi delle card in base all'anno selezionato in alto
@@ -494,84 +505,140 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       const FiscOnLogo(fontSize: 22, sottotitolo: 'Gestione P.IVA'),
                       
-                      // 🗓️ SELETTORE ANNO FISCALE
-                      _buildGlassContainer(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Freccia Indietro (Anno Precedente)
-                            InkWell(
-                              onTap: () {
-                                walletProvider.setAnnoFiscale(walletProvider.annoFiscaleCorrente - 1);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
-                              ),
-                            ),
-                            
-                            // Anno Selezionato (Cliccabile per tornare all'Anno Corrente)
-                            InkWell(
-                              onTap: () {
-                                final int annoAttuale = DateTime.now().year;
-                                if (walletProvider.annoFiscaleCorrente != annoAttuale) {
-                                  walletProvider.setAnnoFiscale(annoAttuale);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                child: Text(
-                                  '${walletProvider.annoFiscaleCorrente}',
-                                  style: TextStyle(
-                                    color: walletProvider.annoFiscaleCorrente == DateTime.now().year 
-                                        ? const Color(0xFF2DD4BF) 
-                                        : const Color(0xFFF59E0B),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                      // 🗓️ SELETTORE ANNO FISCALE CON ACCENTO CROMATICO
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        decoration: BoxDecoration(
+                          color: isAnnoCorrente ? Colors.white.withOpacity(0.06) : coloreAnnoTema.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isAnnoCorrente ? Colors.white.withOpacity(0.15) : coloreAnnoTema.withOpacity(0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Freccia Indietro
+                                  InkWell(
+                                    onTap: () {
+                                      walletProvider.setAnnoFiscale(walletProvider.annoFiscaleCorrente - 1);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ),
-                            
-                            // Freccia Avanti (Anno Successivo)
-                            InkWell(
-                              onTap: walletProvider.annoFiscaleCorrente < DateTime.now().year
-                                  ? () {
+                                  
+                                  // Anno Selezionato
+                                  InkWell(
+                                    onTap: () {
+                                      if (!isAnnoCorrente) {
+                                        walletProvider.setAnnoFiscale(annoAttuale);
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          if (!isAnnoCorrente) ...[
+                                            Icon(
+                                              isAnnoPassato ? Icons.archive_rounded : Icons.auto_awesome_rounded,
+                                              color: coloreAnnoTema,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Text(
+                                            '$annoSelezionato',
+                                            style: TextStyle(
+                                              color: coloreAnnoTema,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Freccia Avanti
+                                  InkWell(
+                                    onTap: () {
                                       walletProvider.setAnnoFiscale(walletProvider.annoFiscaleCorrente + 1);
-                                    }
-                                  : null,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: walletProvider.annoFiscaleCorrente < DateTime.now().year 
-                                      ? Colors.white.withOpacity(0.1) 
-                                      : Colors.transparent, 
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.chevron_right_rounded, 
-                                  color: walletProvider.annoFiscaleCorrente < DateTime.now().year 
-                                      ? Colors.white70 
-                                      : Colors.white24, 
-                                  size: 16,
-                                ),
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 16),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 45),
+                // 🏷️ BANNER DI CONTESTO TEMPORALE (VISIBILE SE ANNO DIVERSO DA QUELLO CORRENTE)
+                if (!isAnnoCorrente) ...[
+                  const SizedBox(height: 16),
+                  Center(
+                    child: InkWell(
+                      onTap: () => walletProvider.setAnnoFiscale(annoAttuale),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: coloreAnnoTema.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: coloreAnnoTema.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isAnnoPassato ? Icons.archive_rounded : Icons.auto_awesome_rounded,
+                              color: coloreAnnoTema,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isAnnoPassato
+                                  ? 'ARCHIVIO STORICO $annoSelezionato • Tocca per tornare a oggi'
+                                  : 'PROIEZIONE FUTURA $annoSelezionato • Tocca per tornare a oggi',
+                              style: TextStyle(
+                                color: coloreAnnoTema,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                SizedBox(height: isAnnoCorrente ? 45 : 20),
 
                 // 🔹 FATTURATO GIGANTE
                 Center(
@@ -675,11 +742,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Expanded(
                               child: _buildGlassCard(
-                                icon: Icons.add_circle_outline_rounded,
+                                icon: isAnnoPassato ? Icons.lock_outline_rounded : Icons.add_circle_outline_rounded,
                                 title: 'Nuova\nfattura',
-                                value: '+ Registra',
-                                iconColor: const Color(0xFF10B981), 
-                                onTap: _mostraDialogRegistraFattura,
+                                value: isAnnoPassato ? 'Anno Chiuso' : '+ Registra',
+                                iconColor: isAnnoPassato ? const Color(0xFF64748B) : const Color(0xFF10B981),
+                                onTap: () {
+                                  if (isAnnoPassato) {
+                                    AppNotifications.mostraInAlto(
+                                      context,
+                                      'L\'anno $annoSelezionato è archiviato. Seleziona l\'anno corrente per registrare fatture.',
+                                      type: NotificationType.warning,
+                                    );
+                                  } else {
+                                    _mostraDialogRegistraFattura();
+                                  }
+                                },
                               ),
                             ),
                             const SizedBox(width: 12),

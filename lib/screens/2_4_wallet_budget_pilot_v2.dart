@@ -1426,6 +1426,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     HapticFeedback.mediumImpact();
 
     final bool haStipendioOPensione = provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0;
+    final String etichettaStipendio = provider.hasPensione ? 'Pensione' : 'Stipendio';
     final double targetStipendioNettoAnnuo = haStipendioOPensione
         ? (provider.entrataExtraMensile * (provider.hasDipendente ? 13 : 12))
         : 0.0;
@@ -1433,6 +1434,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double stimaPivaLordaAnnuo = (aliquotaTasse < 1.0)
         ? (totalePivaNettaAnnuo / (1 - aliquotaTasse))
         : 0.0;
+    
 
     showDialog(
       context: context,
@@ -1465,53 +1467,65 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 🎯 TARGET ANNUALE (OBIETTIVI) - VALORI IN GRIGIO
+              // 🎯 TARGET ANNUALE (OBIETTIVI)
               const Text(
                 'TARGET ANNUALE (OBIETTIVI)',
-                style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
               ),
               const SizedBox(height: 6),
-              if (provider.isPartitaIVA)
-                _buildRigaDettaglioPopup('Target Fatturato P.IVA (Lordo):', _formattaInt(targetAnnuoPivaLordo), Colors.white70),
-              if (haStipendioOPensione && targetStipendioNettoAnnuo > 0) ...[
-                const SizedBox(height: 4),
-                _buildRigaDettaglioPopup('Target Stipendio / Pensione (Netto):', _formattaInt(targetStipendioNettoAnnuo), Colors.white70),
-              ],
+              Padding(
+                padding: const EdgeInsets.only(left: 12.0),
+                child: Column(
+                  children: [
+                    if (provider.isPartitaIVA)
+                      _buildRigaDettaglioPopup('Target Fatturato P.IVA (Lordo):', _formattaInt(targetAnnuoPivaLordo), Colors.white70),
+                    if (haStipendioOPensione && targetStipendioNettoAnnuo > 0) ...[
+                      if (provider.isPartitaIVA) const SizedBox(height: 4),
+                      _buildRigaDettaglioPopup('Target $etichettaStipendio (Netto):', _formattaInt(targetStipendioNettoAnnuo), Colors.white70),
+                    ],
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 14),
 
-              // 📈 PREVISIONE ANNUALE (PROIEZIONI) - VALORI IN VERDE E PURPLE
+              // 📈 PREVISIONE ANNUALE (PROIEZIONI)
               const Text(
                 'PREVISIONE ANNUALE (PROIEZIONI)',
-                style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
               ),
               const SizedBox(height: 6),
-              if (provider.isPartitaIVA) ...[
-                _buildRigaDettaglioPopup('Previsione P.IVA (Lordo):', _formattaInt(stimaPivaLordaAnnuo), greenProfit),
-                const SizedBox(height: 4),
-                _buildRigaDettaglioPopup('Previsione P.IVA (Netto):', _formattaInt(totalePivaNettaAnnuo), greenProfit),
-                const SizedBox(height: 4),
-              ],
-              if (haStipendioOPensione && totaleStipendioAnnuo > 0) ...[
-                _buildRigaDettaglioPopup('Previsione Stipendio / Pensione (Netto):', _formattaInt(totaleStipendioAnnuo), greenProfit),
-                const SizedBox(height: 4),
-              ],
-              if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
-                _buildRigaDettaglioPopup(
-                  'Fondo Cuscinetto Mesi OFF (${12 - provider.mesiAttivi} mesi):',
-                  // ✅ CALCOLO ESATTO DEL FABBISOGNO ANNUO MASSIMO
-                  '${_formattaInt((provider.nettoTargetMensile - provider.entrataExtraMensile).clamp(0.0, double.infinity) * (12 - provider.mesiAttivi))} (Bilanciato)',
-                  purpleZen,
+              Padding(
+                padding: const EdgeInsets.only(left: 12.0),
+                child: Column(
+                  children: [
+                    if (provider.isPartitaIVA) ...[
+                      _buildRigaDettaglioPopup('Previsione P.IVA (Lordo):', _formattaInt(stimaPivaLordaAnnuo), greenProfit),
+                      const SizedBox(height: 4),
+                      _buildRigaDettaglioPopup('Previsione P.IVA (Netto):', _formattaInt(totalePivaNettaAnnuo), greenProfit),
+                      const SizedBox(height: 4),
+                    ],
+                    if (haStipendioOPensione && totaleStipendioAnnuo > 0) ...[
+                      _buildRigaDettaglioPopup('Previsione $etichettaStipendio (Netto):', _formattaInt(totaleStipendioAnnuo), greenProfit),
+                      const SizedBox(height: 4),
+                    ],
+                    if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
+                      _buildRigaDettaglioPopup(
+                        'Fondo Cuscinetto Mesi OFF (${12 - provider.mesiAttivi} mesi):',
+                        '${_formattaInt((provider.nettoTargetMensile - provider.entrataExtraMensile).clamp(0.0, double.infinity) * (12 - provider.mesiAttivi))}',
+                        purpleZen,
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 4),
-              ],
+              ),
 
               const Divider(color: Colors.white10, height: 18),
 
               // 💰 SINTESI RISPARMIO E BILANCIO
               _buildRigaDettaglioPopup('TOTALE ENTRATE NETTE:', _formattaInt(totaleNettoAnnuo), greenProfit, isBold: true),
               const SizedBox(height: 6),
-              _buildRigaDettaglioPopup('Uscite / Spese Pianificate:', '- ${_formattaInt(totaleSpeseAnnuo)}', const Color(0xFFEF4444)),
+              _buildRigaDettaglioPopup('USCITE / SPESE PIANIFICATE:', '- ${_formattaInt(totaleSpeseAnnuo)}', const Color(0xFFEF4444), isBold: true),
               const Divider(color: Colors.white10, height: 18),
               _buildRigaDettaglioPopup('RISPARMIO NETTO ANNUO:', _formattaInt(totaleRisparmioAnnuo), totaleRisparmioAnnuo >= 0 ? purpleZen : const Color(0xFFEF4444), isBold: true),
 
@@ -2596,40 +2610,32 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
     HapticFeedback.mediumImpact();
     final DateTime ora = DateTime.now();
 
-    // 🎯 1. Determinazione intelligente dell'anno di riferimento storico
-    int annoRiferimento = _annoSelezionatoPilotaggio < ora.year
-        ? _annoSelezionatoPilotaggio
-        : ora.year - 1;
+    // 🎯 1. L'anno storico è SEMPRE l'anno precedente all'anno selezionato nel pilotaggio
+    final int annoStorico = _annoSelezionatoPilotaggio - 1;
+    final int annoPilotato = _annoSelezionatoPilotaggio;
 
-    // Se l'anno di riferimento non ha transazioni, cerca il primo anno disponibile nel passato
-    final anniConIncassi = provider.transactions
-        .where((tx) => tx.isIncome && (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso')))
-        .map((tx) => tx.date.year)
-        .toSet();
-
-    if (!anniConIncassi.contains(annoRiferimento) && anniConIncassi.isNotEmpty) {
-      annoRiferimento = (anniConIncassi.toList()..sort((a, b) => b.compareTo(a))).first;
-    }
-
+    // 1️⃣ Recupera incassi P.IVA effettivi dell'Anno Storico precedente
     final Map<int, double> pivaStorica = {};
-    final Map<int, double> stipendioStorico = {};
-    double maxValoreMese = 100.0;
-
     for (int m = 1; m <= 12; m++) {
       double pivaMese = provider.transactions.where((tx) {
-        return tx.isIncome && tx.date.year == annoRiferimento && tx.date.month == m &&
+        return tx.isIncome && tx.date.year == annoStorico && tx.date.month == m &&
             (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
       }).fold(0.0, (sum, tx) => sum + tx.amount);
-
-      double stipMese = provider.transactions.where((tx) {
-        return tx.isIncome && tx.date.year == annoRiferimento && tx.date.month == m &&
-            (tx.category == 'Stipendio' || tx.category == 'Pensione' || tx.title.toLowerCase().contains('stipendio'));
-      }).fold(0.0, (sum, tx) => sum + tx.amount);
-
       pivaStorica[m] = pivaMese;
-      stipendioStorico[m] = stipMese;
+    }
 
-      if (pivaMese > maxValoreMese) maxValoreMese = pivaMese;
+    // 2️⃣ Recupera proiezione P.IVA Lorda dell'Anno Pilotato (AI + Override)
+    final matricePilotata = provider.calcolaMatriceProiezioneAnnuale(annoSelezionato: annoPilotato);
+    final Map<int, double> pivaPilotata = {};
+    for (int i = 0; i < 12; i++) {
+      pivaPilotata[i + 1] = (matricePilotata[i]['entrataPivaLorda'] as double? ?? 0.0);
+    }
+
+    // Scala proporzionale unica su entrambe le serie per confronto diretto
+    double maxValoreMese = 100.0;
+    for (int m = 1; m <= 12; m++) {
+      if ((pivaStorica[m] ?? 0) > maxValoreMese) maxValoreMese = pivaStorica[m]!;
+      if ((pivaPilotata[m] ?? 0) > maxValoreMese) maxValoreMese = pivaPilotata[m]!;
     }
 
     int? meseSelezionatoIndex = ora.month - 1;
@@ -2639,16 +2645,11 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final selectedMonthNum = meseSelezionatoIndex != null ? meseSelezionatoIndex! + 1 : null;
-          final selectedPiva = selectedMonthNum != null ? (pivaStorica[selectedMonthNum] ?? 0.0) : 0.0;
-          final selectedStip = selectedMonthNum != null ? (stipendioStorico[selectedMonthNum] ?? 0.0) : 0.0;
+          final selectedPivaStorico = selectedMonthNum != null ? (pivaStorica[selectedMonthNum] ?? 0.0) : 0.0;
+          final selectedPivaPilotato = selectedMonthNum != null ? (pivaPilotata[selectedMonthNum] ?? 0.0) : 0.0;
 
-          final List<double> percentualiHeights = List.generate(12, (i) {
-            final m = i + 1;
-            final piva = pivaStorica[m] ?? 0.0;
-            return (piva / maxValoreMese).clamp(0.05, 1.0);
-          });
-
-          final bool isPrevisioneFutura = _annoSelezionatoPilotaggio >= ora.year;
+          final List<double> heightsPctStorico = List.generate(12, (i) => ((pivaStorica[i + 1] ?? 0.0) / maxValoreMese).clamp(0.05, 1.0));
+          final List<double> heightsPctPilotato = List.generate(12, (i) => ((pivaPilotata[i + 1] ?? 0.0) / maxValoreMese).clamp(0.05, 1.0));
 
           return Dialog(
             backgroundColor: const Color(0xFF18181B),
@@ -2674,9 +2675,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  isPrevisioneFutura
-                                      ? 'Stagionalità da Storico $annoRiferimento'
-                                      : 'Consuntivo Incassi $annoRiferimento',
+                                  'Confronto $annoStorico vs $annoPilotato',
                                   style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -2692,9 +2691,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isPrevisioneFutura
-                          ? 'Curva usata dall\'AI per distribuire il fatturato del $_annoSelezionatoPilotaggio.'
-                          : 'Incassi effettivi P.IVA registrati nell\'anno $annoRiferimento.',
+                      'Confronta il fatturato P.IVA dello Storico $annoStorico con il Pianificato $annoPilotato.',
                       style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, height: 1.2),
                     ),
                     const SizedBox(height: 14),
@@ -2711,43 +2708,34 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            meseSelezionatoIndex != null
+                                ? 'FATTURATO P.IVA - ${_nomiMesiBrevi[meseSelezionatoIndex!]}'
+                                : 'SELEZIONA UN MESE',
+                            style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                          ),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                meseSelezionatoIndex != null
-                                    ? 'FATTURATO P.IVA ${_nomiMesiBrevi[meseSelezionatoIndex!]} $annoRiferimento'
-                                    : 'SELEZIONA UN MESE',
-                                style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                              ),
-                              Text(
-                                meseSelezionatoIndex != null ? _formattaInt(selectedPiva) : '0 €',
-                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
-                              ),
+                              Text('Storico P.IVA $annoStorico:', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                              Text(_formattaInt(selectedPivaStorico), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                          if (selectedStip > 0) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Stipendio / Pensione (Separato):',
-                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
-                                ),
-                                Text(
-                                  _formattaInt(selectedStip),
-                                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ],
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Pilotato P.IVA $annoPilotato:', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text(_formattaInt(selectedPivaPilotato), style: TextStyle(color: purpleZen, fontSize: 13, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // 📊 GRAFICO A BARRE P.IVA + OVERLAY CURVA BÈZIER
+                    // 📊 DOPPIA CURVA CONVERTITA IN CANVAS
                     Container(
                       height: 140,
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -2760,28 +2748,24 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                         builder: (context, constraints) {
                           return Stack(
                             children: [
-                              // 📈 CURVA BÈZIER MORBIDA IN SOVRIMPRASE
+                              // 📈 DOPPIA CURVA (Storico + Pilotato)
                               CustomPaint(
                                 size: Size(constraints.maxWidth, constraints.maxHeight),
                                 painter: _CurvaStagionalePainter(
-                                  heightsPct: percentualiHeights,
-                                  color: oceanCyan,
+                                  heightsPct1: heightsPctStorico,
+                                  color1: Colors.white38,
+                                  heightsPct2: heightsPctPilotato,
+                                  color2: purpleZen,
                                 ),
                               ),
 
-                              // 📊 BARRE INTERATTIVE CON TAP
+                              // 📊 BARRE INTERATTIVE MESE
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: List.generate(12, (index) {
-                                  final m = index + 1;
-                                  final piva = pivaStorica[m] ?? 0.0;
-                                  final double altezzaPct = percentualiHeights[index];
+                                  final double altezzaPct = heightsPctPilotato[index];
                                   final bool isSelected = meseSelezionatoIndex == index;
-
-                                  final pivaAnnoMap = provider.getPilotaggioFatturatoPerAnno(_annoSelezionatoPilotaggio);
-                                  final bool isOverrideManuale = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
-                                  final Color coloreBarra = isOverrideManuale ? purpleZen : oceanCyan;
 
                                   return GestureDetector(
                                     behavior: HitTestBehavior.opaque,
@@ -2799,11 +2783,11 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                           height: 80 * altezzaPct,
                                           decoration: BoxDecoration(
                                             color: isSelected
-                                                ? coloreBarra
-                                                : (piva > 0 ? coloreBarra.withOpacity(0.4) : Colors.white10),
+                                                ? purpleZen
+                                                : purpleZen.withOpacity(0.3),
                                             borderRadius: BorderRadius.circular(4),
                                             boxShadow: isSelected
-                                                ? [BoxShadow(color: coloreBarra.withOpacity(0.6), blurRadius: 8)]
+                                                ? [BoxShadow(color: purpleZen.withOpacity(0.6), blurRadius: 8)]
                                                 : null,
                                           ),
                                         ),
@@ -2811,7 +2795,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                         Text(
                                           _nomiMesiBrevi[index],
                                           style: TextStyle(
-                                            color: isSelected ? oceanCyan : (piva > 0 ? Colors.white : Colors.white38),
+                                            color: isSelected ? oceanCyan : Colors.white54,
                                             fontSize: 8,
                                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                           ),
@@ -2830,13 +2814,13 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(width: 8, height: 8, decoration: BoxDecoration(color: oceanCyan, shape: BoxShape.circle)),
+                        Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white38, shape: BoxShape.circle)),
                         const SizedBox(width: 4),
-                        const Text('Algoritmo AI', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text('Storico $annoStorico', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 14),
                         Container(width: 8, height: 8, decoration: BoxDecoration(color: purpleZen, shape: BoxShape.circle)),
                         const SizedBox(width: 4),
-                        const Text('Modifica Manuale', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text('Pilotato $annoPilotato', style: TextStyle(color: purpleZen, fontSize: 10, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -2864,31 +2848,50 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 }
 
 class _CurvaStagionalePainter extends CustomPainter {
-  final List<double> heightsPct;
-  final Color color;
+  final List<double> heightsPct1;
+  final Color color1;
+  final List<double> heightsPct2;
+  final Color color2;
 
   const _CurvaStagionalePainter({
-    required this.heightsPct,
-    required this.color,
+    required this.heightsPct1,
+    required this.color1,
+    required this.heightsPct2,
+    required this.color2,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (heightsPct.isEmpty) return;
-
-    final paint = Paint()
-      ..color = color.withOpacity(0.75)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    if (heightsPct1.isEmpty || heightsPct2.isEmpty) return;
 
     final double availableWidth = size.width;
-    final double columnWidth = availableWidth / heightsPct.length;
+    final double columnWidth = availableWidth / heightsPct1.length;
     final double maxBarHeight = 80.0;
     final double bottomY = size.height - 20;
 
-    final path = Path();
+    // 1️⃣ Disegna la curva dello Storico (Tratteggiata / Bianca tenue)
+    _disegnaCurva(canvas, heightsPct1, color1, columnWidth, bottomY, maxBarHeight, isDashed: true);
 
+    // 2️⃣ Disegna la curva del Pilotato (Continua / Viola)
+    _disegnaCurva(canvas, heightsPct2, color2, columnWidth, bottomY, maxBarHeight, isDashed: false);
+  }
+
+  void _disegnaCurva(
+    Canvas canvas,
+    List<double> heightsPct,
+    Color col,
+    double columnWidth,
+    double bottomY,
+    double maxBarHeight, {
+    required bool isDashed,
+  }) {
+    final paint = Paint()
+      ..color = isDashed ? col.withOpacity(0.5) : col
+      ..strokeWidth = isDashed ? 1.8 : 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
     for (int i = 0; i < heightsPct.length; i++) {
       final double x = (columnWidth * i) + (columnWidth / 2);
       final double barHeight = maxBarHeight * heightsPct[i];
@@ -2910,6 +2913,9 @@ class _CurvaStagionalePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CurvaStagionalePainter oldDelegate) {
-    return oldDelegate.heightsPct != heightsPct || oldDelegate.color != color;
+    return oldDelegate.heightsPct1 != heightsPct1 ||
+        oldDelegate.heightsPct2 != heightsPct2 ||
+        oldDelegate.color1 != color1 ||
+        oldDelegate.color2 != color2;
   }
 }

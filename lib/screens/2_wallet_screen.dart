@@ -57,12 +57,13 @@ class _WalletScreenState extends State<WalletScreen> {
   ];
 
   String _formattaValuta(double importo) {
+    final String segno = importo < 0 ? '-' : ''; // 👈 Mantiene il segno negativo se in rosso
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     );
-    return '$intPart,${parti[1]} €';
+    return '$segno$intPart,${parti[1]} €';
   }
 
   String _formattaInt(double importo) {
@@ -376,33 +377,41 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isCoperto ? Icons.flag_rounded : Icons.track_changes_rounded,
+                            color: statusColor,
+                            size: 16,
+                          ),
                         ),
-                        child: Icon(
-                          isCoperto ? Icons.flag_rounded : Icons.track_changes_rounded,
-                          color: statusColor,
-                          size: 16,
+                        const SizedBox(width: 8),
+                        const Flexible(
+                          child: Text(
+                            'Obiettivo Target Mensile',
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Obiettivo Target Mensile',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        _isTargetEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white70,
-                        size: 18,
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Icon(
+                          _isTargetEspanso ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white70,
+                          size: 18,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -910,7 +919,7 @@ class _WalletScreenState extends State<WalletScreen> {
       // 🔴 PASSATO E CORRENTE: Calcolo consuntivo reale puro dalle transazioni
       final txsFiltrate = movimenti.where((tx) {
         if (tx.isIncome) return false;
-        if (tx.category == 'Giroconto' || tx.title.toLowerCase().contains('giroconto')) return false;
+        if (tx.category == 'Giroconto' || tx.category == 'Imposte & F24' || tx.title.toLowerCase().contains('giroconto')) return false;
 
         if (_isVistaAnnuale) {
           return tx.date.year == _dataFiltroRipartizione.year;
@@ -991,34 +1000,38 @@ class _WalletScreenState extends State<WalletScreen> {
             top: 0,
             left: 0,
             right: 0,
-            height: screenHeight * 0.75,
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _testIndex++;
-                });
-              },
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 800),
-                child: Container(
-                  key: ValueKey<String>(currentBackgroundUrl),
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(currentBackgroundUrl),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.99),
-                          Colors.black.withOpacity(0.4),
-                          Colors.black,
-                        ],
-                        stops: const [0.0, 0.3, 1.0],
+            height: screenHeight * 0.55,
+            child: ClipRect(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _testIndex++;
+                  });
+                },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 800),
+                  child: SizedBox.expand(
+                    key: ValueKey<String>(currentBackgroundUrl),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: NetworkImage(currentBackgroundUrl),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.95),
+                              Colors.black.withOpacity(0.3),
+                              Colors.black,
+                            ],
+                            stops: const [0.0, 0.4, 1.0],
+                          ),
+                        ),
                       ),
                     ),
                   ),

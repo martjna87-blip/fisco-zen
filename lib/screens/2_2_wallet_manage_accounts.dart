@@ -7,11 +7,214 @@ import '../widgets_shared/app_bottom_sheet.dart';
 import '../widgets_shared/app_secondary_popup.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_popup_wrapper.dart';
+import '2_6_import_statement_sheet.dart';
+import '0_1_pro_upgrade.dart';
+
 
 class ManageAccountsSheet extends StatefulWidget {
   final bool? isPiva;
 
   const ManageAccountsSheet({super.key, this.isPiva});
+
+  static String formattaValuta(double importo) {
+    final String segno = importo < 0 ? '-' : '';
+    final parti = importo.abs().toStringAsFixed(2).split('.');
+    final intPart = parti[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$segno$intPart,${parti[1]} €';
+  }
+
+  static String formattaDataInItaliano(DateTime date) {
+    final List<String> mesi = [
+      'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+      'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${mesi[date.month - 1]} ${date.year}';
+  }
+
+  static void mostraDialogGiroconto(
+    BuildContext context, {
+    required List<AccountModel> accounts,
+    String? daContoIniziale,
+    String? aContoIniziale,
+    double? importoIniziale,
+    DateTime? dataIniziale,
+  }) {
+    if (accounts.length < 2) return;
+
+    String daConto = daContoIniziale ?? accounts[0].title;
+    String aConto = aContoIniziale ?? accounts[1].title;
+    DateTime dataGiroconto = dataIniziale ?? DateTime.now();
+
+    final List<String> nomiConti = accounts.map((c) => c.title).toList();
+    final TextEditingController importoController = TextEditingController(
+      text: importoIniziale != null && importoIniziale > 0
+          ? importoIniziale.toStringAsFixed(2).replaceAll('.', ',')
+          : '',
+    );
+
+    // Helper funzioni ricreate localmente nel metodo statico
+    String formattaValutaLocale(double importo) {
+      final String segno = importo < 0 ? '-' : '';
+      final parti = importo.abs().toStringAsFixed(2).split('.');
+      final intPart = parti[0].replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]}.',
+      );
+      return '$segno$intPart,${parti[1]} €';
+    }
+
+    String formattaDataLocale(DateTime date) {
+      final List<String> mesi = [
+        'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+        'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+      ];
+      return '${date.day.toString().padLeft(2, '0')} ${mesi[date.month - 1]} ${date.year}';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AppSecondaryPopup(
+            icon: Icons.sync_alt_rounded,
+            iconColor: const Color(0xFF2DD4BF),
+            titolo: 'Giroconto Tra Conti',
+            testoConferma: 'Esegui Giroconto',
+            onConferma: () {
+              final importo = double.tryParse(importoController.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
+              
+              if (importo <= 0) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Inserisci un importo valido maggiore di 0 €',
+                  type: NotificationType.warning,
+                );
+                return;
+              }
+
+              if (daConto == aConto) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Seleziona due conti differenti per il trasferimento',
+                  type: NotificationType.warning,
+                );
+                return;
+              }
+
+              final accDa = accounts.firstWhere((a) => a.title == daConto);
+              final accA = accounts.firstWhere((a) => a.title == aConto);
+
+              if (accDa.amount < importo) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${formattaValutaLocale(accDa.amount)})',
+                  type: NotificationType.error,
+                );
+                return;
+              }
+
+              try {
+                final provider = context.read<WalletProvider>();
+                provider.eseguiGiroconto(
+                  daAccountId: accDa.id,
+                  aAccountId: accA.id,
+                  importo: importo,
+                  isAccantonamentoTasse: false,
+                  date: dataGiroconto,
+                );
+
+                Navigator.pop(context);
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Giroconto di ${formattaValutaLocale(importo)} eseguito con successo! 🎉',
+                );
+              } catch (e) {
+                AppNotifications.mostraInAlto(
+                  context,
+                  'Errore durante il giroconto: $e',
+                  type: NotificationType.error,
+                );
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppSecondaryDropdown<String>(
+                    label: 'Da Conto (Addebito)',
+                    accentColor: const Color(0xFF2DD4BF),
+                    selectedValue: daConto,
+                    items: nomiConti.map((c) => AppDropdownItem(value: c, label: c)).toList(),
+                    onSelect: (val) => setDialogState(() => daConto = val),
+                  ),
+                  const SizedBox(height: 12),
+                  AppSecondaryDropdown<String>(
+                    label: 'A Conto (Accredito)',
+                    accentColor: const Color(0xFF2DD4BF),
+                    selectedValue: aConto,
+                    items: nomiConti.map((c) => AppDropdownItem(value: c, label: c)).toList(),
+                    onSelect: (val) => setDialogState(() => aConto = val),
+                  ),
+                  const SizedBox(height: 12),
+
+                  const Text('DATA TRASFERIMENTO', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await AppDatePicker.selezionaData(
+                        context,
+                        dataIniziale: dataGiroconto,
+                      );
+                      if (picked != null) {
+                        setDialogState(() => dataGiroconto = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 14),
+                          const SizedBox(width: 8),
+                          Text(
+                            formattaDataLocale(dataGiroconto),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextField(
+                    controller: importoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'Importo Trasferimento (€)',
+                      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      prefixIcon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   State<ManageAccountsSheet> createState() => _ManageAccountsSheetState();
@@ -23,12 +226,13 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
   final Set<int> _anniEspansi = {};
 
   String _formattaValuta(double importo) {
+    final String segno = importo < 0 ? '-' : ''; // 👈 Mantiene il segno meno se il saldo è in rosso
     final parti = importo.abs().toStringAsFixed(2).split('.');
     final intPart = parti[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     );
-    return '$intPart,${parti[1]} €';
+    return '$segno$intPart,${parti[1]} €';
   }
 
   String _formattaDataInItaliano(DateTime date) {
@@ -197,7 +401,26 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
       ),
     );
   }
+void _apriImportazioneEstratto(BuildContext context, AccountModel account) {
+    final walletProvider = context.read<WalletProvider>();
 
+    if (!walletProvider.isProUser) {
+      AppBottomSheet.mostra(
+        context: context,
+        child: const ProUpgradeSheet(funzionalita: 'Importazione Estratto Conto AI'),
+      );
+      return;
+    }
+
+    AppBottomSheet.mostra(
+      context: context,
+      child: ImportStatementSheet(
+        accountId: account.id,
+        accountName: account.title,
+        accountColor: account.color,
+      ),
+    );
+  }
   void _mostraDialogModificaConto(BuildContext context, AccountModel account) {
     final TextEditingController nomeController = TextEditingController(text: account.title);
     final TextEditingController controller = TextEditingController(
@@ -588,15 +811,26 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
     );
   }
 
-  void _mostraDialogGiroconto(List<AccountModel> accounts) {
+  static void mostraDialogGiroconto(
+    BuildContext context, {
+    required List<AccountModel> accounts,
+    String? daContoIniziale,
+    String? aContoIniziale,
+    double? importoIniziale,
+    DateTime? dataIniziale,
+  }) {
     if (accounts.length < 2) return;
 
-    String daConto = accounts[0].title;
-    String aConto = accounts[1].title;
-    DateTime dataGiroconto = DateTime.now();
+    String daConto = daContoIniziale ?? accounts[0].title;
+    String aConto = aContoIniziale ?? accounts[1].title;
+    DateTime dataGiroconto = dataIniziale ?? DateTime.now();
 
     final List<String> nomiConti = accounts.map((c) => c.title).toList();
-    final TextEditingController importoController = TextEditingController();
+    final TextEditingController importoController = TextEditingController(
+      text: importoIniziale != null && importoIniziale > 0
+          ? importoIniziale.toStringAsFixed(2).replaceAll('.', ',')
+          : '',
+    );
 
     showDialog(
       context: context,
@@ -634,7 +868,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
               if (accDa.amount < importo) {
                 AppNotifications.mostraInAlto(
                   context,
-                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${_formattaValuta(accDa.amount)})',
+                  'Saldo insufficiente su "${accDa.title}"! (Disponibili: ${ManageAccountsSheet.formattaValuta(accDa.amount)})',
                   type: NotificationType.error,
                 );
                 return;
@@ -653,7 +887,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                 Navigator.pop(context);
                 AppNotifications.mostraInAlto(
                   context,
-                  'Giroconto di ${_formattaValuta(importo)} eseguito con successo! 🎉',
+                  'Giroconto di ${ManageAccountsSheet.formattaValuta(importo)} eseguito con successo! 🎉',
                 );
               } catch (e) {
                 AppNotifications.mostraInAlto(
@@ -709,13 +943,14 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                           const Icon(Icons.calendar_today_rounded, color: Color(0xFF2DD4BF), size: 14),
                           const SizedBox(width: 8),
                           Text(
-                            _formattaDataInItaliano(dataGiroconto),
+                            ManageAccountsSheet.formattaDataInItaliano(dataGiroconto),
                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
                   ),
+                  
                   const SizedBox(height: 12),
 
                   TextField(
@@ -979,7 +1214,7 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                     const SizedBox(width: 4),
                     IconButton(
                       icon: const Icon(Icons.sync_alt_rounded, color: Color(0xFF2DD4BF), size: 20),
-                      onPressed: () => _mostraDialogGiroconto(accounts),
+                      onPressed: () => ManageAccountsSheet.mostraDialogGiroconto(context, accounts: accounts),
                       tooltip: 'Esegui Giroconto',
                     ),
                   ],
@@ -1087,10 +1322,44 @@ class _ManageAccountsSheetState extends State<ManageAccountsSheet> {
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                     offset: const Offset(0, 40),
                                     onSelected: (value) {
+                                      if (value == 'import') _apriImportazioneEstratto(context, account);
                                       if (value == 'edit') _mostraDialogModificaConto(context, account);
                                       if (value == 'delete') _confermaEliminazioneConto(context, account);
                                     },
                                     itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'import',
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.document_scanner_rounded, color: Color(0xFF38BDF8), size: 16),
+                                            const SizedBox(width: 8),
+                                            const Text(
+                                              'Importa Estratto',
+                                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                            ),
+                                            // Mostra il badge PRO solo se l'utente NON è abbonato
+                                            if (!context.read<WalletProvider>().isProUser) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF59E0B),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: const Text(
+                                                  'PRO',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                       const PopupMenuItem(
                                         value: 'edit',
                                         child: Row(

@@ -121,9 +121,9 @@ class _ProUpgradeSheetState extends State<ProUpgradeSheet> {
                             isSelected: _selectedTier == UserTier.pro,
                             badgeText: 'CONSIGLIATO',
                             features: [
-                              'Lettura ricevute con Fotocamera (OCR)',
-                              'Gestione Riserva Tasse F24 illimitata',
-                              'Previsione e pianificazione mensile'
+                              'Scansione Ricevute e Scontrini AI (OCR)',
+                              'Importazione Estratto Conto AI',
+                              'Pilotaggio Strategico e Regole Ricorrenti'
                             ],
                             onTap: () {
                               if (_selectedTier != UserTier.pro) {
