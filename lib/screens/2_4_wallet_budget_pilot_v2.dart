@@ -9,7 +9,6 @@ import '../widgets_shared/app_secondary_popup.dart';
 import '0_1_pro_upgrade.dart';
 import '../widgets_shared/app_datepicker.dart';
 import '../widgets_shared/app_action_card.dart';
-import '../screens/0_1_pro_upgrade.dart';
 import '../data/recurrence_manager.dart';
 import '../widgets_shared/app_gestione_ricorrenza_popup.dart';
 
@@ -22,7 +21,7 @@ class PianoSpesaSheet extends StatefulWidget {
 
 class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
   int _tabSelezionata = 0; // 0 = 🔄 Ricorrenze, 1 = 🎯 Pilotaggio & Regole
-  int _subTabRicorrenze = 0; // 👈 AGGIUNTO: 0 = Attive, 1 = Passate
+  int _subTabRicorrenze = 0; // 0 = Attive, 1 = Passate
   int _annoSelezionatoPilotaggio = DateTime.now().year;
   final Color oceanCyan   = const Color(0xFF38BDF8);
   final Color goldAccent  = const Color(0xFFFBBF24);
@@ -52,7 +51,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     return '$intPart,${parti[1]} €';
   }
 
-  // 🚀 APERTURA DEL NUOVO PAYWALL PREMIUM
   void _mostraModalPRO(BuildContext context) {
     AppBottomSheet.mostra(
       context: context,
@@ -77,7 +75,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔘 SELETTORE TAB MINIMALE
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -152,9 +149,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 ],
               ),
             ),
-
             const SizedBox(height: 14),
-
             Expanded(
               child: Stack(
                 children: [
@@ -171,9 +166,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
- // ===========================================================================
-  // TAB 1: 🔄 RICORRENZE (CON TOGGLE ATTIVE / STORICO PASSATE)
-  // ===========================================================================
   Widget _buildTabRicorrenze(WalletProvider provider) {
     final bool isPro = provider.isProUser;
 
@@ -218,7 +210,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
       }
     }
 
-    // 🎯 SEPARAZIONE REGOLE ATTIVE ED ARCHIVIATE / TERMINATE
     final List<Map<String, dynamic>> vociAttive = [];
     final List<Map<String, dynamic>> vociTerminate = [];
 
@@ -245,7 +236,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🔹 SELETTORE A DOPPIO PULSANTE AFFIANCATO
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -315,7 +305,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
         const SizedBox(height: 10),
 
-        // 📋 LISTA FLUIDA DELLE REGOLE
         Expanded(
           child: listaDaMostrare.isEmpty
               ? Padding(
@@ -341,7 +330,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
         const SizedBox(height: 12),
 
-        // 🔘 BOTTONE D'AZIONE IN BASSO
         SizedBox(
           width: double.infinity,
           height: 46,
@@ -555,22 +543,16 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // ===========================================================================
-  // TAB 2: 🎯 PILOTAGGIO STRATEGICO (HUMAN-IN-THE-LOOP + PLANCIA DI COMANDO)
-  // ===========================================================================
   Widget _buildTabPilotaggioERegole(WalletProvider provider) {
     final bool isPro = provider.isProUser;
     final double targetAnnuoPivaLordo = provider.fatturatoStimato;
 
-    // ⚡ RECUPERO MATRICE CENTRALIZZATA DAL PROVIDER PER L'ANNO SELEZIONATO
     final List<Map<String, dynamic>> matriceMesi = provider.calcolaMatriceProiezioneAnnuale(annoSelezionato: _annoSelezionatoPilotaggio);
 
-    // 1. Dichiariamo prima i totali parziali della matrice
     final double totalePivaNettaAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['entrataPivaNetta'] as double));
     final double totaleStipendioAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['entrataStipendio'] as double));
     final double totaleSpeseAnnuo = matriceMesi.fold(0.0, (sum, m) => sum + (m['speseMese'] as double));
 
-    // 2. Dichiariamo i totali derivati (esatti senza doppi conteggi)
     final double totaleNettoAnnuo = totalePivaNettaAnnuo + totaleStipendioAnnuo;
     final double totaleRisparmioAnnuo = totaleNettoAnnuo - totaleSpeseAnnuo;
 
@@ -580,10 +562,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double totaleGiaFissatoManualmenteLordo = pivaAnnoMap.values.fold(0.0, (sum, v) => sum + v) +
         stipAnnoMap.values.fold(0.0, (sum, v) => sum + v);
 
-    final double totaleEntratePerBarra = (totalePivaNettaAnnuo + totaleStipendioAnnuo) > 0 ? (totalePivaNettaAnnuo + totaleStipendioAnnuo) : 1.0;
-    final int flexPiva = ((totalePivaNettaAnnuo / totaleEntratePerBarra) * 100).round().clamp(1, 100);
-    final int flexStipendio = (100 - flexPiva).clamp(0, 99);
-
     return Column(
       children: [
         Expanded(
@@ -592,360 +570,375 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-          // 📊 KPI HERO CARD MINIMALE: NETTO & RISPARMIO CON POPUP SU TAP SINGOLO
-          GestureDetector(
-            onTap: () => _mostraPopupDettaglioSintesi(
-              context,
-              provider,
-              targetAnnuoPivaLordo,
-              totalePivaNettaAnnuo,
-              totaleStipendioAnnuo,
-              totaleSpeseAnnuo,
-              totaleNettoAnnuo,
-              totaleRisparmioAnnuo,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF18181B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                GestureDetector(
+                  onTap: () => _mostraPopupDettaglioSintesi(
+                    context,
+                    provider,
+                    targetAnnuoPivaLordo,
+                    totalePivaNettaAnnuo,
+                    totaleStipendioAnnuo,
+                    totaleSpeseAnnuo,
+                    totaleNettoAnnuo,
+                    totaleRisparmioAnnuo,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF18181B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
                       children: [
-                        const Text('NETTO REALE ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                        const SizedBox(height: 3),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _formattaInt(totaleNettoAnnuo),
-                            style: TextStyle(color: greenProfit, fontSize: 18, fontWeight: FontWeight.w900),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('NETTO REALE ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                              const SizedBox(height: 3),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _formattaInt(totaleNettoAnnuo),
+                                  style: TextStyle(color: greenProfit, fontSize: 18, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        Container(
+                          height: 28,
+                          width: 1,
+                          color: Colors.white10,
+                          margin: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('RISPARMIO ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                  if (totaleSpeseAnnuo == 0) ...[
+                                    const SizedBox(width: 4),
+                                    const Text('(Spese = 0)', style: TextStyle(color: Colors.white24, fontSize: 7, fontStyle: FontStyle.italic)),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _formattaInt(totaleRisparmioAnnuo),
+                                  style: TextStyle(
+                                    color: totaleRisparmioAnnuo >= 0 ? purpleZen : const Color(0xFFEF4444),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.info_outline_rounded, color: Colors.white38, size: 16),
                       ],
                     ),
                   ),
-                  Container(
-                    height: 28,
-                    width: 1,
-                    color: Colors.white10,
-                    margin: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+
+                const SizedBox(height: 14),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            const Text('RISPARMIO ANNUO', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                            if (totaleSpeseAnnuo == 0) ...[
-                              const SizedBox(width: 4),
-                              const Text('(Spese = 0)', style: TextStyle(color: Colors.white24, fontSize: 7, fontStyle: FontStyle.italic)),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            _formattaInt(totaleRisparmioAnnuo),
-                            style: TextStyle(
-                              color: totaleRisparmioAnnuo >= 0 ? purpleZen : const Color(0xFFEF4444),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                        const Text('PIANIFICAZIONE MESE PER MESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _mostraPopupCurvaStorica(context, provider),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: oceanCyan.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.show_chart_rounded, color: oceanCyan, size: 12),
+                                const SizedBox(width: 4),
+                                Text('Curva', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.info_outline_rounded, color: Colors.white38, size: 16),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // 1. INTESTAZIONE PIANIFICAZIONE, PULSANTE CURVA E SELETTORE ANNO
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Text('PIANIFICAZIONE MESE PER MESE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () => _mostraPopupCurvaStorica(context, provider),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
+                    
+                    Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: oceanCyan.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: oceanCyan.withOpacity(0.3)),
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.show_chart_rounded, color: oceanCyan, size: 12),
-                          const SizedBox(width: 4),
-                          Text('Curva', style: TextStyle(color: oceanCyan, fontSize: 9, fontWeight: FontWeight.bold)),
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _annoSelezionatoPilotaggio--;
+                              });
+                            },
+                            child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '$_annoSelezionatoPilotaggio',
+                              style: TextStyle(
+                                color: _annoSelezionatoPilotaggio == DateTime.now().year ? oceanCyan : goldAccent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _annoSelezionatoPilotaggio++;
+                              });
+                            },
+                            child: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 16),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-              
-              // 🗓️ SELETTORE ANNO
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _annoSelezionatoPilotaggio--;
-                        });
-                      },
-                      child: const Icon(Icons.chevron_left_rounded, color: Colors.white70, size: 16),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        '$_annoSelezionatoPilotaggio',
-                        style: TextStyle(
-                          color: _annoSelezionatoPilotaggio == DateTime.now().year ? oceanCyan : goldAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _annoSelezionatoPilotaggio++;
-                        });
-                      },
-                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 16),
-                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-          // 2. BANNER INFORMATIVO E PULSANTE RESET AI SOTTO L'INTESTAZIONE
+                // 2. BANNER INFORMATIVO AI CON GUIDA INTEGRATA E RESET
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: oceanCyan.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: oceanCyan.withOpacity(0.25)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.psychology_rounded, color: oceanCyan, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    totaleGiaFissatoManualmenteLordo > 0
-                        ? 'Interventi manuali attivi per il $_annoSelezionatoPilotaggio. L\'AI ricalcola il residuo sui mesi liberi.'
-                        : 'Algoritmo AI attivo: Ripartizione dinamica P.IVA sui mesi ON per il $_annoSelezionatoPilotaggio.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.psychology_rounded, color: oceanCyan, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        totaleGiaFissatoManualmenteLordo > 0
+                            ? 'Interventi manuali attivi per il $_annoSelezionatoPilotaggio. L\'AI ricalcola il residuo sui mesi liberi.'
+                            : 'Algoritmo AI attivo: Ripartizione dinamica P.IVA sui mesi ON per il $_annoSelezionatoPilotaggio.',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11, height: 1.2),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: totaleGiaFissatoManualmenteLordo > 0
-                      ? () {
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    InkWell(
+                      onTap: () => _mostraPopupGuidaEPilotaggio(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: oceanCyan.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: oceanCyan.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.help_outline_rounded, color: oceanCyan, size: 13),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Guida & Legenda indicatori',
+                              style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (totaleGiaFissatoManualmenteLordo > 0)
+                      InkWell(
+                        onTap: () {
                           provider.resetPilotaggioAnno(_annoSelezionatoPilotaggio);
                           AppNotifications.mostraInAlto(
                             context,
                             'Reset AI per l\'anno $_annoSelezionatoPilotaggio effettuato: Algoritmo ripristinato! 🎯',
                           );
-                        }
-                      : null,
-                  borderRadius: BorderRadius.circular(8),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: totaleGiaFissatoManualmenteLordo > 0
-                          ? oceanCyan.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: totaleGiaFissatoManualmenteLordo > 0
-                            ? oceanCyan.withOpacity(0.5)
-                            : Colors.white10,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.refresh_rounded,
-                          color: totaleGiaFissatoManualmenteLordo > 0 ? oceanCyan : Colors.white24,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Reset AI',
-                          style: TextStyle(
-                            color: totaleGiaFissatoManualmenteLordo > 0 ? oceanCyan : Colors.white24,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: oceanCyan.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: oceanCyan.withOpacity(0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.refresh_rounded, color: oceanCyan, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Reset AI',
+                                style: TextStyle(color: oceanCyan, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-          // 🗓️ GRIGLIA 12 MESI INTERATTIVA CON BADGE E ANOMALIE
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 1.55,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final m = matriceMesi[index];
-              final Color coloreStato = m['coloreStato'] as Color;
-              final bool isCorrente = m['isCorrente'] as bool;
-              final bool isPassato = m['isPassato'] as bool;
-              final bool isMeseOFF = !(m['isMeseON'] as bool);
-              final bool haAnomalia = m['haAnomalia'] as bool;
-              final bool isManual = m['isManualOverride'] as bool;
-
-              final Color coloreDot = isPassato ? Colors.grey : (isCorrente ? oceanCyan : coloreStato);
-
-              return InkWell(
-                onTap: () {
-                  if (!isPro) {
-                    _mostraModalPRO(context);
-                  } else {
-                    _mostraPlanciaComandoMese(context, provider, m);
-                  }
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isCorrente 
-                        ? oceanCyan.withOpacity(0.12) 
-                        : (isMeseOFF ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.04)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isCorrente 
-                          ? oceanCyan 
-                          : (isPassato ? greenProfit.withOpacity(0.4) : Colors.white10),
-                      width: isCorrente ? 1.5 : 1.0,
-                    ),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.55,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(color: coloreDot, shape: BoxShape.circle),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(m['nomeMese'] as String, style: TextStyle(color: isCorrente ? oceanCyan : Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          if (haAnomalia)
-                            Icon(Icons.warning_amber_rounded, color: goldAccent, size: 12)
-                          else if (isMeseOFF)
-                            const Text('🏖️', style: TextStyle(fontSize: 8))
-                          else if (isManual)
-                            Icon(Icons.edit_rounded, color: oceanCyan, size: 10)
-                          else if (isPassato)
-                            const Text('🔒', style: TextStyle(fontSize: 8))
-                          else
-                            Icon(Icons.auto_awesome_rounded, color: purpleZen, size: 10),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      FittedBox(
-                        child: Text(
-                          _formattaInt(m['entrataTotaleNetta'] as double),
-                          style: TextStyle(
-                            color: isMeseOFF ? Colors.white24 : Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (isMeseOFF && provider.isPartitaIVA)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 1.0),
-                          child: Text(
-                            '🏖️ da Cuscinetto',
-                            style: TextStyle(color: purpleZen, fontSize: 8, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      const SizedBox(height: 2),
-                      (() {
-                        final double valRisparmio = (m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0);
-                        Color coloreRisparmio = Colors.white38;
-                        if (valRisparmio > 0 && !isPassato) {
-                          coloreRisparmio = greenProfit;
-                        } else if (valRisparmio < 0) {
-                          coloreRisparmio = const Color(0xFFEF4444);
+                  itemCount: 12,
+                  itemBuilder: (context, index) {
+                    final m = matriceMesi[index];
+                    final Color coloreStato = m['coloreStato'] as Color;
+                    final bool isCorrente = m['isCorrente'] as bool;
+                    final bool isPassato = m['isPassato'] as bool;
+                    final bool isMeseOFF = !(m['isMeseON'] as bool);
+                    final bool haAnomalia = m['haAnomalia'] as bool;
+                    final bool isManual = m['isManualOverride'] as bool;
+
+                    final Color coloreDot = isPassato ? Colors.grey : (isCorrente ? oceanCyan : coloreStato);
+
+                    return InkWell(
+                      onTap: () {
+                        if (!isPro) {
+                          _mostraModalPRO(context);
+                        } else {
+                          _mostraPlanciaComandoMese(context, provider, m);
                         }
-
-                        return FittedBox(
-                          child: Text(
-                            'Risparmio: ${_formattaInt(valRisparmio)}',
-                            style: TextStyle(
-                              color: coloreRisparmio,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isCorrente 
+                              ? oceanCyan.withOpacity(0.12) 
+                              : (isMeseOFF ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.04)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isCorrente 
+                                ? oceanCyan 
+                                : (isPassato ? greenProfit.withOpacity(0.4) : Colors.white10),
+                            width: isCorrente ? 1.5 : 1.0,
                           ),
-                        );
-                      })(),
-                    ],
-                  ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(color: coloreDot, shape: BoxShape.circle),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(m['nomeMese'] as String, style: TextStyle(color: isCorrente ? oceanCyan : Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                if (haAnomalia)
+                                  Icon(Icons.warning_amber_rounded, color: goldAccent, size: 12)
+                                else if (isMeseOFF)
+                                  const Text('🏖️', style: TextStyle(fontSize: 8))
+                                else if (isManual)
+                                  Icon(Icons.edit_rounded, color: oceanCyan, size: 10)
+                                else if (isPassato)
+                            const Icon(Icons.lock_rounded, color: Colors.white38, size: 11)
+                                else
+                                  Icon(Icons.auto_awesome_rounded, color: purpleZen, size: 10),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              child: Text(
+                                _formattaInt(m['entrataTotaleNetta'] as double),
+                                style: TextStyle(
+                                  color: isMeseOFF ? Colors.white24 : Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (provider.isPartitaIVA)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1.0),
+                                child: Text(
+                                  isMeseOFF 
+                                      ? '🏖️ da Cuscinetto' 
+                                      : ((m['quotaCuscinetto'] as double? ?? 0) > 0 ? '🛡️ al Cuscinetto' : ''),
+                                  style: TextStyle(color: purpleZen, fontSize: 8, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            const SizedBox(height: 2),
+                            (() {
+                              final double valRisparmio = (m['bilancioNetto'] as double? ?? 0.0) - (m['quotaCuscinetto'] as double? ?? 0.0);
+                              Color coloreRisparmio = Colors.white38;
+                              if (valRisparmio > 0 && !isPassato) {
+                                coloreRisparmio = greenProfit;
+                              } else if (valRisparmio < 0) {
+                                coloreRisparmio = const Color(0xFFEF4444);
+                              }
+
+                              return FittedBox(
+                                child: Text(
+                                  'Risparmio: ${_formattaInt(valRisparmio)}',
+                                  style: TextStyle(
+                                    color: coloreRisparmio,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              );
+                            })(),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
 
-          const SizedBox(height: 20),
-          const Text('PARAMETRIZZAZIONE BUSSOLA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-          const SizedBox(height: 8),
+                const SizedBox(height: 20),
+                const Text('PARAMETRIZZAZIONE BUSSOLA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                const SizedBox(height: 8),
 
-          // 🎛️ REGOLATORE BUSSOLA 50/30/20
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -1048,7 +1041,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-  // 🎛️ PLANCIA DI COMANDO DEL MESE (GRAFICA PULITA E UNIFORMATA)
   void _mostraPlanciaComandoMese(BuildContext context, WalletProvider provider, Map<String, dynamic> m) {
     final int meseIdx = m['meseIdx'] as int;
     final String nomeMese = m['nomeMese'] as String;
@@ -1068,7 +1060,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final bool isCorrente = m['isCorrente'] as bool? ?? false;
     final int annoCorrente = DateTime.now().year;
 
-    // 🎯 CALCOLO REALTIME PER IL MESE CORRENTE
     double stipendioReale = 0.0;
     double pivaLordaReale = 0.0;
     double speseRealiSostenute = 0.0;
@@ -1093,16 +1084,13 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double entratePureTarget = isMeseOFF ? stipendioTarget : (stipendioTarget + pivaNettaTarget);
     final double entratePureReali = isMeseOFF ? stipendioReale : (stipendioReale + pivaNettaReale);
 
-    // 🛡️ ANTI-DUPLICAZIONE SPESE: Sostenute Reali + Pianificate Rimanenti
     final double spesePianificateRimanenti = (spesePianificateTotali - speseRealiSostenute).clamp(0.0, double.infinity);
     final double speseTotaliProiettateMese = isCorrente ? (speseRealiSostenute + spesePianificateRimanenti) : spesePianificateTotali;
 
-    // Risparmio netto effettivo
     final double risparmioNettoMese = isMeseOFF
         ? ((isCorrente ? stipendioReale : stipendioTarget) + quotaCuscinetto - speseTotaliProiettateMese)
         : ((isCorrente ? entratePureReali : entratePureTarget) - quotaCuscinetto - speseTotaliProiettateMese);
 
-    // 🔒 GESTIONE ESATTA DEL SEGNO PER EVITARE DOPPIO -
     final String strRisparmioNetto = risparmioNettoMese < 0
         ? '- ${_formattaInt(risparmioNettoMese.abs())}'
         : _formattaInt(risparmioNettoMese);
@@ -1138,7 +1126,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🏷️ BADGE ORIGINE DATO
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -1185,12 +1172,10 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
             const SizedBox(height: 14),
 
-            // 💵 COMPOSIZIONE ENTRATE
             const Text('COMPOSIZIONE ENTRATE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
             const SizedBox(height: 6),
 
             if (isCorrente) ...[
-              // 🔴 BLOCCO REAL TIME & TARGET (MESE CORRENTE)
               if (provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1238,7 +1223,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                 ),
               ),
             ] else ...[
-              // 🔮 BLOCCO PREVISIONE / CONSOLIDATO (MESI FUTURI O PASSATI)
               if (provider.hasDipendente || provider.hasPensione || provider.entrataExtraMensile > 0) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1291,7 +1275,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
             const Divider(color: Colors.white10, height: 1),
             const SizedBox(height: 12),
 
-            // 📉 BILANCIO & BUSSOLA BUDGET
             const Text('BILANCIO & BUSSOLA BUDGET', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
             const SizedBox(height: 6),
 
@@ -1321,31 +1304,38 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               ),
             ],
 
-            // 🏖️ CUSCINETTO FERIE SOTTO IL BILANCIO
-            if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
+            if (provider.isPartitaIVA) ...[
               const SizedBox(height: 4),
-              if (isMeseOFF) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Integrazione Cuscinetto Ferie:', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.w600)),
-                    Text('+ ${_formattaInt(quotaCuscinetto.abs())}', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ] else if (quotaCuscinetto > 0) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Accantonamento Cuscinetto Ferie:', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.w600)),
-                    Text('- ${_formattaInt(quotaCuscinetto.abs())}', style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ],
+              Builder(
+                builder: (context) {
+                  final double valReale = quotaCuscinetto.abs();
+                  String strValuta;
+                  
+                  if (valReale < 0.01) {
+                    strValuta = '0 €';
+                  } else if (isMeseOFF) {
+                    strValuta = '+ ${_formattaInt(valReale)}';
+                  } else {
+                    strValuta = '- ${_formattaInt(valReale)}';
+                  }
+
+                  final String etichetta = isMeseOFF 
+                      ? 'Integrazione Cuscinetto Ferie:' 
+                      : 'Accantonamento Cuscinetto Ferie:';
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(etichetta, style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text(strValuta, style: TextStyle(color: purpleZen, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  );
+                },
+              ),
             ],
 
             const SizedBox(height: 8),
 
-            // 🛡️ RISPARMIO NETTO MESE
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
@@ -1434,7 +1424,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     final double stimaPivaLordaAnnuo = (aliquotaTasse < 1.0)
         ? (totalePivaNettaAnnuo / (1 - aliquotaTasse))
         : 0.0;
-    
 
     showDialog(
       context: context,
@@ -1467,7 +1456,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 🎯 TARGET ANNUALE (OBIETTIVI)
               const Text(
                 'TARGET ANNUALE (OBIETTIVI)',
                 style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
@@ -1489,7 +1477,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
               const SizedBox(height: 14),
 
-              // 📈 PREVISIONE ANNUALE (PROIEZIONI)
               const Text(
                 'PREVISIONE ANNUALE (PROIEZIONI)',
                 style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
@@ -1512,7 +1499,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
                     if (provider.isPartitaIVA && provider.mesiAttivi < 12) ...[
                       _buildRigaDettaglioPopup(
                         'Fondo Cuscinetto Mesi OFF (${12 - provider.mesiAttivi} mesi):',
-                        '${_formattaInt((provider.nettoTargetMensile - provider.entrataExtraMensile).clamp(0.0, double.infinity) * (12 - provider.mesiAttivi))}',
+                        _formattaInt((provider.nettoTargetMensile - provider.entrataExtraMensile).clamp(0.0, double.infinity) * (12 - provider.mesiAttivi)),
                         purpleZen,
                       ),
                     ],
@@ -1522,7 +1509,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
               const Divider(color: Colors.white10, height: 18),
 
-              // 💰 SINTESI RISPARMIO E BILANCIO
               _buildRigaDettaglioPopup('TOTALE ENTRATE NETTE:', _formattaInt(totaleNettoAnnuo), greenProfit, isBold: true),
               const SizedBox(height: 6),
               _buildRigaDettaglioPopup('USCITE / SPESE PIANIFICATE:', '- ${_formattaInt(totaleSpeseAnnuo)}', const Color(0xFFEF4444), isBold: true),
@@ -1531,7 +1517,6 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
 
               const SizedBox(height: 20),
 
-              // 🔘 BOTTONE "HO CAPITO" FULL-WIDTH
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1607,7 +1592,7 @@ class _PianoSpesaSheetState extends State<PianoSpesaSheet> {
     );
   }
 
-void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String, dynamic>) onAggiunto) {
+  void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String, dynamic>) onAggiunto) {
     final TextEditingController nameController = TextEditingController();
     IconData iconaNuova = Icons.shopping_bag_outlined;
     String categoriaNuova = 'Supermercato';
@@ -1845,7 +1830,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
     );
   }  
 
- void _mostraFormRegolaAvanzata(
+  void _mostraFormRegolaAvanzata(
     WalletProvider provider, {
     Map<String, dynamic>? voceEsistente,
     double? importoIniziale,
@@ -1883,7 +1868,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
     String frequenzaSel = isEdit ? (voceEsistente['frequenza'] ?? 'Ogni mese') : 'Ogni mese';
     int giornoAddebitoSel = isEdit ? (voceEsistente['giornoAddebito'] ?? 1) : 1;
     
-    // 🎯 Controller per la digitazione diretta del giorno
     final TextEditingController giornoAddebitoCtrl = TextEditingController(
       text: giornoAddebitoSel.toString(),
     );
@@ -1958,31 +1942,10 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
           return;
         }
 
-        final dati = {
-          'id': isEdit ? voceEsistente['id'] : DateTime.now().millisecondsSinceEpoch.toString(),
-          'tipoMovimento': tipoMovimentoSel,
-          'nome': tipoMovimentoSel == 'giroconto' ? 'Giroconto Ricorrente' : nome,
-          'previsto': importo,
-          'accountId': contoSel,
-          'daAccountId': daContoSel,
-          'aAccountId': aContoSel,
-          'sottocategoria': categoriaSel,
-          'categoria': bussolaSel,
-          'frequenza': frequenzaSel,
-          'giornoAddebito': giornoDigitato.clamp(1, 31),
-          'dataInizio': dataInizioSel.toIso8601String(),
-          'dataFineRicorrenza': dataFineSel?.toIso8601String(),
-          'termineRicorrenza': termineRicorrenzaSel,
-          'tipo': 'mensile',
-          'isArchived': false,
-        };
-
         if (isEdit) {
-          // Se stiamo modificando una regola esistente
           provider.deleteTransaction(voceEsistente['id'].toString());
         }
 
-        // Salva direttamente nel registro centrale delle transazioni
         provider.addTransaction(
           title: tipoMovimentoSel == 'giroconto' ? 'Giroconto Ricorrente' : nome,
           amount: importo,
@@ -2016,7 +1979,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔘 SELETTORE TAB MOVIMENTO
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
@@ -2083,7 +2045,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 
                 const SizedBox(height: 12),
 
-                // 🚀 PREFERITI RAPIDI CHIPS (CON PULSANTE + E GESTIONE)
                 if (tipoMovimentoSel != 'giroconto') ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2100,7 +2061,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                       physics: const BouncingScrollPhysics(),
                       itemCount: preferitiRapidi.length + 1,
                       itemBuilder: (context, index) {
-                        // 🟢 TASTO + PER NUOVO PREFERITO
                         if (index == 0) {
                           return Padding(
                             padding: const EdgeInsets.only(right: 6.0),
@@ -2185,7 +2145,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                   const SizedBox(height: 12),
                 ],
 
-                // 📌 CAMPI GIROCONTO
                 if (tipoMovimentoSel == 'giroconto') ...[
                   AppSecondaryDropdown<String>(
                     label: 'Da Conto (Addebito)',
@@ -2218,7 +2177,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     ),
                   ),
                 ] else ...[
-                  // 📌 CAMPI USCITA / ENTRATA
                   TextField(
                     controller: nomeCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -2286,7 +2244,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 
                 const SizedBox(height: 14),
 
-                // 🛡️ IMPOSTAZIONI RICORRENZA CON DATA INIZIO
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -2309,7 +2266,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                       ),
                       const SizedBox(height: 10),
                       
-                      // 📅 RIGA 1: DATA INIZIO & FREQUENZA
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2376,7 +2332,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
 
                       const SizedBox(height: 10),
 
-                      // 📅 RIGA 2: GIORNO ADDEBITO & TERMINE RICORRENZA
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2498,6 +2453,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       ),
     );
   }
+
   void _mostraDialogModificaMese(WalletProvider provider, int meseIdx, String nomeMese, double stimaCorrente) {
     final TextEditingController importoCtrl = TextEditingController(text: stimaCorrente > 0 ? stimaCorrente.toStringAsFixed(0) : '');
 
@@ -2565,7 +2521,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               ),
               const SizedBox(height: 16),
 
-              // 1️⃣ DUPLICA / RIATTIVA
               AppActionCard(
                 icon: Icons.control_point_duplicate_rounded,
                 iconColor: const Color(0xFF38BDF8),
@@ -2580,7 +2535,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
               const Divider(color: Colors.white10, height: 1),
               const SizedBox(height: 12),
 
-              // 2️⃣ ELIMINA DEFINITIVAMENTE DALL'ELENCO (SENZA TOCCARE I SALDI)
               AppActionCard(
                 icon: Icons.delete_forever_rounded,
                 iconColor: const Color(0xFFEF4444),
@@ -2588,9 +2542,7 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                 subtitle: 'Rimuove la scheda dall\'elenco mantenendo intatto lo storico dei pagamenti e dei saldi.',
                 isDanger: true,
                 onTap: () {
-                  // 💥 Converte le uscite passate in spese fisse ordinarie e rimuove solo il modello ricorrente dall'Archivio
                   provider.eliminaRegolaRicorrenteDefinitivamente(id);
-                  
                   Navigator.pop(ctx);
                   setState(() {});
                   AppNotifications.mostraInAlto(
@@ -2606,15 +2558,14 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       ),
     );
   }
- void _mostraPopupCurvaStorica(BuildContext context, WalletProvider provider) {
+
+  void _mostraPopupCurvaStorica(BuildContext context, WalletProvider provider) {
     HapticFeedback.mediumImpact();
     final DateTime ora = DateTime.now();
 
-    // 🎯 1. L'anno storico è SEMPRE l'anno precedente all'anno selezionato nel pilotaggio
     final int annoStorico = _annoSelezionatoPilotaggio - 1;
     final int annoPilotato = _annoSelezionatoPilotaggio;
 
-    // 1️⃣ Recupera incassi P.IVA effettivi dell'Anno Storico precedente
     final Map<int, double> pivaStorica = {};
     for (int m = 1; m <= 12; m++) {
       double pivaMese = provider.transactions.where((tx) {
@@ -2624,14 +2575,12 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       pivaStorica[m] = pivaMese;
     }
 
-    // 2️⃣ Recupera proiezione P.IVA Lorda dell'Anno Pilotato (AI + Override)
     final matricePilotata = provider.calcolaMatriceProiezioneAnnuale(annoSelezionato: annoPilotato);
     final Map<int, double> pivaPilotata = {};
     for (int i = 0; i < 12; i++) {
       pivaPilotata[i + 1] = (matricePilotata[i]['entrataPivaLorda'] as double? ?? 0.0);
     }
 
-    // Scala proporzionale unica su entrambe le serie per confronto diretto
     double maxValoreMese = 100.0;
     for (int m = 1; m <= 12; m++) {
       if ((pivaStorica[m] ?? 0) > maxValoreMese) maxValoreMese = pivaStorica[m]!;
@@ -2696,7 +2645,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     ),
                     const SizedBox(height: 14),
 
-                    // 💡 DETTAGLIO MESE SELEZIONATO
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -2735,7 +2683,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                     ),
                     const SizedBox(height: 16),
 
-                    // 📊 DOPPIA CURVA CONVERTITA IN CANVAS
                     Container(
                       height: 140,
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -2748,7 +2695,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                         builder: (context, constraints) {
                           return Stack(
                             children: [
-                              // 📈 DOPPIA CURVA (Storico + Pilotato)
                               CustomPaint(
                                 size: Size(constraints.maxWidth, constraints.maxHeight),
                                 painter: _CurvaStagionalePainter(
@@ -2759,7 +2705,6 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
                                 ),
                               ),
 
-                              // 📊 BARRE INTERATTIVE MESE
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -2845,6 +2790,107 @@ void _mostraDialogNuovoPreferitoRegola(BuildContext context, Function(Map<String
       ),
     );
   }
+
+  // ℹ️ POPUP GUIDA AL PILOTAGGIO STRATEGICO, CUSCINETTO E LEGENDA SIMBOLI
+  void _mostraPopupGuidaEPilotaggio(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AppSecondaryPopup(
+        backgroundColor: const Color(0xFF18181B),
+        icon: Icons.psychology_rounded,
+        iconColor: oceanCyan,
+        titolo: 'Come Funziona il Pilotaggio',
+        testoAnnulla: 'Chiudi',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('PILOTAGGIO AI E OVERRIDE MANUALI', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+              const SizedBox(height: 8),
+              _buildRigaLegenda(
+                icona: Icon(Icons.auto_awesome_rounded, color: purpleZen, size: 14),
+                titolo: 'Pilotaggio Automatico AI',
+                descrizione: 'L\'algoritmo stima e distribuisce il tuo fatturato annuo sui mesi lavorativi ("ON") garantendo la copertura delle tue spese e obiettivi.',
+              ),
+              _buildRigaLegenda(
+                icona: Icon(Icons.edit_rounded, color: oceanCyan, size: 14),
+                titolo: 'Override Manuale (Fissato da te)',
+                descrizione: 'Se conosci già l\'incasso di un mese, inseriscilo a mano. L\'AI bloccherà quel valore e ripartirà in automatico solo il fatturato rimanente sui mesi ancora liberi.',
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 12),
+
+              const Text('CUSCINETTO FERIE & RISERVA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+              const SizedBox(height: 8),
+              _buildRigaLegenda(
+                icona: const Text('🛡️', style: TextStyle(fontSize: 10)),
+                titolo: 'Accantonamento nei mesi ON',
+                descrizione: 'Quando lavori, l\'app trattiene una piccola quota dal netto per accumulare una riserva personale.',
+              ),
+              _buildRigaLegenda(
+                icona: const Text('🏖️', style: TextStyle(fontSize: 10)),
+                titolo: 'Integrazione nei mesi OFF (Ferie)',
+                descrizione: 'Nei mesi di pausa la riserva accumulata viene rilasciata per assicurarti uno "stipendio" ed entrate stabili anche senza fatturare.',
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 12),
+
+              const Text('SEMAFORI DI SALUTE FINANZIARIA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+              const SizedBox(height: 8),
+              _buildRigaLegenda(
+                icona: Container(width: 8, height: 8, decoration: BoxDecoration(color: greenProfit, shape: BoxShape.circle)),
+                titolo: 'Verde (Sostenibile)',
+                descrizione: 'Entrate e bilancio in linea o in surplus rispetto al target.',
+              ),
+              _buildRigaLegenda(
+                icona: Container(width: 8, height: 8, decoration: BoxDecoration(color: goldAccent, shape: BoxShape.circle)),
+                titolo: 'Giallo (Attenzione)',
+                descrizione: 'Margine di sicurezza risicato o entrate vicine al limite di spesa.',
+              ),
+              _buildRigaLegenda(
+                icona: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle)),
+                titolo: 'Rosso (Deficit)',
+                descrizione: 'Spese superiori alle entrate o fatturato insufficiente.',
+              ),
+              _buildRigaLegenda(
+                icona: const Icon(Icons.lock_rounded, color: Colors.white54, size: 13),
+                titolo: 'Mese Passato',
+                descrizione: 'Periodo concluso con entrate e uscite reali consolidate.',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRigaLegenda({required Widget icona, required String titolo, required String descrizione}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 20, child: Center(child: icona)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titolo, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(descrizione, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 10, height: 1.2)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CurvaStagionalePainter extends CustomPainter {
@@ -2869,10 +2915,7 @@ class _CurvaStagionalePainter extends CustomPainter {
     final double maxBarHeight = 80.0;
     final double bottomY = size.height - 20;
 
-    // 1️⃣ Disegna la curva dello Storico (Tratteggiata / Bianca tenue)
     _disegnaCurva(canvas, heightsPct1, color1, columnWidth, bottomY, maxBarHeight, isDashed: true);
-
-    // 2️⃣ Disegna la curva del Pilotato (Continua / Viola)
     _disegnaCurva(canvas, heightsPct2, color2, columnWidth, bottomY, maxBarHeight, isDashed: false);
   }
 

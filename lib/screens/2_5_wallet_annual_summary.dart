@@ -45,6 +45,7 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
   ];
 
   String _formattaValuta(double importo) {
+    if (importo.abs() < 0.01) return '0 €';
     final parti = importo.abs().toStringAsFixed(0).split('.');
     final intPart = parti[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -88,10 +89,26 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
       double inpsSaldoAnno = 0.0;
       double impostaSaldoAnno = 0.0;
 
+      // 💡 Recupera la matrice calcolata dal WalletProvider con i cuscinetti aggiornati
+      final matriceProvider = wallet.calcolaMatriceProiezioneAnnuale(annoSelezionato: anno);
+
       final List<Map<String, dynamic>> storicoMesi = List.generate(12, (mIdx) {
         final int meseNum = mIdx + 1;
         final DateTime dtMese = DateTime(anno, meseNum);
         final bool isPassato = (anno < ora.year) || (anno == ora.year && meseNum <= ora.month);
+
+        // 💡 Estrazione garantita dei dati di cuscinetto per mesi passati, presenti e futuri
+        final meseMatrice = matriceProvider.firstWhere(
+          (m) => m['meseIdx'] == meseNum, 
+          orElse: () => <String, dynamic>{
+            'quotaCuscinetto': 0.0,
+            'erogazioneCuscinetto': 0.0,
+            'isMeseOFF': false,
+          },
+        );
+        final double quotaCuscinettoMatrice = (meseMatrice['quotaCuscinetto'] as num?)?.toDouble() ?? 0.0;
+        final double erogazioneCuscinettoMatrice = (meseMatrice['erogazioneCuscinetto'] as num?)?.toDouble() ?? 0.0;
+        final bool isMeseOFFMatrice = meseMatrice['isMeseOFF'] == true;
 
         final txMese = wallet.transactions.where((t) => t.date.year == anno && t.date.month == meseNum && !t.id.startsWith('rule_'));
 
@@ -160,6 +177,9 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
           'budget': budgetMese > 0 ? budgetMese : spesoMese,
           'isPassato': isPassato,
           'anno': anno,
+          'quotaCuscinetto': quotaCuscinettoMatrice,
+          'erogazioneCuscinetto': erogazioneCuscinettoMatrice,
+          'isMeseOFF': isMeseOFFMatrice,
         };
       });
 
@@ -396,6 +416,36 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                       _buildReportRow('Stipendio / Pensione:', _formattaValutaDecimale(meseData['stipendioNetto']), greenProfit),
                       const SizedBox(height: 4),
                     ],
+                    // 💡 MOSTRA LA RIGA DEL CUSCINETTO PULITA IN TUTTI I MESI (SENZA SEGNO SE ZERO)
+                    Builder(
+                      builder: (context) {
+                        final bool isOFF = meseData['isMeseOFF'] == true;
+                        final double valErogato = (meseData['erogazioneCuscinetto'] as num?)?.toDouble() ?? 0.0;
+                        final double valAccantonato = (meseData['quotaCuscinetto'] as num?)?.toDouble() ?? 0.0;
+                        final double valoreReale = isOFF ? valErogato : valAccantonato;
+
+                        String testoValuta;
+                        if (valoreReale.abs() < 0.01) {
+                          testoValuta = '0 €';
+                        } else if (isOFF) {
+                          testoValuta = '+${_formattaValuta(valoreReale.abs())}';
+                        } else {
+                          testoValuta = '-${_formattaValuta(valoreReale.abs())}';
+                        }
+
+                        final String etichettaDesc = isOFF 
+                            ? 'Integrazione Cuscinetto Ferie:' 
+                            : 'Accantonamento Cuscinetto Ferie:';
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildReportRow(etichettaDesc, testoValuta, purpleZen),
+                            const SizedBox(height: 4),
+                          ],
+                        );
+                      },
+                    ),
                     _buildReportRow('Uscite Sostenute:', '-${_formattaValutaDecimale(meseData['speso'])}', alertRed),
                     const Divider(color: Colors.white10, height: 12),
                     _buildReportRow('Risparmio Mese:', _formattaValutaDecimale((meseData['incassatoTotaleNetto'] as double) - (meseData['speso'] as double)), purpleZen, isBold: true),
@@ -1138,10 +1188,10 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                 final risparmioTxs = <dynamic>[];
 
                                 for (var tx in usciteTxs) {
-                                  final cat = tx.category.toLowerCase();
-                                  if (cat.contains('salvadanaio') || cat.contains('investim') || cat.contains('previdenz') || cat.contains('fondo')) {
+                                  final bussolaRule = walletProvider.ottieniBussolaSemplificata(tx);
+                                  if (bussolaRule == 'Risparmi') {
                                     risparmioTxs.add(tx);
-                                  } else if (_isSpesaFissa(tx.category)) {
+                                  } else if (bussolaRule == 'Bisogni') {
                                     fisseTxs.add(tx);
                                   } else {
                                     variabiliTxs.add(tx);
@@ -1209,12 +1259,12 @@ class _AnnualSummarySheetState extends State<AnnualSummarySheet> {
                                 );
                               }
 
-                              // 🥧 VISTA 2: CATEGORIE (Legge esattamente tx.category con sotto-tendina)
+                              // 🥧 VISTA 2: CATEGORIE (Raggruppate per Macro-categoria Padre)
                               if (currentView == 'Categorie') {
                                 final Map<String, Map<String, dynamic>> catMap = {};
 
                                 for (var tx in txsMese.where((t) => !t.isIncome)) {
-                                  final String name = tx.category.trim().isEmpty ? 'Altre uscite' : tx.category.trim();
+                                  final String name = walletProvider.ottieniCategoriaPadre(tx.category, isIncome: tx.isIncome);
 
                                   if (!catMap.containsKey(name)) {
                                     catMap[name] = {

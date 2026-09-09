@@ -65,47 +65,30 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   DateTime _meseSelezionatoRiepilogo = DateTime.now();
   DateTime? _dataFineRicorrenza;
 
-  final List<String> _sottocategorieSpesa = [
-    'Casa/Affitto',
-    'Mutuo',
-    'Canoni/Bollette',
-    'Supermercato',
-    'Ristoranti & Bar',
-    'Acquisti',
-    'Divertimento',
-    'Auto',
-    'Viaggi',
+  // 🏢 MACRO-CATEGORIE PADRE UFFICIALI (USCITE)
+  final List<String> _macroCategorieSpesa = [
+    'Casa & Utenze',
+    'Alimentari & Spesa',
+    'Veicoli & Trasporti',
     'Salute & Benessere',
-    'Imposte & F24',
-    'Altro',
+    'Famiglia & Figli',
+    'Tasse & Servizi Finanziari',
+    'Ristorazione & Svago',
+    'Abbigliamento & Cura',
+    'Servizi & Abbonamenti',
+    'Lavoro & P.IVA',
   ];
 
-  final Map<String, String> _mappaSottocategoriaABussola = {
-    'Casa/Affitto': '50% Spese Fisse',
-    'Mutuo': '50% Spese Fisse',
-    'Canoni/Bollette': '50% Spese Fisse',
-    'Supermercato': '50% Spese Fisse',
-    'Auto': '50% Spese Fisse',
-    'Salute & Benessere': '50% Spese Fisse',
-    'Imposte & F24': 'Escluso / Neutro',
-    'Ristoranti & Bar': '30% Spese Variabili',
-    'Divertimento': '30% Spese Variabili',
-    'Acquisti': '30% Spese Variabili',
-    'Viaggi': '30% Spese Variabili',
-    'Altro': '30% Spese Variabili',
-  };
-
-  String _sottocategoriaSelezionata = 'Supermercato';
-
-  final List<String> _sottocategorieEntrata = [
-    'Stipendio',
-    'Entrate Extra / Freelance',
-    'Regalo',
-    'Rimborso',
-    'Investimenti / Dividendi',
-    'Altro',
+  // 💰 MACRO-CATEGORIE PADRE UFFICIALI (ENTRATE MANUALI WALLET)
+  final List<String> _macroCategorieEntrata = [
+    'Stipendio & Pensione',
+    'Rimborsi & Sussidi',
+    'Investimenti & Rendite',
+    'Entrate Extra & Regali',
   ];
-  String _sottocategoriaEntrataSelezionata = 'Stipendio';
+
+  String _sottocategoriaSelezionata = 'Alimentari & Spesa';
+  String _sottocategoriaEntrataSelezionata = 'Stipendio & Pensione';
 
   bool _isCategoriaEspansa = false;
   bool _isSottocategoriaEspansa = false;
@@ -146,22 +129,22 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
   ];
 
   List<Map<String, dynamic>> _speseFrequenti = [
-    {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Supermercato'},
-    {'label': 'Affitto', 'icon': Icons.home_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Casa/Affitto'},
-    {'label': 'Mutuo', 'icon': Icons.account_balance_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Mutuo'},
-    {'label': 'Bollette', 'icon': Icons.bolt_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
-    {'label': 'Assicurazione', 'icon': Icons.verified_user_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Canoni/Bollette'},
-    {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Ristoranti & Bar'},
-    {'label': 'Carburante', 'icon': Icons.local_gas_station_outlined, 'cat': '50% Spese Fisse', 'sottoCat': 'Auto'},
-    {'label': 'Palestra / Sport', 'icon': Icons.fitness_center_outlined, 'cat': '30% Spese Variabili', 'sottoCat': 'Divertimento'},
-    {'label': 'F24 / Tasse', 'icon': Icons.shield_outlined, 'cat': 'Escluso / Neutro', 'sottoCat': 'Imposte & F24'},
+    {'label': 'Supermercato', 'icon': Icons.shopping_cart_outlined, 'sottoCat': 'Alimentari & Spesa'},
+    {'label': 'Affitto / Mutuo', 'icon': Icons.home_outlined, 'sottoCat': 'Casa & Utenze'},
+    {'label': 'Bollette & Utenze', 'icon': Icons.bolt_outlined, 'sottoCat': 'Casa & Utenze'},
+    {'label': 'Carburante & Mezzi', 'icon': Icons.local_gas_station_outlined, 'sottoCat': 'Veicoli & Trasporti'},
+    {'label': 'Ristorante / Bar', 'icon': Icons.restaurant_outlined, 'sottoCat': 'Ristorazione & Svago'},
+    {'label': 'Palestra & Abbonamenti', 'icon': Icons.fitness_center_outlined, 'sottoCat': 'Servizi & Abbonamenti'},
+    {'label': 'Farmacia & Salute', 'icon': Icons.medical_services_outlined, 'sottoCat': 'Salute & Benessere'},
+    {'label': 'F24 & Tasse', 'icon': Icons.shield_outlined, 'sottoCat': 'Tasse & Servizi Finanziari'},
   ];
 
   List<Map<String, dynamic>> _entrateFrequenti = [
-    {'label': 'Stipendio', 'icon': Icons.work_outline, 'sottoCat': 'Stipendio'},
-    {'label': 'Regalo', 'icon': Icons.card_giftcard_outlined, 'sottoCat': 'Regalo'},
-    {'label': 'Entrate Extra', 'icon': Icons.add_chart_outlined, 'sottoCat': 'Entrate Extra / Freelance'},
-    {'label': 'Rimborso', 'icon': Icons.replay_outlined, 'sottoCat': 'Rimborso'},
+    {'label': 'Stipendio / Busta Paga', 'icon': Icons.work_outline, 'sottoCat': 'Stipendio & Pensione'},
+    {'label': 'Rimborso Spese / Bonus', 'icon': Icons.replay_outlined, 'sottoCat': 'Rimborsi & Sussidi'},
+    {'label': 'Dividendi & Interessi', 'icon': Icons.trending_up_rounded, 'sottoCat': 'Investimenti & Rendite'},
+    {'label': 'Prestazione Occasionale', 'icon': Icons.assignment_turned_in_outlined, 'sottoCat': 'Entrate Extra & Regali'},
+    {'label': 'Regalo & Extra', 'icon': Icons.card_giftcard_outlined, 'sottoCat': 'Entrate Extra & Regali'},
   ];
 
   final List<IconData> _iconeDisponibili = [
@@ -328,33 +311,25 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
       return;
     }
 
+    final wallet = Provider.of<WalletProvider>(context, listen: false);
+
     if (paroleRistorazione.any((p) => testo.contains(p))) {
       setState(() {
-        _sottocategoriaSelezionata = 'Ristoranti & Bar';
-        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+        _sottocategoriaSelezionata = wallet.ottieniCategoriaPadre('Ristorante');
       });
     } else if (paroleFisse.any((p) => testo.contains(p))) {
-      if (testo.contains('affitto')) {
-        _sottocategoriaSelezionata = 'Casa/Affitto';
-      } else if (testo.contains('mutuo')) {
-        _sottocategoriaSelezionata = 'Mutuo';
-      } else if (testo.contains('bollett') || testo.contains('luce') || testo.contains('gas')) {
-        _sottocategoriaSelezionata = 'Canoni/Bollette';
+      if (testo.contains('affitto') || testo.contains('mutuo') || testo.contains('bollett') || testo.contains('luce') || testo.contains('gas')) {
+        _sottocategoriaSelezionata = 'Casa & Utenze';
       } else if (testo.contains('supermercad') || testo.contains('spesa')) {
-        _sottocategoriaSelezionata = 'Supermercato';
+        _sottocategoriaSelezionata = 'Alimentari & Spesa';
       } else if (testo.contains('carburante') || testo.contains('auto')) {
-        _sottocategoriaSelezionata = 'Auto';
+        _sottocategoriaSelezionata = 'Veicoli & Trasporti';
       }
-      setState(() {
-        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata] ?? '50% Spese Fisse';
-      });
+      setState(() {});
     } else if (paroleVariabili.any((p) => testo.contains(p))) {
       setState(() {
-        _sottocategoriaSelezionata = 'Divertimento';
-        _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+        _sottocategoriaSelezionata = 'Ristorazione & Svago';
       });
-    } else if (paroleRisparmio.any((p) => testo.contains(p))) {
-      setState(() => _categoriaSelezionata = '20% Risparmio');
     }
   }
 
@@ -398,13 +373,7 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
         }
 
         if (result.categoriaSuggerita != null && result.categoriaSuggerita!.isNotEmpty) {
-          if (_sottocategorieSpesa.contains(result.categoriaSuggerita)) {
-            _sottocategoriaSelezionata = result.categoriaSuggerita!;
-          }
-        }
-
-        if (_mappaSottocategoriaABussola.containsKey(_sottocategoriaSelezionata)) {
-          _categoriaSelezionata = _mappaSottocategoriaABussola[_sottocategoriaSelezionata]!;
+          _sottocategoriaSelezionata = walletProvider.ottieniCategoriaPadre(result.categoriaSuggerita!);
         }
 
         _tipoMovimento = 'uscita';
@@ -467,9 +436,6 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
 
       if (isSpesa) {
         _sottocategoriaSelezionata = cat;
-        if (_mappaSottocategoriaABussola.containsKey(cat)) {
-          _categoriaSelezionata = _mappaSottocategoriaABussola[cat]!;
-        }
       } else {
         _sottocategoriaEntrataSelezionata = cat;
       }
@@ -494,6 +460,36 @@ class _AddMovementSheetState extends State<AddMovementSheet> {
     }
 
     final bool isSpesa = _tipoMovimento == 'uscita' || _tipoMovimento == 'spesa';
+    final String testoNote = _noteController.text.toLowerCase().trim();
+
+    // 🛡️ BLOCCO DI SICUREZZA: Le fatture P.IVA non possono essere registrate dal Wallet
+    if (!isSpesa && (testoNote.contains('fattura') || testoNote.contains('incasso cliente') || testoNote.contains('p.iva'))) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.shield_rounded, color: Color(0xFF38BDF8), size: 22),
+              SizedBox(width: 8),
+              Text('Gestione P.IVA Riservata', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Gli incassi del fatturato P.IVA devono essere registrati ed incassati esclusivamente dalla sezione P.IVA per garantire il corretto accantonamento delle tasse.\n\nUtilizza il modulo Fatture per incassare questo importo.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Ho capito', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final String descrizione = _noteController.text.trim().isNotEmpty
         ? _noteController.text.trim()
         : (isSpesa ? 'Nuova Uscita' : 'Nuova Entrata');
@@ -968,7 +964,7 @@ String _formattaMeseAnno(DateTime date) {
                     selectedValue: sottoCatTemp,
                     isExpanded: isSottoCatEspansa,
                     onToggle: () => setDialogState(() => isSottoCatEspansa = !isSottoCatEspansa),
-                    items: isExpense ? _sottocategorieSpesa : _sottocategorieEntrata,
+                    items: isExpense ? _macroCategorieSpesa : _macroCategorieEntrata,
                     onSelect: (val) {
                       setDialogState(() {
                         sottoCatTemp = val;
@@ -1218,7 +1214,7 @@ String _formattaMeseAnno(DateTime date) {
                     selectedValue: sottoCatNuova,
                     isExpanded: isSottoCatEspansa,
                     onToggle: () => setDialogState(() => isSottoCatEspansa = !isSottoCatEspansa),
-                    items: isExpense ? _sottocategorieSpesa : _sottocategorieEntrata,
+                    items: isExpense ? _macroCategorieSpesa : _macroCategorieEntrata,
                     onSelect: (val) {
                       setDialogState(() {
                         sottoCatNuova = val;
@@ -1414,9 +1410,8 @@ Expanded(
         });
       } else {
         final bool isFatturaPiva = tx.category == 'P.IVA' || tx.title.startsWith('Fattura') || tx.title.startsWith('Incasso:');
-        String regolaBussola = tx.isIncome 
-            ? 'Entrate' 
-            : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
+        final String categoriaPadre = walletProvider.ottieniCategoriaPadre(tx.category, isIncome: tx.isIncome);
+        final String regolaBussola = walletProvider.ottieniBussolaSemplificata(tx);
 
         movimentiReali.add({
           'id': tx.id,
@@ -1424,7 +1419,8 @@ Expanded(
           'parentId': tx.id,
           'desc': tx.title,
           'imp': tx.amount,
-          'cat': tx.category,
+          'cat': categoriaPadre,
+          'tag': tx.category,
           'bussola': regolaBussola,
           'data': tx.date,
           'isSpesa': !tx.isIncome,
@@ -1450,9 +1446,7 @@ Expanded(
         }
       }
 
-      String regolaBussola = tx.isIncome 
-          ? 'Entrate' 
-          : (_mappaSottocategoriaABussola[tx.category] ?? '50% Spese Fisse');
+      String regolaBussola = walletProvider.ottieniBussolaSemplificata(tx);
 
       return {
         'id': tx.id,
@@ -2304,123 +2298,47 @@ Expanded(
               ),
               const SizedBox(height: 12),
 
-              if (isSpesa) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text('CATEGORIA SPECIFICA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          _buildInlineSelector(
-                            icon: Icons.category_outlined,
-                            iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
-                            selectedValue: _sottocategoriaSelezionata,
-                            isExpanded: _isSottocategoriaEspansa,
-                            isDisabled: _isPreferitoSelezionato,
-                            onToggle: () {
-                              if (_isPreferitoSelezionato) return;
-                              setState(() {
-                                _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
-                                if (_isSottocategoriaEspansa) _scrollToOffset(120);
-                              });
-                            },
-                            items: _sottocategorieSpesa,
-                            onSelect: (val) {
-                              setState(() {
-                                _sottocategoriaSelezionata = val;
-                                if (_mappaSottocategoriaABussola.containsKey(val)) {
-                                  _categoriaSelezionata = _mappaSottocategoriaABussola[val]!;
-                                }
-                                _isSottocategoriaEspansa = false;
-                              });
-                            },
-                          ),
-                        ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        isSpesa ? 'MACRO-CATEGORIA USCITA' : 'MACRO-CATEGORIA ENTRATA', 
+                        style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text('BUSSOLA SPESE', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          _buildInlineSelector(
-                            icon: Icons.pie_chart_outline_rounded,
-                            iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF2DD4BF),
-                            selectedValue: _categoriaSelezionata,
-                            isExpanded: _isCategoriaEspansa,
-                            isDisabled: _isPreferitoSelezionato,
-                            onToggle: () {
-                              if (_isPreferitoSelezionato) return;
-                              setState(() {
-                                _isCategoriaEspansa = !_isCategoriaEspansa;
-                                if (_isCategoriaEspansa) _scrollToOffset(120);
-                              });
-                            },
-                            items: _categorieSpesa,
-                            onSelect: (val) {
-                              setState(() {
-                                _categoriaSelezionata = val;
-                                _isCategoriaEspansa = false;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ] else ...[
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('TIPOLOGIA ENTRATA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                        if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    _buildInlineSelector(
-                      icon: Icons.add_chart_outlined,
-                      iconColor: _isPreferitoSelezionato ? Colors.white38 : const Color(0xFF10B981),
-                      selectedValue: _sottocategoriaEntrataSelezionata,
-                      isExpanded: _isSottocategoriaEspansa,
-                      isDisabled: _isPreferitoSelezionato,
-                      onToggle: () {
-                        if (_isPreferitoSelezionato) return;
-                        setState(() {
-                          _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
-                          if (_isSottocategoriaEspansa) _scrollToOffset(120);
-                        });
-                      },
-                      items: _sottocategorieEntrata,
-                      onSelect: (val) {
-                        setState(() {
+                      if (_isPreferitoSelezionato) const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 10),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _buildInlineSelector(
+                    icon: isSpesa ? Icons.grid_view_rounded : Icons.add_chart_outlined,
+                    iconColor: _isPreferitoSelezionato ? Colors.white38 : themeAccent,
+                    selectedValue: isSpesa ? _sottocategoriaSelezionata : _sottocategoriaEntrataSelezionata,
+                    isExpanded: _isSottocategoriaEspansa,
+                    isDisabled: _isPreferitoSelezionato,
+                    onToggle: () {
+                      if (_isPreferitoSelezionato) return;
+                      setState(() {
+                        _isSottocategoriaEspansa = !_isSottocategoriaEspansa;
+                        if (_isSottocategoriaEspansa) _scrollToOffset(120);
+                      });
+                    },
+                    items: isSpesa ? _macroCategorieSpesa : _macroCategorieEntrata,
+                    onSelect: (val) {
+                      setState(() {
+                        if (isSpesa) {
+                          _sottocategoriaSelezionata = val;
+                        } else {
                           _sottocategoriaEntrataSelezionata = val;
-                          _isSottocategoriaEspansa = false;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
+                        }
+                        _isSottocategoriaEspansa = false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),

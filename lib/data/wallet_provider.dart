@@ -1,20 +1,21 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fisco_zen/data/recurrence_manager.dart';
 
 enum AccountRole {
-  principal,  
-  taxReserve, 
-  standard,   
+  principal,
+  taxReserve,
+  standard,
 }
+
 enum UserTier { free, pro, premium }
 
 class AccountModel {
   final String id;
-  String title; 
+  String title;
   final String subtitle;
   double amount;
   double virtualTaxAmount;
@@ -56,7 +57,10 @@ class AccountModel {
 
     if (id == '1' || id == 'main_account' || title.contains('principale')) {
       roleAssegnato = AccountRole.principal;
-    } else if (id == '3' || id == 'tax_account' || title.contains('salvadanaio tasse') || title.contains('acconto tasse')) {
+    } else if (id == '3' ||
+        id == 'tax_account' ||
+        title.contains('salvadanaio tasse') ||
+        title.contains('acconto tasse')) {
       roleAssegnato = AccountRole.taxReserve;
     }
 
@@ -66,7 +70,7 @@ class AccountModel {
       subtitle: json['subtitle'] as String,
       amount: (json['amount'] as num).toDouble(),
       virtualTaxAmount: (json['virtualTaxAmount'] as num?)?.toDouble() ?? 0.0,
-      color: Color(json['color'] as int),
+      color: Color((json['color'] as num).toInt()),
       role: roleAssegnato,
     );
   }
@@ -80,11 +84,11 @@ class TransactionModel {
   final bool isIncome;
   final String category;
   final DateTime date;
-  final String? accountId; 
-  
-  final bool isRecurrent; 
-  final String? frequenza; 
-  final String? giornoRicorrenza; 
+  final String? accountId;
+
+  final bool isRecurrent;
+  final String? frequenza;
+  final String? giornoRicorrenza;
   final DateTime? dataInizio;
   final DateTime? dataFineRicorrenza;
   final bool isArchived;
@@ -136,8 +140,8 @@ class TransactionModel {
         frequenza: json['frequenza'] as String?,
         giornoRicorrenza: json['giornoRicorrenza'] as String?,
         dataInizio: json['dataInizio'] != null ? DateTime.parse(json['dataInizio'] as String) : null,
-        dataFineRicorrenza: json['dataFineRicorrenza'] != null 
-            ? DateTime.parse(json['dataFineRicorrenza'] as String) 
+        dataFineRicorrenza: json['dataFineRicorrenza'] != null
+            ? DateTime.parse(json['dataFineRicorrenza'] as String)
             : null,
         isArchived: json['isArchived'] as bool? ?? false,
       );
@@ -145,32 +149,138 @@ class TransactionModel {
 
 class WalletProvider with ChangeNotifier {
   final FirebaseFirestore _firestore;
+
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   String? get _userId {
-  try {
-    return FirebaseAuth.instance.currentUser?.uid;
-  } catch (_) {
-    return null;
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
   }
-}
-  final Map<String, String> _mappaSottocategoriaABussola = {
-    'Casa/Affitto': 'Bisogni',
-    'Mutuo': 'Bisogni',
-    'Canoni/Bollette': 'Bisogni',
-    'Supermercato': 'Bisogni',
-    'Auto': 'Bisogni',
-    'Salute & Benessere': 'Bisogni',
-    'Alimentari': 'Bisogni',
-    'Ristoranti & Bar': 'Svago',
-    'Divertimento': 'Svago',
-    'Acquisti': 'Svago',
-    'Viaggi': 'Svago',
-    'Altro': 'Svago',
-  };
+
+  // 🏢 ESTRUTTURA UFFICIALE 10 MACRO-CATEGORIE PADRE (USCITE) & REGOLA BUSSOLA
+  static const List<Map<String, String>> macroCategoriePadre = [
+    {'padre': 'Casa & Utenze', 'bussola': 'Bisogni'},          // 50% Spese Fisse
+    {'padre': 'Alimentari & Spesa', 'bussola': 'Bisogni'},     // 50% Spese Fisse
+    {'padre': 'Veicoli & Trasporti', 'bussola': 'Bisogni'},    // 50% Spese Fisse
+    {'padre': 'Salute & Benessere', 'bussola': 'Bisogni'},     // 50% Spese Fisse
+    {'padre': 'Famiglia & Figli', 'bussola': 'Bisogni'},       // 50% Spese Fisse
+    {'padre': 'Tasse & Servizi Finanziari', 'bussola': 'Bisogni'}, // 50% Spese Fisse / Neutro
+    {'padre': 'Ristorazione & Svago', 'bussola': 'Svago'},     // 30% Spese Variabili
+    {'padre': 'Abbigliamento & Cura', 'bussola': 'Svago'},     // 30% Spese Variabili
+    {'padre': 'Servizi & Abbonamenti', 'bussola': 'Svago'},    // 30% Spese Variabili
+    {'padre': 'Lavoro & P.IVA', 'bussola': 'Svago'},           // 30% Spese Variabili
+  ];
+
+  // 💰 ESTRUTTURA UFFICIALE 5 MACRO-CATEGORIE PADRE (ENTRATE)
+  static const List<Map<String, String>> macroCategoriePadreEntrate = [
+    {'padre': 'Fatturato P.IVA', 'bussola': 'Entrate'},
+    {'padre': 'Stipendio & Pensione', 'bussola': 'Entrate'},
+    {'padre': 'Rimborsi & Sussidi', 'bussola': 'Entrate'},
+    {'padre': 'Investimenti & Rendite', 'bussola': 'Entrate'},
+    {'padre': 'Entrate Extra & Regali', 'bussola': 'Entrate'},
+  ];
+
+  // 🧹 METODO DI NORMALIZZAZIONE TESTO (Invarianza Maiuscole/Minuscole e Simboli)
+  String normalizzaTestoCategoria(String input) {
+    if (input.trim().isEmpty) return 'Altro';
+    String p = input.trim();
+    p = p.replaceAll('&', 'e');
+    p = p.replaceAll(RegExp(r'\s+'), ' ');
+    
+    return p.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  // 🔎 TROVA O ASSEGNA LA MACRO-CATEGORIA PADRE PER QUALSIASI TAG/SOTTOCATEGORIA
+  String ottieniCategoriaPadre(String sottocategoria, {bool isIncome = false}) {
+    final clean = sottocategoria.toLowerCase();
+
+    // 🟢 GESTIONE ENTRATE
+    if (isIncome) {
+      if (clean.contains('p.iva') || clean.contains('fattura') || clean.contains('incasso') || clean.contains('cliente')) {
+        return 'Fatturato P.IVA';
+      }
+      if (clean.contains('stipendio') || clean.contains('pensione') || clean.contains('busta paga') || clean.contains('emolumenti')) {
+        return 'Stipendio & Pensione';
+      }
+      if (clean.contains('rimborso') || clean.contains('bonus') || clean.contains('sussidio') || clean.contains('cashback') || clean.contains('indennita')) {
+        return 'Rimborsi & Sussidi';
+      }
+      if (clean.contains('investim') || clean.contains('dividend') || clean.contains('cedol') || clean.contains('interess') || clean.contains('rendit')) {
+        return 'Investimenti & Rendite';
+      }
+      return 'Entrate Extra & Regali';
+    }
+
+    // 🔴 GESTIONE USCITE
+    if (clean.contains('mutuo') || clean.contains('affitto') || clean.contains('bollet') ||
+        clean.contains('utenz') || clean.contains('casa') || clean.contains('condomin')) {
+      return 'Casa & Utenze';
+    }
+    if (clean.contains('supermercat') || clean.contains('alimentar') || clean.contains('spesa') || clean.contains('panific')) {
+      return 'Alimentari & Spesa';
+    }
+    if (clean.contains('auto') || clean.contains('carburant') || clean.contains('benzina') ||
+        clean.contains('bollo') || clean.contains('trasport') || clean.contains('parchegg') || clean.contains('treno') || clean.contains('aereo')) {
+      return 'Veicoli & Trasporti';
+    }
+    if (clean.contains('farmac') || clean.contains('salut') || clean.contains('dentist') || clean.contains('medic')) {
+      return 'Salute & Benessere';
+    }
+    if (clean.contains('scuola') || clean.contains('infanz') || clean.contains('figli') || clean.contains('animal') || clean.contains('pet')) {
+      return 'Famiglia & Figli';
+    }
+    if (clean.contains('tasse') || clean.contains('f24') || clean.contains('impost') || clean.contains('commission')) {
+      return 'Tasse & Servizi Finanziari';
+    }
+    if (clean.contains('ristorant') || clean.contains('bar') || clean.contains('pizzeri') ||
+        clean.contains('pub') || clean.contains('deliver') || clean.contains('cinema') || clean.contains('hobby') || clean.contains('viagg')) {
+      return 'Ristorazione & Svago';
+    }
+    if (clean.contains('vestit') || clean.contains('abbigliament') || clean.contains('scarp') || clean.contains('parrucchier') || clean.contains('estet')) {
+      return 'Abbigliamento & Cura';
+    }
+    if (clean.contains('netflix') || clean.contains('spotify') || clean.contains('palestra') || clean.contains('internet') || clean.contains('abbonam')) {
+      return 'Servizi & Abbonamenti';
+    }
+    if (clean.contains('p.iva') || clean.contains('lavoro') || clean.contains('software') || clean.contains('canceller')) {
+      return 'Lavoro & P.IVA';
+    }
+
+    return 'Ristorazione & Svago';
+  }
 
   List<AccountModel> _accounts = [
-    AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-    AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
-    AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+    AccountModel(
+      id: 'main_account',
+      title: 'Conto Principale (IBAN)',
+      subtitle: 'Conto Operativo',
+      amount: 0.00,
+      color: const Color(0xFF2DD4BF),
+      role: AccountRole.principal,
+    ),
+    AccountModel(
+      id: 'tax_account',
+      title: 'Salvadanaio Tasse',
+      subtitle: 'Obiettivo Riserva',
+      amount: 0.00,
+      color: const Color(0xFF3B82F6),
+      role: AccountRole.taxReserve,
+    ),
+    AccountModel(
+      id: 'savings_account',
+      title: 'Fondo Risparmio',
+      subtitle: 'Riserva Liquidità',
+      amount: 0.00,
+      color: const Color(0xFFF59E0B),
+      role: AccountRole.standard,
+    ),
   ];
 
   List<AccountModel> get accounts => List.unmodifiable(_accounts);
@@ -210,10 +320,7 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔹 INCOLLA QUI IL NUOVO METODO:
-  void setProUser(bool valore) {
-    impostaStatoPro(valore);
-  }
+  void setProUser(bool valore) => impostaStatoPro(valore);
 
   void attivaPro() {
     _userTier = UserTier.pro;
@@ -227,9 +334,7 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleProUser() {
-    cycleUserTier(); 
-  }
+  void toggleProUser() => cycleUserTier();
 
   double _textScaleFactor = 1.0;
   double get textScaleFactor => _textScaleFactor;
@@ -258,9 +363,7 @@ class WalletProvider with ChangeNotifier {
   String _tipoLavoroDipendente = 'nessuno';
   String? get tipoLavoroDipendente => _tipoLavoroDipendente;
 
-  bool _ralSupera30k = false;
   bool _scontoInps35 = false;
-  bool _isPrimoAnnoAssoluto = false;
 
   double accontiVersatiAnnoPrecedente = 0.0;
   double _accontiVersati = 0.0;
@@ -269,7 +372,6 @@ class WalletProvider with ChangeNotifier {
   double _contributiInpsPagatiAnnoCorrente = 0.0;
 
   double _nettoTargetMensile = 2500.0;
-  double _speseFisseMensili = 800.0;
 
   double _fatturatoStimatoAnnuo = 35000.0;
   double get fatturatoStimato => _fatturatoStimatoAnnuo;
@@ -278,11 +380,9 @@ class WalletProvider with ChangeNotifier {
   int get mesiAttivi => _mesiAttiviIncasso;
   double get nettoTargetMensile => _nettoTargetMensile;
 
-  // 🏖️ STATO MESI ATTIVI (12 MESI: true = Lavoro, false = Pausa)
   List<bool> _mesiAttiviState = List.generate(12, (index) => index < 10);
   List<bool> get mesiAttiviState => List.unmodifiable(_mesiAttiviState);
 
-  // 🛡️ STATO CUSCINETTO MESI OFF
   double _cuscinettoAccumulato = 0.0;
   double _cuscinettoUtilizzato = 0.0;
   double get cuscinettoAccumulato => _cuscinettoAccumulato;
@@ -295,11 +395,10 @@ class WalletProvider with ChangeNotifier {
   int? _meseAperturaPiva = 1;
   int? get meseAperturaPiva => _meseAperturaPiva;
 
-  // 🎯 ENTRATE EXTRA DA ONBOARDING (DIPENDENTE / PENSIONE)
   double _entrataExtraMensile = 0.0;
   double get entrataExtraMensile => _entrataExtraMensile;
 
-  int _numeroMensilitaExtra = 13; // 12, 13 o 14 mensilità
+  int _numeroMensilitaExtra = 13;
   int get numeroMensilitaExtra => _numeroMensilitaExtra;
 
   bool _hasDipendente = false;
@@ -307,7 +406,7 @@ class WalletProvider with ChangeNotifier {
 
   bool _hasPensione = false;
   bool get hasPensione => _hasPensione;
-  // 💡 VERSION 1.1: CONTROLLO ISOLATO ACCREDITO STIPENDIO / PENSIONE
+
   bool get haInseritoStipendioMeseCorrente {
     final ora = DateTime.now();
     return _transactions.any((tx) {
@@ -317,13 +416,11 @@ class WalletProvider with ChangeNotifier {
       final catLower = tx.category.toLowerCase();
       final titleLower = tx.title.toLowerCase();
 
-      // 🛡️ Escludiamo fatture P.IVA, incassi generici e giroconti
-      final bool isPivaOIncasso = tx.category == 'P.IVA' || 
-                                  titleLower.startsWith('incasso') || 
-                                  titleLower.startsWith('fattura');
+      final bool isPivaOIncasso = tx.category == 'P.IVA' ||
+          titleLower.startsWith('incasso') ||
+          titleLower.startsWith('fattura');
       if (isPivaOIncasso || tx.category == 'Giroconto') return false;
 
-      // 🎯 Il banner scompare SOLO se è stato registrato espressamente lo Stipendio o la Pensione
       return catLower.contains('stipendio') ||
           catLower.contains('pensione') ||
           titleLower.contains('stipendio') ||
@@ -337,7 +434,6 @@ class WalletProvider with ChangeNotifier {
       !haInseritoStipendioMeseCorrente &&
       !dismissedTipKeys.contains('tip_stipendio_${DateTime.now().year}_${DateTime.now().month}');
 
-  // 💡 VERSION 1.1: METODO DI ACCREDITO RAPIDO STIPENDIO / PENSIONE
   void accreditaStipendioRapido() {
     if (_entrataExtraMensile <= 0) return;
 
@@ -368,7 +464,6 @@ class WalletProvider with ChangeNotifier {
 
   bool isPartitaIVA = true;
 
-  // 🗓️ GESTIONE ANNO FISCALE E PRINCIPIO DI CASSA
   int _annoFiscaleCorrente = DateTime.now().year;
   int get annoFiscaleCorrente => _annoFiscaleCorrente;
 
@@ -380,22 +475,17 @@ class WalletProvider with ChangeNotifier {
   }
 
   int _estraiAnnoDaData(String? dataStr) {
-    if (dataStr == null || dataStr.isEmpty) {
-      return _annoFiscaleCorrente;
-    }
+    if (dataStr == null || dataStr.isEmpty) return _annoFiscaleCorrente;
     final cleanStr = dataStr.trim().toLowerCase();
-    if (cleanStr == 'oggi') {
-      return DateTime.now().year;
-    }
+    if (cleanStr == 'oggi') return DateTime.now().year;
+
     try {
       if (cleanStr.contains('/')) {
         final parts = cleanStr.split('/');
         if (parts.length >= 3) {
           final aStr = parts[2].trim().split(' ').first;
           final a = int.tryParse(aStr);
-          if (a != null) {
-            return a < 100 ? 2000 + a : a;
-          }
+          if (a != null) return a < 100 ? 2000 + a : a;
         }
       }
       if (cleanStr.contains('-')) {
@@ -408,19 +498,16 @@ class WalletProvider with ChangeNotifier {
       final parsed = DateTime.tryParse(cleanStr);
       if (parsed != null) return parsed.year;
     } catch (_) {}
+
     return _annoFiscaleCorrente;
   }
 
-  // 🎯 FATTURE INCASSATE NELL'ANNO SELEZIONATO (PRINCIPIO DI CASSA)
   List<Map<String, dynamic>> get fattureIncassateAnnoCorrente {
     return _fattureIncassate.where((f) {
       final dataIncasso = f['dataIncasso'] as String? ?? '';
       final dataEmissione = f['data'] as String? ?? '';
 
-      // 1. Tenta di estrarre l'anno dalla data d'incasso
       int anno = _estraiAnnoDaData(dataIncasso);
-
-      // 2. Se la data d'incasso è incompleta (es. "06/06"), usa l'anno della data di registrazione
       if (!dataIncasso.contains('/20') && !dataIncasso.contains('-20') && dataEmissione.isNotEmpty) {
         anno = _estraiAnnoDaData(dataEmissione);
       }
@@ -429,7 +516,6 @@ class WalletProvider with ChangeNotifier {
     }).toList();
   }
 
-  // 🎯 FATTURE DA INCASSARE PER L'ANNO SELEZIONATO
   List<Map<String, dynamic>> get fattureDaIncassareAnnoCorrente {
     return _fattureDaIncassare.where((f) {
       final dataStr = f['data'] as String? ?? '';
@@ -438,11 +524,11 @@ class WalletProvider with ChangeNotifier {
   }
 
   double get aliquotaFiscaleReale {
-    final imponibile = coeffRedditivita;                 
-    final saldoInps = imponibile * aliquotaInps;         
-    final saldoImposta = imponibile * aliquotaImposta;   
-    final accontoInps = saldoInps * 0.80;                
-    final accontoImposta = saldoImposta * 1.00;          
+    final imponibile = coeffRedditivita;
+    final saldoInps = imponibile * aliquotaInps;
+    final saldoImposta = imponibile * aliquotaImposta;
+    final accontoInps = saldoInps * 0.80;
+    final accontoImposta = saldoImposta * 1.00;
     return saldoInps + saldoImposta + accontoInps + accontoImposta;
   }
 
@@ -452,14 +538,10 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🎯 METODI DEDICATI PER IL SALVATAGGIO DALL'ONBOARDING WIZARD
   void salvaContiIniziali(List<AccountModel> nuoviConti) {
     _accounts = List.from(nuoviConti);
-
-    // 🛡️ Rimuove eventuali saldi iniziali precedenti per evitare duplicati se l'utente rifà l'onboarding
     _transactions.removeWhere((t) => t.id.contains('_init_'));
 
-    // 🎯 Crea un movimento "Saldo Iniziale" per giustificare i fondi inseriti nell'Onboarding
     for (var acc in _accounts) {
       if (acc.amount > 0) {
         _transactions.insert(
@@ -499,7 +581,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🎯 CALCOLA DINAMICAMENTE L'ACCUMULO E L'UTILIZZO DEL CUSCINETTO MESI OFF
   void _calcolaStatoCuscinetto() {
     if (!isPartitaIVA || _mesiAttiviIncasso == 12) {
       _cuscinettoAccumulato = 0.0;
@@ -507,18 +588,16 @@ class WalletProvider with ChangeNotifier {
       return;
     }
 
-    // 🛡️ AUTO-CORREZIONE: Se la matrice dei mesi non coincide con _mesiAttiviIncasso, la riallinea
     if (_mesiAttiviState.where((m) => m).length != _mesiAttiviIncasso) {
       _mesiAttiviState = List.generate(12, (index) => index < _mesiAttiviIncasso);
     }
 
     final int annoCorrente = DateTime.now().year;
-    final int meseCorrenteIndex = DateTime.now().month - 1; // 0 = Gen, 7 = Ago...
+    final int meseCorrenteIndex = DateTime.now().month - 1;
 
     double totaleAccumulato = 0.0;
     double totaleUtilizzato = 0.0;
 
-    // 1. ACCUMULO REALE: Quota trattenuta dagli incassi P.IVA fino al mese corrente
     for (var tx in _transactions) {
       if (tx.isIncome && tx.date.year == annoCorrente && tx.date.month <= DateTime.now().month) {
         if (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso')) {
@@ -529,7 +608,6 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    // 2. UTILIZZO REALE: Quota erogata nei mesi OFF passati e in quello attuale
     for (int i = 0; i <= meseCorrenteIndex; i++) {
       final bool isMeseLavorativo = _mesiAttiviState[i];
       if (!isMeseLavorativo) {
@@ -542,7 +620,6 @@ class WalletProvider with ChangeNotifier {
     _cuscinettoUtilizzato = totaleUtilizzato;
   }
 
-  // 🔄 AGGIORNA LA MATRICE DEI MESI ATTIVI (DA ONBOARDING O IMPOSTAZIONI)
   void setMesiAttiviState(List<bool> newState) {
     _mesiAttiviState = List.from(newState);
     _mesiAttiviIncasso = newState.where((m) => m).length;
@@ -550,10 +627,6 @@ class WalletProvider with ChangeNotifier {
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
-  
-  // ===========================================================================
-  // 🔮 MOTORE PROIETTIVO: STIME E RICALIBRAZIONE
-  // ===========================================================================
 
   bool _haRispostoRicalibrazione = false;
   bool get haRispostoRicalibrazione => _haRispostoRicalibrazione;
@@ -564,20 +637,17 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Restituisce lo stato del ritmo di fatturato: 'in_linea', 'over', 'under'
   String get statoRitmoFatturato {
     if (!isPartitaIVA || _fatturatoStimatoAnnuo <= 0) return 'in_linea';
 
     final int meseCorrente = DateTime.now().month;
     final int annoReale = DateTime.now().year;
 
-    // 🎯 Calcola il fatturato reale incassato nell'anno solare corrente (indipendente dal filtro P.IVA)
     final double fatturatoRealeAnnoCorrente = _fattureIncassate.where((f) {
       final dataIncasso = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
       return _estraiAnnoDaData(dataIncasso) == annoReale;
     }).fold(0.0, (sum, item) => sum + ((item['importo'] as num?)?.toDouble() ?? 0.0));
 
-    // Calcoliamo quanti mesi lavorativi sono passati fino ad oggi
     int mesiLavorativiPassati = 0;
     for (int i = 0; i < meseCorrente; i++) {
       if (_mesiAttiviState.length > i && _mesiAttiviState[i]) {
@@ -592,41 +662,36 @@ class WalletProvider with ChangeNotifier {
 
     if (targetAdOggi <= 0) return 'in_linea';
 
-    // 🎯 Usa il fatturato reale indipendente (NON fatturatoTotale che cambia con i filtri)
     final double scostamento = (fatturatoRealeAnnoCorrente - targetAdOggi) / targetAdOggi;
 
-    if (scostamento > 0.15) return 'over';   // +15% di deviazione
-    if (scostamento < -0.15) return 'under'; // -15% di deviazione
+    if (scostamento > 0.15) return 'over';
+    if (scostamento < -0.15) return 'under';
     return 'in_linea';
   }
 
-  /// Calcola l'entrata prevista per un MESE FUTURO
   double getEntrataPrevistaMeseFuturo(DateTime meseFuturo) {
     double stimaEntrata = 0.0;
 
-    // 1. Dipendente / Pensione (Gestione precisa 12, 13 o 14 mensilità)
     if (_entrataExtraMensile > 0) {
       bool isDoppiaMensilita = false;
       if (_numeroMensilitaExtra == 13 && meseFuturo.month == 12) {
-        isDoppiaMensilita = true; // 13esima a Dicembre
+        isDoppiaMensilita = true;
       } else if (_numeroMensilitaExtra == 14 && (meseFuturo.month == 6 || meseFuturo.month == 12)) {
-        isDoppiaMensilita = true; // 14esima a Giugno, 13esima a Dicembre
+        isDoppiaMensilita = true;
       }
       stimaEntrata += isDoppiaMensilita ? (_entrataExtraMensile * 2) : _entrataExtraMensile;
     }
 
-    // 2. Stima P.IVA (solo nei Mesi ON di lavoro)
     if (isPartitaIVA) {
       final int indexMeseFuturo = meseFuturo.month - 1;
-      final bool isMeseLavorativo = _mesiAttiviState.length > indexMeseFuturo 
-          ? _mesiAttiviState[indexMeseFuturo] 
+      final bool isMeseLavorativo = _mesiAttiviState.length > indexMeseFuturo
+          ? _mesiAttiviState[indexMeseFuturo]
           : true;
 
       if (isMeseLavorativo) {
-        final int meseCorrente = DateTime.now().month; // Agosto = 8
+        final int meseCorrente = DateTime.now().month;
         int mesiLavorativiRimanenti = 0;
-        
-        // Conta tutti i mesi ON da Settembre (indice 8) a Dicembre (indice 11)
+
         for (int i = meseCorrente; i < 12; i++) {
           if (_mesiAttiviState.length > i && _mesiAttiviState[i]) {
             mesiLavorativiRimanenti++;
@@ -635,8 +700,8 @@ class WalletProvider with ChangeNotifier {
 
         final double fatturatoResiduo = (_fatturatoStimatoAnnuo - fatturatoTotale).clamp(0.0, double.infinity);
 
-        double lordoMensileStima = mesiLavorativiRimanenti > 0 
-            ? (fatturatoResiduo / mesiLavorativiRimanenti) 
+        double lordoMensileStima = mesiLavorativiRimanenti > 0
+            ? (fatturatoResiduo / mesiLavorativiRimanenti)
             : (_fatturatoStimatoAnnuo / (_mesiAttiviIncasso > 0 ? _mesiAttiviIncasso : 12));
 
         final double nettoMensileStima = lordoMensileStima * (1 - aliquotaFiscaleReale);
@@ -650,11 +715,7 @@ class WalletProvider with ChangeNotifier {
 
     return stimaEntrata;
   }
-  // ===========================================================================
 
-/// 📊 MOTORE PROIETTIVO STRATEGICO 12 MESI (CENTRALIZZATO NEL PROVIDER)
-  /// Genera la matrice dei 12 mesi combinando Consolidato Passato (🔒), Mesi OFF (🏖️)
-  /// e Ricalibrazione Adattiva YTG sui Mesi Futuri basata sul SURPLUS.
   List<Map<String, dynamic>> calcolaMatriceProiezioneAnnuale({int? annoSelezionato}) {
     final int anno = annoSelezionato ?? DateTime.now().year;
     final DateTime ora = DateTime.now();
@@ -668,7 +729,6 @@ class WalletProvider with ChangeNotifier {
       'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'
     ];
 
-    // 📊 1. CALCOLO CURVA IBRIDA PONDERATA YTD (ANNO DI RIFERIMENTO STORICO)
     final int annoRiferimentoStorico = anno <= ora.year ? (ora.year - 1) : ora.year;
     final Map<int, double> pesiCurvaIbrida = {};
     double sommaValoriRiferimento = 0.0;
@@ -703,7 +763,6 @@ class WalletProvider with ChangeNotifier {
       sommaValoriRiferimento += valoreMesePiva;
     }
 
-    // 🛡️ DAMPING FACTOR: Smorzamento dinamico in base alla maturità dei dati YTD
     final double alphaDamping = (mesiYtdCompletati >= 3)
         ? 1.0
         : (mesiYtdCompletati == 2 ? 0.6 : (mesiYtdCompletati == 1 ? 0.3 : 0.0));
@@ -731,7 +790,6 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    // 🔒 2. CALCOLO CONSOLIDATO PASSATO DELL'ANNO SELEZIONATO
     double lordoIncassatoRealePassato = 0.0;
     for (int m = 1; m <= 12; m++) {
       final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
@@ -739,7 +797,7 @@ class WalletProvider with ChangeNotifier {
         final lordoFatture = _fattureIncassate.where((f) {
           final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
           return _estraiAnnoDaData(dataStr) == anno &&
-                 (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+              (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
         }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
 
         final lordoTx = _transactions.where((tx) {
@@ -755,14 +813,11 @@ class WalletProvider with ChangeNotifier {
 
     final double lordoResiduoYTG = (_fatturatoStimatoAnnuo - lordoIncassatoRealePassato).clamp(0.0, double.infinity);
 
-    // 3. CALCOLO CUSCINETTO FERIE SUI MESI FUTURI
     double totaleDeficitMesiOffFuturi = 0.0;
     double totaleSurplusMesiOnFuturi = 0.0;
 
     for (int m = 1; m <= 12; m++) {
       final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
-      final Map<int, double> pivaAnnoMap = _pilotaggioFatturatoMesi[anno] ?? {};
-      final Map<int, double> stipAnnoMap = _pilotaggioStipendioMesi[anno] ?? {};
       final bool isMeseOFF = _mesiAttiviState.length >= m ? !_mesiAttiviState[m - 1] : false;
       final bool isManualPiva = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
       final bool isManualStipendio = stipAnnoMap.containsKey(m) && stipAnnoMap[m]! > 0;
@@ -785,22 +840,28 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    _calcolaStatoCuscinetto();
-    final double saldoCuscinettoAttuale = cuscinettoResiduo;
-    final double fabbisognoResiduoCuscinetto = (totaleDeficitMesiOffFuturi - saldoCuscinettoAttuale).clamp(0.0, double.infinity);
+    // 💡 CALCOLO PUNTUALE DEFICIT REALE SOLO SUI MESI OFF FUTURI EFFETTIVI
+    double deficitRealeOffTotale = 0.0;
+    for (int mFilter = 1; mFilter <= 12; mFilter++) {
+      final bool ePassato = (anno < ora.year) || (anno == ora.year && mFilter < ora.month);
+      final bool eOFF = _mesiAttiviState.length >= mFilter ? !_mesiAttiviState[mFilter - 1] : false;
+      if (!ePassato && eOFF) {
+        final bool eStipManual = stipAnnoMap.containsKey(mFilter) && stipAnnoMap[mFilter]! > 0;
+        double stip = eStipManual ? stipAnnoMap[mFilter]! : (_entrataExtraMensile > 0 ? _entrataExtraMensile : 0.0);
+        if (_numeroMensilitaExtra == 13 && mFilter == 12) stip += _entrataExtraMensile;
+        if (_numeroMensilitaExtra == 14 && (mFilter == 6 || mFilter == 12)) stip += _entrataExtraMensile;
+        
+        final double defMese = (_nettoTargetMensile - stip).clamp(0.0, double.infinity);
+        deficitRealeOffTotale += defMese;
+      }
+    }
 
-    final double pesoSurplus = (totaleSurplusMesiOnFuturi > 0 && fabbisognoResiduoCuscinetto > 0)
-        ? (fabbisognoResiduoCuscinetto / totaleSurplusMesiOnFuturi).clamp(0.0, 1.0)
-        : 0.0;
-
-    final double fondoRaccoglibileTotale = saldoCuscinettoAttuale + (totaleSurplusMesiOnFuturi * pesoSurplus);
-    final double copertaCortaRatio = (totaleDeficitMesiOffFuturi > 0)
-        ? (fondoRaccoglibileTotale / totaleDeficitMesiOffFuturi).clamp(0.0, 1.0)
-        : 1.0;
-
+    final double copertaCortaRatio = 1.0;
     final List<Map<String, dynamic>> matrice = [];
 
-    // 4. COMPILAZIONE DELLA MATRICE FINALE 12 MESI
+    // 💡 TRACCIATORE SEQUENZIALE DINAMICO DEL DEFICIT DA COPRIRE
+    double deficitAncoraDaCoprire = deficitRealeOffTotale;
+
     for (int m = 1; m <= 12; m++) {
       final bool isPassato = (anno < ora.year) || (anno == ora.year && m < ora.month);
       final bool isCorrente = (anno == ora.year && m == ora.month);
@@ -808,7 +869,6 @@ class WalletProvider with ChangeNotifier {
       final bool isManualPiva = pivaAnnoMap.containsKey(m) && pivaAnnoMap[m]! > 0;
       final bool isManualStipendio = stipAnnoMap.containsKey(m) && stipAnnoMap[m]! > 0;
 
-      // STIPENDIO / PENSIONE
       double entrataStipendio = 0.0;
       if (isPassato) {
         entrataStipendio = _transactions.where((tx) {
@@ -825,7 +885,6 @@ class WalletProvider with ChangeNotifier {
         if (_numeroMensilitaExtra == 14 && (m == 6 || m == 12)) entrataStipendio += _entrataExtraMensile;
       }
 
-      // FATTURATO P.IVA
       double entrataPivaLorda = 0.0;
       double entrataPivaNetta = 0.0;
 
@@ -833,7 +892,7 @@ class WalletProvider with ChangeNotifier {
         final lordoFatture = _fattureIncassate.where((f) {
           final dataStr = f['dataIncasso'] as String? ?? f['data'] as String? ?? '';
           return _estraiAnnoDaData(dataStr) == anno &&
-                 (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
+              (dataStr.contains('/$m/') || dataStr.contains('-0$m-') || dataStr.contains('-$m-'));
         }).fold(0.0, (sum, f) => sum + ((f['importo'] as num?)?.toDouble() ?? 0.0));
 
         final lordoTx = _transactions.where((tx) {
@@ -856,7 +915,9 @@ class WalletProvider with ChangeNotifier {
 
         if (isCorrente) {
           final double incassatoRealeCorrente = _transactions.where((tx) {
-            return tx.isIncome && tx.date.year == anno && tx.date.month == m &&
+            return tx.isIncome &&
+                tx.date.year == anno &&
+                tx.date.month == m &&
                 (tx.category == 'P.IVA' || tx.title.toLowerCase().contains('incasso'));
           }).fold(0.0, (sum, tx) => sum + tx.amount);
 
@@ -868,7 +929,6 @@ class WalletProvider with ChangeNotifier {
         entrataPivaNetta = entrataPivaLorda * (1 - aliquotaTasse);
       }
 
-      // SPESE
       double speseMese = 0.0;
       if (isPassato) {
         speseMese = _transactions.where((tx) {
@@ -900,7 +960,6 @@ class WalletProvider with ChangeNotifier {
         });
       }
 
-      // CUSCINETTO FERIE
       double quotaCuscinetto = 0.0;
       double erogazioneCuscinetto = 0.0;
 
@@ -910,8 +969,20 @@ class WalletProvider with ChangeNotifier {
           erogazioneCuscinetto = deficitNominale * copertaCortaRatio;
           quotaCuscinetto = erogazioneCuscinetto;
         } else {
-          final double surplusMese = (entrataPivaNetta + entrataStipendio - _nettoTargetMensile).clamp(0.0, double.infinity);
-          quotaCuscinetto = surplusMese * pesoSurplus;
+          final double surplusMeseNetto = (entrataPivaNetta + entrataStipendio - _nettoTargetMensile).clamp(0.0, double.infinity);
+          
+          // 💡 SATURAZIONE PRIORITARIA SEQUENZIALE REALE
+          if (deficitAncoraDaCoprire > 0 && surplusMeseNetto > 0) {
+            if (surplusMeseNetto >= deficitAncoraDaCoprire) {
+              quotaCuscinetto = deficitAncoraDaCoprire;
+              deficitAncoraDaCoprire = 0.0;
+            } else {
+              quotaCuscinetto = surplusMeseNetto;
+              deficitAncoraDaCoprire = (deficitAncoraDaCoprire - surplusMeseNetto).clamp(0.0, double.infinity);
+            }
+          } else {
+            quotaCuscinetto = 0.0;
+          }
         }
       }
 
@@ -978,15 +1049,15 @@ class WalletProvider with ChangeNotifier {
     final imponibileNettoTasse = (imponibileLordo - _contributiInpsPagatiAnnoCorrente).clamp(0.0, double.infinity);
 
     double stimaInpsAnnuo = 0.0;
-    
+
     if (_tipoCassa == 'gestioneSeparata') {
       final aliquotaInpsVal = (_tipoLavoroDipendente != 'nessuno') ? 0.24 : 0.2607;
       stimaInpsAnnuo = imponibileLordo * aliquotaInpsVal;
     } else if (_tipoCassa == 'commercianti' || _tipoCassa == 'artigiani') {
       final isEsenzioneFissi = (_tipoLavoroDipendente == 'fullTime' || _tipoLavoroDipendente == 'partTimeSuperiore50');
-      
+
       if (isEsenzioneFissi) {
-        stimaInpsAnnuo = 0.0; 
+        stimaInpsAnnuo = 0.0;
       } else {
         double fissoBase = 4200.0;
         if (_scontoInps35) fissoBase *= 0.65;
@@ -1002,19 +1073,19 @@ class WalletProvider with ChangeNotifier {
     final nettoRealeAnnuo = fatturato - totaleTasseAnnuo;
     final stipendioMensile12Mesi = (nettoRealeAnnuo / 12) + _entrataExtraMensile;
     final mesiPausa = 12 - mesiAttivi;
-    final quotaMesiZeroMensile = (mesiPausa > 0) 
-        ? (stipendioMensile12Mesi * mesiPausa) / mesiAttivi 
+    final quotaMesiZeroMensile = (mesiPausa > 0)
+        ? (stipendioMensile12Mesi * mesiPausa) / mesiAttivi
         : 0.0;
 
-    final percentualeTrattenutaTasseFattura = fatturato > 0 
-        ? (totaleTasseAnnuo / fatturato) * 100 
+    final percentualeTrattenutaTasseFattura = fatturato > 0
+        ? (totaleTasseAnnuo / fatturato) * 100
         : 0.0;
-    
+
     final percentualeTrattenutaMesiZeroFattura = (fatturato > 0 && mesiPausa > 0)
         ? ((stipendioMensile12Mesi * mesiPausa) / fatturato) * 100
         : 0.0;
 
-    String semaforo = 'VERDE'; 
+    String semaforo = 'VERDE';
     String motivazione = '';
 
     if (stipendioMensile12Mesi >= nettoTargetMese) {
@@ -1055,7 +1126,7 @@ class WalletProvider with ChangeNotifier {
 
   double get fondoTasseDaVersare {
     double fondo = _tasseLordeAccantonate - accontiVersatiAnnoPrecedente;
-    return fondo > 0 ? fondo : 0.0; 
+    return fondo > 0 ? fondo : 0.0;
   }
 
   double get nettoSpendibile => patrimonioNetto - fondoTasseDaVersare;
@@ -1063,31 +1134,18 @@ class WalletProvider with ChangeNotifier {
   String ottieniBussolaSemplificata(TransactionModel tx) {
     final testoCompleto = '${tx.category} ${tx.title} ${tx.subtitle}'.toLowerCase();
 
-    if (tx.category == 'Imposte & F24' || testoCompleto.contains('f24') || testoCompleto.contains('imposte')) {
-      return 'Escluso'; // Categoria Neutra
+    if (tx.category == 'Imposte & F24' || testoCompleto.contains('f24') || testoCompleto.contains('imposte') || tx.category == 'Giroconto') {
+      return 'Escluso';
     }
 
-    if (testoCompleto.contains('20%') ||
-        testoCompleto.contains('risparm') ||
-        testoCompleto.contains('invest')) {
+    if (testoCompleto.contains('20%') || testoCompleto.contains('risparm') || testoCompleto.contains('invest') || testoCompleto.contains('salvadanaio')) {
       return 'Risparmi';
     }
 
-    if (testoCompleto.contains('30%') ||
-        testoCompleto.contains('svag') ||
-        testoCompleto.contains('variabil') ||
-        testoCompleto.contains('ristorant') ||
-        testoCompleto.contains('trattoria') ||
-        testoCompleto.contains('pizzeria') ||
-        testoCompleto.contains('pub') ||
-        testoCompleto.contains('bar') ||
-        testoCompleto.contains('divertiment') ||
-        testoCompleto.contains('acquisti') ||
-        testoCompleto.contains('viaggi')) {
-      return 'Svago';
-    }
+    final String padre = ottieniCategoriaPadre(tx.category, isIncome: tx.isIncome);
+    final matchMacro = macroCategoriePadre.firstWhere((m) => m['padre'] == padre, orElse: () => {'bussola': 'Bisogni'});
 
-    return 'Bisogni';
+    return matchMacro['bussola'] ?? 'Bisogni';
   }
 
   double getSpesoBussola(String targetBussola) {
@@ -1105,8 +1163,7 @@ class WalletProvider with ChangeNotifier {
   double get spesoRisparmi => getSpesoBussola('Risparmi');
 
   double _fatturatoTotale = 0.00;
-  
-  // 🎯 Calcola dinamicamente il Fatturato Incassato in base all'Anno Fiscale selezionato
+
   double get fatturatoTotale {
     return fattureIncassateAnnoCorrente.fold(
       0.0,
@@ -1128,7 +1185,6 @@ class WalletProvider with ChangeNotifier {
   List<TransactionModel> _transactions = [];
   List<TransactionModel> get transactions => List.unmodifiable(_transactions);
 
-  // ⚙️ PERCENTUALI BUSSOLA BUDGET PERSONALIZZATE
   double _percentBisogni = 50.0;
   double _percentSvago = 30.0;
   double _percentRisparmio = 20.0;
@@ -1137,11 +1193,9 @@ class WalletProvider with ChangeNotifier {
   double get percentSvago => _percentSvago;
   double get percentRisparmio => _percentRisparmio;
 
-  // 📊 PILOTAGGIO FATTURATO P.IVA & STIPENDIO (MAPPA PER ANNO -> MESE -> IMPORTO)
   Map<int, Map<int, double>> _pilotaggioFatturatoMesi = {};
   Map<int, Map<int, double>> _pilotaggioStipendioMesi = {};
 
-  // 🧹 AZZERAMENTO OVERRIDE SELETTIVO PER SINGOLO ANNO
   void resetPilotaggioAnno(int anno) {
     _pilotaggioFatturatoMesi.remove(anno);
     _pilotaggioStipendioMesi.remove(anno);
@@ -1180,10 +1234,8 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔒 Lista Reale per utenti PRO (Inizia VUOTA)
   List<Map<String, dynamic>> _vociPianificateReali = [];
 
-  // 🎨 Lista Demo per la modalità Anteprima FREE
   final List<Map<String, dynamic>> _vociPianificateDemo = [
     {'id': '1', 'nome': 'Affitto / Mutuo', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Casa/Affitto', 'previsto': 650.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
     {'id': '2', 'nome': 'Bollette & Utenze', 'categoria': 'Bisogni (50%)', 'sottocategoria': 'Canoni/Bollette', 'previsto': 140.00, 'tipo': 'mensile', 'frequenzaMensile': 'tutti'},
@@ -1202,14 +1254,12 @@ class WalletProvider with ChangeNotifier {
     final List<Map<String, dynamic>> result = [];
     final Set<String> rootIdsProcessati = {};
 
-    // 1. Controlliamo le voci salvate in Pianificazione (2.4)
     for (var v in _vociPianificateReali) {
       if (v['isArchived'] == true) continue;
       final rootId = RecurrenceManager.getRootId((v['id'] ?? '').toString());
 
       if (rootIdsProcessati.contains(rootId)) continue;
 
-      // Interroghiamo il Manager per sapere se la regola è ancora viva
       if (RecurrenceManager.isRicorrenzaAttiva(
           elementId: rootId,
           transactions: _transactions,
@@ -1221,7 +1271,6 @@ class WalletProvider with ChangeNotifier {
       }
     }
 
-    // 2. Controlliamo le ricorrenze create dal Wallet (2.1)
     final txsRicorrenti = _transactions.where((tx) =>
         tx.isRecurrent && !tx.isArchived && !tx.id.startsWith('rec_real_') && !tx.id.startsWith('prev_'));
 
@@ -1229,7 +1278,6 @@ class WalletProvider with ChangeNotifier {
       final rootId = RecurrenceManager.getRootId(tx.id);
       if (rootIdsProcessati.contains(rootId)) continue;
 
-      // Interroghiamo di nuovo il Manager
       if (RecurrenceManager.isRicorrenzaAttiva(
           elementId: rootId,
           transactions: _transactions,
@@ -1259,7 +1307,6 @@ class WalletProvider with ChangeNotifier {
     return List.unmodifiable(result);
   }
 
-  // 🎯 GETTER PER LE RICORRENZE ARCHIVIATE (CESTINO / DISATTIVATE)
   List<Map<String, dynamic>> get vociArchiviate {
     final List<Map<String, dynamic>> archiviate = [];
 
@@ -1289,14 +1336,12 @@ class WalletProvider with ChangeNotifier {
   }
 
   void aggiungiSpesaPianificata(Map<String, dynamic> voce) {
-    // 1. Estrae o crea il rootId univoco
     final String rootId = (voce['id'] != null && voce['id'].toString().isNotEmpty)
         ? RecurrenceManager.getRootId(voce['id'].toString())
         : DateTime.now().millisecondsSinceEpoch.toString();
 
     final vocePulita = {...voce, 'id': rootId};
 
-    // 2. Aggiorna o inserisce la voce in 2.4
     final pIdx = _vociPianificateReali.indexWhere((v) =>
         RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
     if (pIdx != -1) {
@@ -1305,7 +1350,6 @@ class WalletProvider with ChangeNotifier {
       _vociPianificateReali.add(vocePulita);
     }
 
-    // 3. Sincronizza creando la "Regola Madre" nel Wallet (2.1)
     final txIdx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId);
     if (txIdx == -1) {
       final DateTime dataUso = voce['dataInizio'] != null
@@ -1342,10 +1386,7 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void rimuoviSpesaPianificata(String id) {
-    // Ora usa il metodo centralizzato che stornare i soldi e aggiorna anche 2.1!
-    deleteTransaction(id); 
-  }
+  void rimuoviSpesaPianificata(String id) => deleteTransaction(id);
 
   void azzeraPianificazioneSpese() {
     _vociPianificateReali.clear();
@@ -1433,19 +1474,6 @@ class WalletProvider with ChangeNotifier {
     _caricaDatiDaLocalStorage();
   }
 
-  int _stringToWeekday(String day) {
-    switch (day) {
-      case 'Lunedì': return 1;
-      case 'Martedì': return 2;
-      case 'Mercoledì': return 3;
-      case 'Giovedì': return 4;
-      case 'Venerdì': return 5;
-      case 'Sabato': return 6;
-      case 'Domenica': return 7;
-      default: return 1;
-    }
-  }
-
   bool _superaDataFine(DateTime dataVirtuale, DateTime? dataFine) {
     if (dataFine == null) return false;
     final dVirtuale = DateTime(dataVirtuale.year, dataVirtuale.month, dataVirtuale.day);
@@ -1453,10 +1481,9 @@ class WalletProvider with ChangeNotifier {
     return dVirtuale.isAfter(dFine);
   }
 
- List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
+  List<TransactionModel> getMovimentiPrevisti(DateTime meseRiferimento) {
     final previsti = <TransactionModel>[];
 
-    // Mantiene una sola regola master per serie
     final Map<String, TransactionModel> masterMap = {};
     for (var tx in _transactions.where((t) => t.isRecurrent && !t.isArchived)) {
       if (tx.id.startsWith('rec_real_') || tx.id.startsWith('prev_')) continue;
@@ -1490,7 +1517,6 @@ class WalletProvider with ChangeNotifier {
 
           DateTime dataVirtuale = DateTime(meseRiferimento.year, meseRiferimento.month, giornoEffettivo);
 
-          // 🛡️ CONTROLLO RIGIDO SCADENZA: Esclude la rata se il mese supera la data di fine
           if (tx.dataFineRicorrenza != null) {
             final DateTime inizioMeseRiferimento = DateTime(meseRiferimento.year, meseRiferimento.month, 1);
             final DateTime inizioMeseFine = DateTime(tx.dataFineRicorrenza!.year, tx.dataFineRicorrenza!.month, 1);
@@ -1532,7 +1558,6 @@ class WalletProvider with ChangeNotifier {
     return previsti;
   }
 
-  // ⚡ CONVERTE AUTOMATICAMENTE LE RATE SCADUTE O ODIERNE IN MOVIMENTI REALI
   void sincronizzaRicorrenzeScadute() {
     final ora = DateTime.now();
     final oggi = DateTime(ora.year, ora.month, ora.day);
@@ -1616,12 +1641,12 @@ class WalletProvider with ChangeNotifier {
   void deleteAccount(String accountId) {
     final target = _accounts.firstWhere((a) => a.id == accountId, orElse: () => _accounts.first);
 
-    final bool isProtetto = target.role == AccountRole.principal || 
-                            target.role == AccountRole.taxReserve ||
-                            target.id == 'main_account' ||
-                            target.id == 'tax_account' ||
-                            target.id == '1' || 
-                            target.id == '3';
+    final bool isProtetto = target.role == AccountRole.principal ||
+        target.role == AccountRole.taxReserve ||
+        target.id == 'main_account' ||
+        target.id == 'tax_account' ||
+        target.id == '1' ||
+        target.id == '3';
 
     if (isProtetto) {
       throw Exception('"${target.title}" è un conto di sistema protetto e non può essere eliminato.');
@@ -1727,8 +1752,7 @@ class WalletProvider with ChangeNotifier {
             giornoRicorrenza: tx.giornoRicorrenza,
           );
         }
-      } 
-      else if (tx.accountId == targetAccountId) {
+      } else if (tx.accountId == targetAccountId) {
         _transactions[i] = TransactionModel(
           id: tx.id,
           title: '${tx.title} [Ex ${target.title}]',
@@ -1759,7 +1783,7 @@ class WalletProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   Future<void> _caricaDatiDaLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1883,24 +1907,27 @@ class WalletProvider with ChangeNotifier {
 
       _aggiornaTasseVirtuali();
       _calcolaStatoCuscinetto();
-      sincronizzaRicorrenzeScadute(); // 👈 Converti le rate scadute in reali
+      sincronizzaRicorrenzeScadute();
+      _isInitialized = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Errore durante la lettura: $e');
+      _isInitialized = true;
+      notifyListeners();
     }
   }
 
   Future<void> _salvaDatiInLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       await prefs.setString('userTier', _userTier.name);
       await prefs.setBool('isPartitaIVA', isPartitaIVA);
       await prefs.setDouble('coeffRedditivita', coeffRedditivita);
       await prefs.setDouble('aliquotaImposta', aliquotaImposta);
       await prefs.setDouble('aliquotaInps', aliquotaInps);
       await prefs.setDouble('accontiVersatiAnnoPrecedente', accontiVersatiAnnoPrecedente);
-      
+
       await prefs.setDouble('textScaleFactor', _textScaleFactor);
       await prefs.setBool('haRispostoRicalibrazione', _haRispostoRicalibrazione);
 
@@ -1934,18 +1961,24 @@ class WalletProvider with ChangeNotifier {
       await prefs.setDouble('percentBisogni', _percentBisogni);
       await prefs.setDouble('percentSvago', _percentSvago);
       await prefs.setDouble('percentRisparmio', _percentRisparmio);
-      await prefs.setString('pilotaggioFatturatoMesi', jsonEncode(
-        _pilotaggioFatturatoMesi.map((annoKey, mesiMap) => MapEntry(
-          annoKey.toString(),
-          mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
-        )),
-      ));
-      await prefs.setString('pilotaggioStipendioMesi', jsonEncode(
-        _pilotaggioStipendioMesi.map((annoKey, mesiMap) => MapEntry(
-          annoKey.toString(),
-          mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
-        )),
-      ));
+      await prefs.setString(
+        'pilotaggioFatturatoMesi',
+        jsonEncode(
+          _pilotaggioFatturatoMesi.map((annoKey, mesiMap) => MapEntry(
+                annoKey.toString(),
+                mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
+              )),
+        ),
+      );
+      await prefs.setString(
+        'pilotaggioStipendioMesi',
+        jsonEncode(
+          _pilotaggioStipendioMesi.map((annoKey, mesiMap) => MapEntry(
+                annoKey.toString(),
+                mesiMap.map((mKey, val) => MapEntry(mKey.toString(), val)),
+              )),
+        ),
+      );
 
       await _salvaDatiSuCloud();
     } catch (e) {
@@ -1968,7 +2001,7 @@ class WalletProvider with ChangeNotifier {
         'fatturatoStimatoAnnuo': _fatturatoStimatoAnnuo,
         'mesiAttiviIncasso': _mesiAttiviIncasso,
         'annoAperturaPiva': _annoAperturaPiva,
-        'meseAperturaPiva': _meseAperturaPiva,        
+        'meseAperturaPiva': _meseAperturaPiva,
         'entrataExtraMensile': _entrataExtraMensile,
         'numeroMensilitaExtra': _numeroMensilitaExtra,
         'hasDipendente': _hasDipendente,
@@ -1993,7 +2026,6 @@ class WalletProvider with ChangeNotifier {
     );
   }
 
-  // 🎯 Calcola le tasse dovute ESCLUSIVAMENTE per l'anno solare corrente (2026)
   double get totaleTasseDovuteAnnoCorrenteReale {
     final int annoReale = DateTime.now().year;
     return _fattureIncassate.where((f) {
@@ -2035,9 +2067,9 @@ class WalletProvider with ChangeNotifier {
     required String category,
     String? accountId,
     DateTime? date,
-    bool isRecurrent = false, 
-    String? frequenza,         
-    String? giornoRicorrenza, 
+    bool isRecurrent = false,
+    String? frequenza,
+    String? giornoRicorrenza,
     DateTime? dataInizio,
     DateTime? dataFineRicorrenza,
     String? customId,
@@ -2075,7 +2107,7 @@ class WalletProvider with ChangeNotifier {
 
     _aggiornaTasseVirtuali();
     _calcolaStatoCuscinetto();
-    sincronizzaRicorrenzeScadute(); // 👈 Converti subito se la data inserita è odierna o passata
+    sincronizzaRicorrenzeScadute();
     _salvaDatiInLocalStorage();
     notifyListeners();
   }
@@ -2133,8 +2165,7 @@ class WalletProvider with ChangeNotifier {
     final String dataFinale = (dataIncasso == null || dataIncasso.toLowerCase() == 'oggi' || dataIncasso.isEmpty)
         ? dataOggiFormattata
         : dataIncasso;
-        
-    // 🎯 Converte qualsiasi formato di data d'incasso in DateTime reale per lo storico Wallet
+
     DateTime dataObj = DateTime.now();
     try {
       final strPulita = dataFinale.trim().split(' ').first;
@@ -2222,7 +2253,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 📦 ARCHIVIA (DISATTIVA SULL'ARCHIVIO SENZA CANCELLARE LO STORICO PASSATO)
   void archiviaRicorrenza(String id) {
     final rootId = RecurrenceManager.getRootId(id);
 
@@ -2243,7 +2273,7 @@ class WalletProvider with ChangeNotifier {
         giornoRicorrenza: tx.giornoRicorrenza,
         dataInizio: tx.dataInizio,
         dataFineRicorrenza: tx.dataFineRicorrenza,
-        isArchived: true, // 👈 Contrassegnato come archiviato
+        isArchived: true,
       );
     }
 
@@ -2256,7 +2286,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔄 RIPRISTINA DALL'ARCHIVIO
   void ripristinaRicorrenzaArchiviata(String id, {double? nuovoImporto, DateTime? nuovaDataInizio, DateTime? nuovaDataFine}) {
     final rootId = RecurrenceManager.getRootId(id);
 
@@ -2277,7 +2306,7 @@ class WalletProvider with ChangeNotifier {
         giornoRicorrenza: tx.giornoRicorrenza,
         dataInizio: nuovaDataInizio ?? tx.dataInizio,
         dataFineRicorrenza: nuovaDataFine,
-        isArchived: false, // 👈 Riattivato
+        isArchived: false,
       );
     }
 
@@ -2293,27 +2322,22 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 🗑️ ELIMINA LA REGOLA DALL'ARCHIVIO CONSERVANDO I MOVIMENTI NEI MESI
   void eliminaRegolaRicorrenteDefinitivamente(String id) {
     final String rootId = RecurrenceManager.getRootId(id);
 
-    // 1. Rimuove la regola pianificata da 2.4 (sparisce dall'Archivio)
     _vociPianificateReali.removeWhere((v) =>
         RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
 
-    // 2. Converte tutti i movimenti passati in transazioni singole slegate
     for (int i = 0; i < _transactions.length; i++) {
       if (RecurrenceManager.getRootId(_transactions[i].id) == rootId) {
         final tx = _transactions[i];
 
-        // Se è solo un segnaposto/template fittizio (rule_...), lo eliminiamo
         if (tx.id.startsWith('rule_')) {
           _transactions.removeAt(i);
           i--;
           continue;
         }
 
-        // Se è un movimento reale (rec_real_... o la prima rata), lo convertiamo in transazione normale
         _transactions[i] = TransactionModel(
           id: tx.id,
           title: tx.title,
@@ -2323,7 +2347,7 @@ class WalletProvider with ChangeNotifier {
           category: tx.category,
           date: tx.date,
           accountId: tx.accountId,
-          isRecurrent: false, // 👈 Impostato a false per non farlo cancellare come regola
+          isRecurrent: false,
           frequenza: null,
           giornoRicorrenza: null,
           dataInizio: null,
@@ -2339,41 +2363,35 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 💥 ELIMINAZIONE TRANSAZIONE O REGOLE RICORRENTI
   void deleteTransaction(String id) {
     final String rootId = RecurrenceManager.getRootId(id);
 
-    // 1. Se è una singola rata specifica (reale o prevista)
     if (id.startsWith('rec_real_') || id.startsWith('prev_')) {
       final parts = id.split('_');
       if (parts.length >= 4) {
         final month = parts.last;
         final year = parts[parts.length - 2];
-        
+
         final keySkip = '${rootId}_${year}_${month}';
         if (!_skippedPredictions.contains(keySkip)) {
           _skippedPredictions.add(keySkip);
         }
       }
-      
+
       final idx = _transactions.indexWhere((t) => t.id == id);
       if (idx != -1) {
         _stornaSaldoConto(_transactions[idx]);
         _transactions.removeAt(idx);
       }
     } else {
-      // 2. Controllo se è una transazione singola non ricorrente
       final txSingolaIdx = _transactions.indexWhere((t) => t.id == id && !t.isRecurrent);
 
       if (txSingolaIdx != -1) {
-        // Singolo movimento autonomo: storno il saldo e rimuovo
         _stornaSaldoConto(_transactions[txSingolaIdx]);
         _transactions.removeAt(txSingolaIdx);
       } else {
-        // Intera serie ricorrente: Rimuovo sia la pianificazione che TUTTE le transazioni della serie
         _vociPianificateReali.removeWhere((v) =>
-          RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId
-        );
+            RecurrenceManager.getRootId((v['id'] ?? '').toString()) == rootId);
 
         for (int i = _transactions.length - 1; i >= 0; i--) {
           final tx = _transactions[i];
@@ -2393,7 +2411,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 1️⃣ ELIMINA SOLO QUESTO MESE
   void eliminaSoloQuestoMese(String id, DateTime dataRata) {
     final String rootId = RecurrenceManager.getRootId(id);
     final String keySkip = '${rootId}_${dataRata.year}_${dataRata.month}';
@@ -2437,7 +2454,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 2️⃣ ELIMINA QUESTO E I FUTURI
   void eliminaQuestoEFuturi(String id, DateTime dataRata) {
     final String rootId = RecurrenceManager.getRootId(id);
 
@@ -2478,7 +2494,6 @@ class WalletProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // 3️⃣ ELIMINA L'INTERA SERIE
   void eliminaInteraSerie(String id) {
     deleteTransaction(RecurrenceManager.getRootId(id));
   }
@@ -2535,8 +2550,8 @@ class WalletProvider with ChangeNotifier {
   void stopRecurrenceFromDate(String id, DateTime limiteData) {
     final rootId = RecurrenceManager.getRootId(id);
 
-    final DateTime dataFine = limiteData.day > 1 
-        ? limiteData 
+    final DateTime dataFine = limiteData.day > 1
+        ? limiteData
         : DateTime(limiteData.year, limiteData.month + 1, 0, 23, 59, 59);
 
     final idx = _transactions.indexWhere((t) => RecurrenceManager.getRootId(t.id) == rootId && !t.id.startsWith('rec_real_'));
@@ -2663,12 +2678,33 @@ class WalletProvider with ChangeNotifier {
     await prefs.clear();
 
     _accounts = [
-      AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-      AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
-      AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+      AccountModel(
+        id: 'main_account',
+        title: 'Conto Principale (IBAN)',
+        subtitle: 'Conto Operativo',
+        amount: 0.00,
+        color: const Color(0xFF2DD4BF),
+        role: AccountRole.principal,
+      ),
+      AccountModel(
+        id: 'tax_account',
+        title: 'Salvadanaio Tasse',
+        subtitle: 'Obiettivo Riserva',
+        amount: 0.00,
+        color: const Color(0xFF3B82F6),
+        role: AccountRole.taxReserve,
+      ),
+      AccountModel(
+        id: 'savings_account',
+        title: 'Fondo Risparmio',
+        subtitle: 'Riserva Liquidità',
+        amount: 0.00,
+        color: const Color(0xFFF59E0B),
+        role: AccountRole.standard,
+      ),
     ];
 
-    isPartitaIVA = true; 
+    isPartitaIVA = true;
     _fatturatoTotale = 0.00;
     _transactions.clear();
     _fattureDaIncassare.clear();
@@ -2717,12 +2753,12 @@ class WalletProvider with ChangeNotifier {
 
   void reorderAccounts(int oldIndex, int newIndex) {
     if (oldIndex < newIndex) {
-      newIndex -= 1; 
+      newIndex -= 1;
     }
     final AccountModel item = _accounts.removeAt(oldIndex);
     _accounts.insert(newIndex, item);
 
-    _salvaDatiInLocalStorage(); 
+    _salvaDatiInLocalStorage();
     notifyListeners();
   }
 
@@ -2736,8 +2772,6 @@ class WalletProvider with ChangeNotifier {
 
     targetAccount.amount -= importoF24;
 
-    // Quando pago un F24 per un anno specifico, aumento l'acconto versato.
-    // L'app lo decurterà automaticamente dal carico fiscale totale dovuto per quell'anno.
     if (annoRiferimentoTasse == _annoFiscaleCorrente - 1) {
       accontiVersatiAnnoPrecedente += importoF24;
       _accontiVersati += importoF24;
@@ -2749,11 +2783,11 @@ class WalletProvider with ChangeNotifier {
       subtitle: 'Liquidazione / Acconti Tasse',
       amount: importoF24,
       isIncome: false,
-      category: 'Imposte & F24', 
+      category: 'Imposte & F24',
       date: data,
       accountId: targetAccount.id,
     );
-    
+
     _transactions.insert(0, newTx);
 
     _aggiornaTasseVirtuali();
@@ -2877,9 +2911,30 @@ class WalletProvider with ChangeNotifier {
 
   Future<void> resetSoloMovimentieFatture() async {
     _accounts = [
-      AccountModel(id: 'main_account', title: 'Conto Principale (IBAN)', subtitle: 'Conto Operativo', amount: 0.00, color: const Color(0xFF2DD4BF), role: AccountRole.principal),
-      AccountModel(id: 'tax_account', title: 'Salvadanaio Tasse', subtitle: 'Obiettivo Riserva', amount: 0.00, color: const Color(0xFF3B82F6), role: AccountRole.taxReserve),
-      AccountModel(id: 'savings_account', title: 'Fondo Risparmio', subtitle: 'Riserva Liquidità', amount: 0.00, color: const Color(0xFFF59E0B), role: AccountRole.standard),
+      AccountModel(
+        id: 'main_account',
+        title: 'Conto Principale (IBAN)',
+        subtitle: 'Conto Operativo',
+        amount: 0.00,
+        color: const Color(0xFF2DD4BF),
+        role: AccountRole.principal,
+      ),
+      AccountModel(
+        id: 'tax_account',
+        title: 'Salvadanaio Tasse',
+        subtitle: 'Obiettivo Riserva',
+        amount: 0.00,
+        color: const Color(0xFF3B82F6),
+        role: AccountRole.taxReserve,
+      ),
+      AccountModel(
+        id: 'savings_account',
+        title: 'Fondo Risparmio',
+        subtitle: 'Riserva Liquidità',
+        amount: 0.00,
+        color: const Color(0xFFF59E0B),
+        role: AccountRole.standard,
+      ),
     ];
 
     _fatturatoTotale = 0.00;
